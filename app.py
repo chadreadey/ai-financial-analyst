@@ -29,6 +29,7 @@ def _env_flag(name: str, default: bool) -> bool:
 def _set_runtime_env(
     provider: str,
     model: str,
+    openai_user_key: str,
     enable_yahoo: bool,
     enable_tavily: bool,
     max_agent_context_chars: int,
@@ -40,6 +41,12 @@ def _set_runtime_env(
     os.environ["LLM_PROVIDER"] = provider
     if model.strip():
         os.environ["OPENAI_MODEL"] = model.strip()
+    if provider == "openai":
+        if openai_user_key.strip():
+            os.environ["OPENAI_API_KEY"] = openai_user_key.strip()
+        elif not os.getenv("OPENAI_API_KEY") and os.getenv("OPENAI_CBS_API_KEY"):
+            # Fallback to deployment default if user didn't provide a key.
+            os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_CBS_API_KEY", "")
     os.environ["ENABLE_YAHOO"] = "true" if enable_yahoo else "false"
     os.environ["ENABLE_TAVILY"] = "true" if enable_tavily else "false"
     os.environ["MAX_AGENT_CONTEXT_CHARS"] = str(max_agent_context_chars)
@@ -47,6 +54,31 @@ def _set_runtime_env(
     os.environ["SYNTHESIS_REPORT_MAX_CHARS"] = str(synthesis_report_max_chars)
     os.environ["SYNTHESIS_INPUT_MAX_CHARS"] = str(synthesis_input_max_chars)
     os.environ["MAX_SYNTHESIS_OUTPUT_TOKENS"] = str(max_synthesis_output_tokens)
+
+
+def _bootstrap_env_from_streamlit_secrets() -> None:
+    """
+    Copy selected Streamlit secrets into environment variables if missing.
+    Useful for Streamlit Community Cloud deployments.
+    """
+    try:
+        secret_keys = [
+            "ANTHROPIC_API_KEY",
+            "OPENAI_API_KEY",
+            "OPENAI_CBS_API_KEY",
+            "OPENAI_BASE_URL",
+            "TAVILY_API_KEY",
+        ]
+        for key in secret_keys:
+            if not os.getenv(key) and key in st.secrets:
+                val = str(st.secrets[key]).strip()
+                if val:
+                    os.environ[key] = val
+        if not os.getenv("OPENAI_API_KEY") and os.getenv("OPENAI_CBS_API_KEY"):
+            os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_CBS_API_KEY", "")
+    except Exception:
+        # Ignore secret bootstrap errors in local/dev runs.
+        pass
 
 
 def _run_analysis_sync(ticker: str, user_agent: str, provider: str, model: str, progress) -> dict:
@@ -161,6 +193,7 @@ def _render_cached_report(path: Path) -> None:
 
 def main() -> None:
     st.set_page_config(page_title="AI Financial Analyst", layout="wide")
+    _bootstrap_env_from_streamlit_secrets()
     st.title("AI Financial Analyst")
     st.caption("Five-agent equity research with provider selection and context budgets.")
 
@@ -175,6 +208,14 @@ def main() -> None:
             "claude-sonnet-4-20250514" if provider == "anthropic" else "gpt-4o-mini"
         )
         model = st.text_input("Model (optional override)", value=os.getenv("OPENAI_MODEL", default_model))
+        openai_user_key = st.text_input(
+            "Your OpenAI API key (optional override)",
+            type="password",
+            help=(
+                "If blank, the app uses the deployment default OpenAI key "
+                "(e.g., CBS key from secrets)."
+            ),
+        )
         user_agent = st.text_input(
             "SEC User-Agent",
             value=os.getenv("SEC_USER_AGENT", "AIFinancialAnalyst admin@example.com"),
@@ -232,6 +273,7 @@ def main() -> None:
         _set_runtime_env(
             provider=provider,
             model=model,
+            openai_user_key=openai_user_key,
             enable_yahoo=enable_yahoo,
             enable_tavily=enable_tavily,
             max_agent_context_chars=int(max_agent_context_chars),
@@ -240,6 +282,11 @@ def main() -> None:
             synthesis_input_max_chars=int(synthesis_input_max_chars),
             max_synthesis_output_tokens=int(max_synthesis_output_tokens),
         )
+
+        if provider == "openai" and not os.getenv("OPENAI_API_KEY"):
+            st.error("OpenAI provider selected but no API key is available.")
+            st.info("Enter your key in the sidebar or configure OPENAI_CBS_API_KEY in deployment secrets.")
+            return
 
         progress = st.status("Running analysis...", expanded=True)
         try:

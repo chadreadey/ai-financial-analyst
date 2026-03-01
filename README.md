@@ -53,6 +53,9 @@ ai-financial-analyst/
 ├── prompt_loader.py       # Markdown prompt loader + token rendering
 ├── market_enrichment.py   # Optional Yahoo + Tavily enrichment context
 ├── requirements.txt       # Dependencies
+├── .streamlit/
+│   ├── config.toml
+│   └── secrets.toml.example
 ├── prompts/
 │   ├── dcf.md
 │   ├── risk.md
@@ -146,6 +149,18 @@ python -m streamlit run app.py
 ```
 
 The UI exposes provider selection, enrichment toggles, budget guardrails, PDF download, and a cached report viewer so you can toggle between historical runs.
+For OpenAI runs, users can enter their own API key in the sidebar; if left blank, the app falls back to `OPENAI_CBS_API_KEY` (deployment default) when configured.
+
+### Deploy on Streamlit Community Cloud
+
+1. Push this repository to GitHub.
+2. In Streamlit Community Cloud, create a new app and set entrypoint to `app.py`.
+3. Add secrets in app settings (use `.streamlit/secrets.toml.example` as template):
+   - `OPENAI_CBS_API_KEY` (default OpenAI key fallback)
+   - `OPENAI_BASE_URL` (if using CBS endpoint)
+   - `ANTHROPIC_API_KEY` and/or `OPENAI_API_KEY` as needed
+   - `TAVILY_API_KEY` (optional)
+4. Deploy and test with both provider modes.
 
 ### Analyze a stock
 
