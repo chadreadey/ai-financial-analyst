@@ -66,7 +66,7 @@ ai-financial-analyst/
 ### Requirements
 
 - Python 3.9+
-- An [Anthropic API key](https://console.anthropic.com/)
+- An [Anthropic API key](https://console.anthropic.com/) or OpenAI-compatible API key
 
 ### Install
 
@@ -76,13 +76,22 @@ cd ai-financial-analyst
 pip install -r requirements.txt
 ```
 
-### Set your API key
+### Configure provider and API keys
 
 ```bash
-export ANTHROPIC_API_KEY="your-key-here"
+cp .env.example .env
 ```
 
-No other configuration needed. The SEC EDGAR API is free and requires no key.
+Then edit `.env`:
+
+```env
+LLM_PROVIDER=anthropic
+ANTHROPIC_API_KEY=your-anthropic-key
+OPENAI_API_KEY=your-openai-key
+# OPENAI_BASE_URL=https://api.openai.com/v1
+```
+
+No other SEC configuration needed. The SEC EDGAR API is free and requires no key.
 
 ## Usage
 
@@ -116,7 +125,7 @@ python main.py AAPL --user-agent "YourName your@email.com"
 
 ## Tech Stack
 
-- **LLM**: Anthropic Claude via the Python SDK (no LangChain — orchestration is ~30 lines of async Python)
+- **LLM**: Provider-selectable Anthropic Claude or OpenAI-compatible APIs
 - **Data**: SEC EDGAR API (filings + XBRL structured financials)
 - **Orchestration**: Python `asyncio.gather()` for parallel agent execution
 - **Caching**: SQLite for SEC data (avoids redundant API calls across runs)

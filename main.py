@@ -10,13 +10,17 @@ Usage:
 
 import argparse
 import asyncio
+import os
 import sys
+
+from dotenv import load_dotenv
 
 from orchestrator import Orchestrator
 from report import format_report, save_report
 from sec.client import SECClient
 from sec.cache import SECCache
 
+load_dotenv()
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -44,6 +48,19 @@ def parse_args() -> argparse.Namespace:
         default="AIFinancialAnalyst admin@example.com",
         help="User-Agent string for SEC API requests",
     )
+    parser.add_argument(
+        "--provider",
+        type=str,
+        choices=["anthropic", "openai"],
+        default=None,
+        help="LLM provider override (default: uses LLM_PROVIDER env var, fallback anthropic)",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Model override (default: provider-specific default model)",
+    )
     return parser.parse_args()
 
 
@@ -61,7 +78,12 @@ async def main() -> None:
     sec_client = SECClient(user_agent=args.user_agent, cache=cache)
 
     # Run the orchestrator
-    orchestrator = Orchestrator(sec_client=sec_client)
+    provider_name = args.provider or os.getenv("LLM_PROVIDER")
+    orchestrator = Orchestrator(
+        sec_client=sec_client,
+        llm_provider_name=provider_name,
+        model=args.model,
+    )
 
     try:
         result = await orchestrator.run(ticker)

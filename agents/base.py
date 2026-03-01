@@ -7,12 +7,12 @@ Each agent is defined by:
   - An async analyze() method that calls Claude
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
-import anthropic
+from llm import LLMProvider, get_provider
 
 
-DEFAULT_MODEL = "claude-sonnet-4-20250514"
+DEFAULT_MODEL = None
 DEFAULT_MAX_TOKENS = 4096
 
 
@@ -32,12 +32,13 @@ class BaseAgent:
 
     def __init__(
         self,
-        model: str = DEFAULT_MODEL,
+        provider: Optional[LLMProvider] = None,
+        model: Optional[str] = DEFAULT_MODEL,
         max_tokens: int = DEFAULT_MAX_TOKENS,
     ):
-        self.model = model
+        self.provider = provider or get_provider()
+        self.model = model or self.provider.default_model
         self.max_tokens = max_tokens
-        self._client = anthropic.AsyncAnthropic()
 
     def build_context(self, data: Dict[str, Any]) -> str:
         """
@@ -73,19 +74,12 @@ class BaseAgent:
         """
         context = self.build_context(data)
 
-        message = await self._client.messages.create(
+        return await self.provider.generate(
+            system=self.system_prompt,
+            user=(
+                "Analyze the following company based on the SEC data provided. "
+                f"Provide your professional analysis.\n\n{context}"
+            ),
             model=self.model,
             max_tokens=self.max_tokens,
-            system=self.system_prompt,
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        f"Analyze the following company based on the SEC data provided. "
-                        f"Provide your professional analysis.\n\n{context}"
-                    ),
-                }
-            ],
         )
-
-        return message.content[0].text

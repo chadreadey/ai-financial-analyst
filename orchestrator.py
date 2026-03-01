@@ -9,8 +9,6 @@ Phase 2: Feed all agent outputs to a 6th synthesis agent that
 import asyncio
 from typing import Any, Dict, List, Optional, Tuple
 
-import anthropic
-
 from agents import (
     DCFAgent,
     RiskAgent,
@@ -18,11 +16,11 @@ from agents import (
     CompetitiveAgent,
     PatternAgent,
 )
+from llm import LLMProvider, get_provider
 from sec.client import SECClient
 from sec.xbrl_parser import XBRLParser
 
 
-SYNTHESIS_MODEL = "claude-sonnet-4-20250514"
 SYNTHESIS_MAX_TOKENS = 6000
 
 SYNTHESIS_SYSTEM_PROMPT = """You are the Chief Investment Officer synthesizing \
@@ -71,14 +69,22 @@ class Orchestrator:
         result = asyncio.run(orchestrator.run("AAPL"))
     """
 
-    def __init__(self, sec_client: Optional[SECClient] = None):
+    def __init__(
+        self,
+        sec_client: Optional[SECClient] = None,
+        provider: Optional[LLMProvider] = None,
+        llm_provider_name: Optional[str] = None,
+        model: Optional[str] = None,
+    ):
         self.sec_client = sec_client or SECClient()
+        self.provider = provider or get_provider(llm_provider_name)
+        self.synthesis_model = model or self.provider.default_model
         self.agents = [
-            DCFAgent(),
-            RiskAgent(),
-            EarningsAgent(),
-            CompetitiveAgent(),
-            PatternAgent(),
+            DCFAgent(provider=self.provider, model=self.synthesis_model),
+            RiskAgent(provider=self.provider, model=self.synthesis_model),
+            EarningsAgent(provider=self.provider, model=self.synthesis_model),
+            CompetitiveAgent(provider=self.provider, model=self.synthesis_model),
+            PatternAgent(provider=self.provider, model=self.synthesis_model),
         ]
 
     def _prepare_data(self, ticker: str) -> Dict[str, Any]:
@@ -147,26 +153,20 @@ class Orchestrator:
 
         combined_reports = "\n\n".join(report_sections)
 
-        client = anthropic.AsyncAnthropic()
-        message = await client.messages.create(
-            model=SYNTHESIS_MODEL,
-            max_tokens=SYNTHESIS_MAX_TOKENS,
+        synthesis_text = await self.provider.generate(
             system=SYNTHESIS_SYSTEM_PROMPT,
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        f"Company: {company_name} ({ticker})\n\n"
-                        f"Below are the five analyst reports. "
-                        f"Synthesize them into a unified investment brief.\n\n"
-                        f"{combined_reports}"
-                    ),
-                }
-            ],
+            user=(
+                f"Company: {company_name} ({ticker})\n\n"
+                "Below are the five analyst reports. "
+                "Synthesize them into a unified investment brief.\n\n"
+                f"{combined_reports}"
+            ),
+            model=self.synthesis_model,
+            max_tokens=SYNTHESIS_MAX_TOKENS,
         )
 
         print("  ✓ Synthesis complete")
-        return message.content[0].text
+        return synthesis_text
 
     async def run(self, ticker: str) -> Dict[str, Any]:
         """
