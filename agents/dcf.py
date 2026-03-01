@@ -13,6 +13,9 @@ from agents.base import BaseAgent
 
 class DCFAgent(BaseAgent):
     name = "DCF Analyst"
+    prompt_file = "prompts/dcf.md"
+    context_limit_env = "MAX_CONTEXT_DCF_CHARS"
+    enrichment_sections = ("market_data", "external_company")
 
     system_prompt = """You are a senior equity research analyst at Morgan Stanley, \
 specializing in Discounted Cash Flow (DCF) valuation.
@@ -49,8 +52,8 @@ Be rigorous but concise. Use actual numbers from the provided financials."""
             f"Company: {data.get('company_name', 'Unknown')} ({data.get('ticker', '?')})\n",
         ]
 
-        if "financial_summary" in data:
-            parts.append(data["financial_summary"])
+        if "financial_core_summary" in data:
+            parts.append(data["financial_core_summary"])
 
         # DCF agent needs historical trends for projection
         if "historical_revenue" in data:
@@ -72,4 +75,5 @@ Be rigorous but concise. Use actual numbers from the provided financials."""
                 if key in m and m[key] is not None:
                     parts.append(f"  {key}: {m[key]}")
 
+        self.append_enrichment_sections(parts, data)
         return "\n".join(parts)

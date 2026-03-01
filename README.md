@@ -5,7 +5,7 @@ An agentic financial analysis system that pulls real SEC filings and runs them t
 ## How It Works
 
 1. You input a stock ticker
-2. The system fetches all relevant SEC data (10-K, 10-Q, XBRL financials) via the EDGAR API
+2. The system fetches SEC data (10-K, 10-Q, XBRL financials) via EDGAR, then optionally enriches with Yahoo market data and Tavily external research
 3. Five analyst agents run in parallel, each examining the data through a different lens
 4. A synthesis agent cross-references all five reports and produces a final investment brief with health scores
 
@@ -14,6 +14,8 @@ User Input (ticker)
        │
        ▼
  SEC Data Layer ─── fetch, parse, cache
+       │
+       ├── Optional Enrichment ─── Yahoo market snapshot + Tavily research
        │
        ├── DCF Analyst (Morgan Stanley)
        ├── Risk Analyst (Bridgewater)
@@ -44,12 +46,28 @@ The synthesis agent acts as a CIO — it reads all five reports, flags where ana
 
 ```
 ai-financial-analyst/
+├── app.py                # Streamlit UI (same orchestrator core)
 ├── main.py               # CLI entry point
 ├── orchestrator.py        # Phase 1 parallel fan-out + Phase 2 synthesis
 ├── report.py              # Output formatting
+├── prompt_loader.py       # Markdown prompt loader + token rendering
+├── market_enrichment.py   # Optional Yahoo + Tavily enrichment context
 ├── requirements.txt       # Dependencies
+├── .streamlit/
+│   ├── config.toml
+│   └── secrets.toml.example
+├── prompts/
+│   ├── dcf.md
+│   ├── risk.md
+│   ├── earnings.md
+│   ├── competitive.md
+│   ├── pattern.md
+│   └── synthesis.md
+├── llm/
+│   ├── __init__.py
+│   └── providers.py       # LLM provider abstraction (Anthropic/OpenAI)
 ├── agents/
-│   ├── base.py            # Shared agent interface (Anthropic SDK)
+│   ├── base.py            # Shared agent interface
 │   ├── dcf.py             # DCF Analyst
 │   ├── risk.py            # Risk Analyst
 │   ├── earnings.py        # Earnings Analyst
@@ -66,7 +84,7 @@ ai-financial-analyst/
 ### Requirements
 
 - Python 3.9+
-- An [Anthropic API key](https://console.anthropic.com/)
+- An [Anthropic API key](https://console.anthropic.com/) or OpenAI-compatible API key
 
 ### Install
 
@@ -76,21 +94,95 @@ cd ai-financial-analyst
 pip install -r requirements.txt
 ```
 
-### Set your API key
+### Configure provider and API keys
 
 ```bash
-export ANTHROPIC_API_KEY="your-key-here"
+cp .env.example .env
 ```
 
-No other configuration needed. The SEC EDGAR API is free and requires no key.
+Then edit `.env`:
+
+```env
+LLM_PROVIDER=anthropic
+ANTHROPIC_API_KEY=your-anthropic-key
+OPENAI_API_KEY=your-openai-key
+# Optional override. Default is:
+# OPENAI_BASE_URL=https://cbsai.business.columbia.edu/api/v1
+ENABLE_YAHOO=true
+ENABLE_TAVILY=true
+TAVILY_API_KEY=your-tavily-key
+TAVILY_MAX_RESULTS=3
+TAVILY_SNIPPET_CHARS=220
+ENRICHMENT_MAX_CHARS=3500
+MAX_MARKET_SECTION_CHARS=900
+MAX_EXTERNAL_COMPANY_SECTION_CHARS=1200
+MAX_EXTERNAL_INDUSTRY_SECTION_CHARS=1200
+MAX_EXTERNAL_RISKS_SECTION_CHARS=1200
+MAX_AGENT_CONTEXT_CHARS=7000
+MAX_CONTEXT_DCF_CHARS=7000
+MAX_CONTEXT_RISK_CHARS=7000
+MAX_CONTEXT_EARNINGS_CHARS=7000
+MAX_CONTEXT_COMPETITIVE_CHARS=7000
+MAX_CONTEXT_PATTERN_CHARS=7000
+MAX_AGENT_OUTPUT_TOKENS=1200
+SYNTHESIS_REPORT_MAX_CHARS=3200
+SYNTHESIS_INPUT_MAX_CHARS=14000
+MAX_SYNTHESIS_OUTPUT_TOKENS=1500
+```
+
+No other SEC configuration needed. The SEC EDGAR API is free and requires no key.
+
+### Prompt customization
+
+All agent/synthesis prompts live in `prompts/` as Markdown files. You can edit these directly without changing Python code. Supported placeholder tokens:
+
+- `[COMPANY NAME]`
+- `[STOCK NAME]`
+- `[TICKER]`
 
 ## Usage
+
+### Run Streamlit UI
+
+```bash
+python -m streamlit run app.py
+```
+
+The UI exposes provider selection, enrichment toggles, budget guardrails, PDF download, and a cached report viewer so you can toggle between historical runs.
+For OpenAI runs, users can enter their own API key in the sidebar; if left blank, the app falls back to `OPENAI_CBS_API_KEY` (deployment default) when configured.
+
+### Deploy on Streamlit Community Cloud
+
+1. Push this repository to GitHub.
+2. In Streamlit Community Cloud, create a new app and set entrypoint to `app.py`.
+3. Add secrets in app settings (use `.streamlit/secrets.toml.example` as template):
+   - `OPENAI_CBS_API_KEY` (default OpenAI key fallback)
+   - `OPENAI_BASE_URL` (if using CBS endpoint)
+   - `ANTHROPIC_API_KEY` and/or `OPENAI_API_KEY` as needed
+   - `TAVILY_API_KEY` (optional)
+4. Deploy and test with both provider modes.
 
 ### Analyze a stock
 
 ```bash
 python main.py AAPL
 ```
+
+### Disable enrichment (SEC/XBRL only mode)
+
+```bash
+ENABLE_YAHOO=false ENABLE_TAVILY=false python main.py AAPL
+```
+
+### Inspect context sizes without calling any LLM
+
+```bash
+python main.py AAPL --inspect-context --preview-chars 1200
+```
+
+The inspection output includes enrichment section sizes and per-agent context caps/sent size, so you can tune token cost before running any model calls.
+
+Tavily results are used directly (no domain filtering). Inspection output shows how many sources were included per bucket.
 
 ### Save the report to a file
 
@@ -116,8 +208,9 @@ python main.py AAPL --user-agent "YourName your@email.com"
 
 ## Tech Stack
 
-- **LLM**: Anthropic Claude via the Python SDK (no LangChain — orchestration is ~30 lines of async Python)
+- **LLM**: Provider-selectable Anthropic Claude or OpenAI-compatible APIs
 - **Data**: SEC EDGAR API (filings + XBRL structured financials)
+- **Optional enrichment**: Yahoo Finance + Tavily research
 - **Orchestration**: Python `asyncio.gather()` for parallel agent execution
 - **Caching**: SQLite for SEC data (avoids redundant API calls across runs)
 - **Data processing**: pandas for financial data manipulation

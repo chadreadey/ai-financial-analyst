@@ -13,6 +13,9 @@ from agents.base import BaseAgent
 
 class CompetitiveAgent(BaseAgent):
     name = "Competitive & Sector Analyst"
+    prompt_file = "prompts/competitive.md"
+    context_limit_env = "MAX_CONTEXT_COMPETITIVE_CHARS"
+    enrichment_sections = ("external_company", "external_industry")
 
     system_prompt = """You are a senior partner at Bain & Company, specializing in \
 competitive strategy and sector analysis for investor clients.
@@ -59,8 +62,8 @@ margins, growth rates, and R&D spend reveal competitive dynamics."""
             f"Company: {data.get('company_name', 'Unknown')} ({data.get('ticker', '?')})\n",
         ]
 
-        if "financial_summary" in data:
-            parts.append(data["financial_summary"])
+        if "financial_core_summary" in data:
+            parts.append(data["financial_core_summary"])
 
         # Competitive analyst needs trends to assess market position
         if "historical_revenue" in data:
@@ -83,4 +86,5 @@ margins, growth rates, and R&D spend reveal competitive dynamics."""
             for f in data["recent_filings"][:5]:
                 parts.append(f"  {f['form']} filed {f['filingDate']}")
 
+        self.append_enrichment_sections(parts, data)
         return "\n".join(parts)

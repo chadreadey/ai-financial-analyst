@@ -7,9 +7,9 @@ Phase 2: Feed all agent outputs to a 6th synthesis agent that
 """
 
 import asyncio
+import os
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-
-import anthropic
 
 from agents import (
     DCFAgent,
@@ -18,12 +18,16 @@ from agents import (
     CompetitiveAgent,
     PatternAgent,
 )
+from context_budget import trim_text
+from llm import LLMProvider, get_provider
+from market_enrichment import build_enrichment_context
+from prompt_loader import load_prompt_file, render_prompt
 from sec.client import SECClient
 from sec.xbrl_parser import XBRLParser
 
 
-SYNTHESIS_MODEL = "claude-sonnet-4-20250514"
-SYNTHESIS_MAX_TOKENS = 6000
+SYNTHESIS_MAX_TOKENS = None
+SYNTHESIS_PROMPT_FILE = Path("prompts/synthesis.md")
 
 SYNTHESIS_SYSTEM_PROMPT = """You are the Chief Investment Officer synthesizing \
 research from your team of five specialist analysts. You have received reports from:
@@ -71,14 +75,22 @@ class Orchestrator:
         result = asyncio.run(orchestrator.run("AAPL"))
     """
 
-    def __init__(self, sec_client: Optional[SECClient] = None):
+    def __init__(
+        self,
+        sec_client: Optional[SECClient] = None,
+        provider: Optional[LLMProvider] = None,
+        llm_provider_name: Optional[str] = None,
+        model: Optional[str] = None,
+    ):
         self.sec_client = sec_client or SECClient()
+        self.provider = provider or get_provider(llm_provider_name)
+        self.synthesis_model = model or self.provider.default_model
         self.agents = [
-            DCFAgent(),
-            RiskAgent(),
-            EarningsAgent(),
-            CompetitiveAgent(),
-            PatternAgent(),
+            DCFAgent(provider=self.provider, model=self.synthesis_model),
+            RiskAgent(provider=self.provider, model=self.synthesis_model),
+            EarningsAgent(provider=self.provider, model=self.synthesis_model),
+            CompetitiveAgent(provider=self.provider, model=self.synthesis_model),
+            PatternAgent(provider=self.provider, model=self.synthesis_model),
         ]
 
     def _prepare_data(self, ticker: str) -> Dict[str, Any]:
@@ -91,15 +103,27 @@ class Orchestrator:
 
         print("  Parsing XBRL financial data...")
         parser = XBRLParser(raw["company_facts"])
+        print("  Building optional market/research enrichment...")
+        enrichment = build_enrichment_context(raw["ticker"], raw["company_name"])
+        financial_summary = parser.to_summary_text()
 
         data = {
             "ticker": raw["ticker"],
             "company_name": raw["company_name"],
-            "financial_summary": parser.to_summary_text(),
+            "financial_core_summary": financial_summary,
+            "financial_summary": (
+                f"{financial_summary}\n\n{enrichment.get('text', '')}".strip()
+                if enrichment.get("text")
+                else financial_summary
+            ),
             "metrics": parser.compute_metrics(),
             "recent_filings": raw["recent_filings"],
             "historical_revenue": parser.get_historical_revenue(years=8),
             "historical_net_income": parser.get_historical_net_income(years=8),
+            "enrichment_sections": enrichment.get("sections", {}),
+            "enrichment_warnings": enrichment.get("warnings", []),
+            "enrichment_sources": enrichment.get("sources", []),
+            "enrichment_filter_stats": enrichment.get("filter_stats", {}),
         }
         return data
 
@@ -137,36 +161,52 @@ class Orchestrator:
 
         # Build the synthesis prompt with all agent reports
         report_sections = []
+        per_report_cap = int(os.getenv("SYNTHESIS_REPORT_MAX_CHARS", "3200"))
         for agent_name, analysis in agent_reports:
+            trimmed_analysis = trim_text(
+                analysis,
+                per_report_cap,
+                marker="\n...[agent report trimmed]...",
+            )
             report_sections.append(
                 f"{'=' * 60}\n"
                 f"REPORT FROM: {agent_name}\n"
                 f"{'=' * 60}\n\n"
-                f"{analysis}\n"
+                f"{trimmed_analysis}\n"
             )
 
         combined_reports = "\n\n".join(report_sections)
+        combined_reports = trim_text(
+            combined_reports,
+            int(os.getenv("SYNTHESIS_INPUT_MAX_CHARS", "14000")),
+            marker="\n...[synthesis input trimmed]...",
+        )
+        if SYNTHESIS_PROMPT_FILE.exists():
+            synthesis_template = load_prompt_file(str(SYNTHESIS_PROMPT_FILE))
+            synthesis_system_prompt = render_prompt(
+                synthesis_template,
+                {"company_name": company_name, "ticker": ticker},
+            )
+        else:
+            synthesis_system_prompt = SYNTHESIS_SYSTEM_PROMPT
 
-        client = anthropic.AsyncAnthropic()
-        message = await client.messages.create(
-            model=SYNTHESIS_MODEL,
-            max_tokens=SYNTHESIS_MAX_TOKENS,
-            system=SYNTHESIS_SYSTEM_PROMPT,
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        f"Company: {company_name} ({ticker})\n\n"
-                        f"Below are the five analyst reports. "
-                        f"Synthesize them into a unified investment brief.\n\n"
-                        f"{combined_reports}"
-                    ),
-                }
-            ],
+        synthesis_text = await self.provider.generate(
+            system=synthesis_system_prompt,
+            user=(
+                f"Company: {company_name} ({ticker})\n\n"
+                "Below are the five analyst reports. "
+                "Synthesize them into a unified investment brief.\n\n"
+                f"{combined_reports}"
+            ),
+            model=self.synthesis_model,
+            max_tokens=(
+                SYNTHESIS_MAX_TOKENS
+                or int(os.getenv("MAX_SYNTHESIS_OUTPUT_TOKENS", "1500"))
+            ),
         )
 
         print("  ✓ Synthesis complete")
-        return message.content[0].text
+        return synthesis_text
 
     async def run(self, ticker: str) -> Dict[str, Any]:
         """
@@ -199,4 +239,7 @@ class Orchestrator:
             "agent_reports": agent_reports,
             "synthesis": synthesis,
             "metrics": data["metrics"],
+            "enrichment_warnings": data.get("enrichment_warnings", []),
+            "enrichment_sources": data.get("enrichment_sources", []),
+            "enrichment_filter_stats": data.get("enrichment_filter_stats", {}),
         }
