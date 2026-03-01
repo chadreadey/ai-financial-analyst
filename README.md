@@ -149,7 +149,8 @@ python -m streamlit run app.py
 ```
 
 The UI exposes provider selection, enrichment toggles, budget guardrails, PDF download, and a cached report viewer so you can toggle between historical runs.
-For OpenAI runs, users can enter their own API key in the sidebar; if left blank, the app falls back to `OPENAI_CBS_API_KEY` (deployment default) when configured.
+OpenAI mode uses `OPENAI_CBS_API_KEY` as the default deployed key (fallback to `OPENAI_API_KEY` if needed).
+Anthropic mode is BYOK in the UI: users must paste their own Anthropic key per run.
 
 ### Deploy on Streamlit Community Cloud
 
@@ -158,7 +159,7 @@ For OpenAI runs, users can enter their own API key in the sidebar; if left blank
 3. Add secrets in app settings (use `.streamlit/secrets.toml.example` as template):
    - `OPENAI_CBS_API_KEY` (default OpenAI key fallback)
    - `OPENAI_BASE_URL` (if using CBS endpoint)
-   - `ANTHROPIC_API_KEY` and/or `OPENAI_API_KEY` as needed
+   - `OPENAI_API_KEY` (optional fallback)
    - `TAVILY_API_KEY` (optional)
 4. Deploy and test with both provider modes.
 

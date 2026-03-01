@@ -12,6 +12,7 @@ from report import (
     list_cached_reports,
     save_pdf_report,
     save_report,
+    streamlit_markdown_text,
 )
 from sec.cache import SECCache
 from sec.client import SECClient
@@ -28,8 +29,6 @@ def _env_flag(name: str, default: bool) -> bool:
 
 def _set_runtime_env(
     provider: str,
-    model: str,
-    openai_user_key: str,
     enable_yahoo: bool,
     enable_tavily: bool,
     max_agent_context_chars: int,
@@ -39,13 +38,9 @@ def _set_runtime_env(
     max_synthesis_output_tokens: int,
 ) -> None:
     os.environ["LLM_PROVIDER"] = provider
-    if model.strip():
-        os.environ["OPENAI_MODEL"] = model.strip()
     if provider == "openai":
-        if openai_user_key.strip():
-            os.environ["OPENAI_API_KEY"] = openai_user_key.strip()
-        elif not os.getenv("OPENAI_API_KEY") and os.getenv("OPENAI_CBS_API_KEY"):
-            # Fallback to deployment default if user didn't provide a key.
+        # Always prioritize CBS deployment key as default for app users.
+        if os.getenv("OPENAI_CBS_API_KEY"):
             os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_CBS_API_KEY", "")
     os.environ["ENABLE_YAHOO"] = "true" if enable_yahoo else "false"
     os.environ["ENABLE_TAVILY"] = "true" if enable_tavily else "false"
@@ -63,7 +58,6 @@ def _bootstrap_env_from_streamlit_secrets() -> None:
     """
     try:
         secret_keys = [
-            "ANTHROPIC_API_KEY",
             "OPENAI_API_KEY",
             "OPENAI_CBS_API_KEY",
             "OPENAI_BASE_URL",
@@ -74,11 +68,29 @@ def _bootstrap_env_from_streamlit_secrets() -> None:
                 val = str(st.secrets[key]).strip()
                 if val:
                     os.environ[key] = val
-        if not os.getenv("OPENAI_API_KEY") and os.getenv("OPENAI_CBS_API_KEY"):
+        if os.getenv("OPENAI_CBS_API_KEY"):
             os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_CBS_API_KEY", "")
     except Exception:
         # Ignore secret bootstrap errors in local/dev runs.
         pass
+
+
+def _with_ephemeral_env(env_overrides: dict[str, str], fn):
+    """
+    Run fn() with temporary env vars, then restore previous env state.
+    """
+    previous: dict[str, str | None] = {}
+    for key, value in env_overrides.items():
+        previous[key] = os.getenv(key)
+        os.environ[key] = value
+    try:
+        return fn()
+    finally:
+        for key, old in previous.items():
+            if old is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = old
 
 
 def _run_analysis_sync(ticker: str, user_agent: str, provider: str, model: str, progress) -> dict:
@@ -126,7 +138,7 @@ def _run_analysis_sync(ticker: str, user_agent: str, provider: str, model: str, 
 
 def _render_result(result: dict, txt_path: str | None = None, pdf_path: str | None = None) -> None:
     st.subheader(f"{result['company_name']} ({result['ticker']})")
-    st.markdown(clean_generated_text(result["synthesis"]))
+    st.markdown(streamlit_markdown_text(result["synthesis"]))
 
     pdf_bytes = build_pdf_report(result)
 
@@ -149,7 +161,7 @@ def _render_result(result: dict, txt_path: str | None = None, pdf_path: str | No
 
     for idx, (agent_name, analysis) in enumerate(result["agent_reports"]):
         with tabs[idx]:
-            st.markdown(clean_generated_text(analysis))
+            st.markdown(streamlit_markdown_text(analysis))
 
     with tabs[-1]:
         sources = result.get("enrichment_sources", [])
@@ -188,7 +200,7 @@ def _render_cached_report(path: Path) -> None:
             mime="application/pdf",
             use_container_width=True,
         )
-    st.markdown(clean_generated_text(text))
+    st.markdown(streamlit_markdown_text(text))
 
 
 def main() -> None:
@@ -201,20 +213,17 @@ def main() -> None:
         st.header("Run Configuration")
         provider = st.selectbox(
             "LLM Provider",
-            options=["anthropic", "openai"],
-            index=0 if os.getenv("LLM_PROVIDER", "anthropic") == "anthropic" else 1,
+            options=["openai", "anthropic"],
+            index=0 if os.getenv("LLM_PROVIDER", "openai") == "openai" else 1,
         )
-        default_model = (
-            "claude-sonnet-4-20250514" if provider == "anthropic" else "gpt-4o-mini"
-        )
-        model = st.text_input("Model (optional override)", value=os.getenv("OPENAI_MODEL", default_model))
-        openai_user_key = st.text_input(
-            "Your OpenAI API key (optional override)",
+        if provider == "openai":
+            st.caption("Using default OpenAI model and deployment CBS key.")
+        else:
+            st.caption("Anthropic requires user-provided key for each run (BYOK).")
+        anthropic_user_key = st.text_input(
+            "Anthropic API key (required only for Anthropic runs)",
             type="password",
-            help=(
-                "If blank, the app uses the deployment default OpenAI key "
-                "(e.g., CBS key from secrets)."
-            ),
+            help="Used only for the current run and not stored server-side.",
         )
         user_agent = st.text_input(
             "SEC User-Agent",
@@ -272,8 +281,6 @@ def main() -> None:
 
         _set_runtime_env(
             provider=provider,
-            model=model,
-            openai_user_key=openai_user_key,
             enable_yahoo=enable_yahoo,
             enable_tavily=enable_tavily,
             max_agent_context_chars=int(max_agent_context_chars),
@@ -285,18 +292,35 @@ def main() -> None:
 
         if provider == "openai" and not os.getenv("OPENAI_API_KEY"):
             st.error("OpenAI provider selected but no API key is available.")
-            st.info("Enter your key in the sidebar or configure OPENAI_CBS_API_KEY in deployment secrets.")
+            st.info("Configure OPENAI_CBS_API_KEY in deployment secrets.")
+            return
+        if provider == "anthropic" and not anthropic_user_key.strip():
+            st.error("Anthropic provider selected but no Anthropic key was provided.")
+            st.info("Paste your Anthropic API key in the sidebar for this run.")
             return
 
         progress = st.status("Running analysis...", expanded=True)
         try:
-            result = _run_analysis_sync(ticker, user_agent, provider, model, progress)
+            if provider == "anthropic":
+                result = _with_ephemeral_env(
+                    {"ANTHROPIC_API_KEY": anthropic_user_key.strip()},
+                    lambda: _run_analysis_sync(ticker, user_agent, provider, "", progress),
+                )
+            else:
+                result = _run_analysis_sync(ticker, user_agent, provider, "", progress)
             txt_path = save_report(result)
             pdf_path = save_pdf_report(result, filepath=txt_path.replace(".txt", ".pdf"))
             st.session_state["latest_result"] = result
             st.session_state["latest_txt_path"] = txt_path
             st.session_state["latest_pdf_path"] = pdf_path
         except Exception as exc:
+            msg = str(exc)
+            if "401" in msg or "Invalid API key" in msg or "AuthenticationError" in msg:
+                st.error("Authentication failed with the selected provider key.")
+                if provider == "anthropic":
+                    st.info("Check ANTHROPIC_API_KEY in deployment secrets, or switch to OpenAI.")
+                else:
+                    st.info("Check OPENAI_CBS_API_KEY / OPENAI_API_KEY and OPENAI_BASE_URL in deployment secrets.")
             progress.update(label=f"Failed: {exc}", state="error", expanded=True)
             st.exception(exc)
             return

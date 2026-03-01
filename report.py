@@ -84,6 +84,15 @@ def clean_result_payload(result: Dict[str, Any]) -> Dict[str, Any]:
     return out
 
 
+def streamlit_markdown_text(text: str) -> str:
+    """
+    Prepare cleaned text for Streamlit markdown rendering.
+    Escapes '$' so dollar amounts don't get parsed as LaTeX.
+    """
+    cleaned = clean_generated_text(text)
+    return cleaned.replace("$", r"\$")
+
+
 def format_report(result: Dict[str, Any]) -> str:
     """
     Format the full orchestrator result into a readable text report.
