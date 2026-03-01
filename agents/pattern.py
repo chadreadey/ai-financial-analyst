@@ -14,6 +14,9 @@ from agents.base import BaseAgent
 
 class PatternAgent(BaseAgent):
     name = "Pattern Analyst"
+    prompt_file = "prompts/pattern.md"
+    context_limit_env = "MAX_CONTEXT_PATTERN_CHARS"
+    enrichment_sections = ("market_data",)
 
     system_prompt = """You are a quantitative analyst at Renaissance Technologies, \
 applying systematic pattern recognition to fundamental financial data.
@@ -57,8 +60,8 @@ in the data."""
             f"Company: {data.get('company_name', 'Unknown')} ({data.get('ticker', '?')})\n",
         ]
 
-        if "financial_summary" in data:
-            parts.append(data["financial_summary"])
+        if "financial_core_summary" in data:
+            parts.append(data["financial_core_summary"])
 
         # Pattern agent needs as much historical data as possible
         if "historical_revenue" in data:
@@ -76,4 +79,5 @@ in the data."""
                 if val is not None:
                     parts.append(f"  {key}: {val}")
 
+        self.append_enrichment_sections(parts, data)
         return "\n".join(parts)

@@ -13,6 +13,8 @@ from typing import Optional
 from anthropic import AsyncAnthropic
 from openai import AsyncOpenAI
 
+DEFAULT_OPENAI_BASE_URL = "https://cbsai.business.columbia.edu/api/v1"
+
 
 class LLMProvider(ABC):
     """Abstract async provider interface."""
@@ -69,7 +71,9 @@ class OpenAIProvider(LLMProvider):
         base_url: Optional[str] = None,
     ):
         key = api_key or os.getenv("OPENAI_API_KEY")
-        url = base_url or os.getenv("OPENAI_BASE_URL")
+        # Default to the Columbia OpenAI-compatible endpoint to preserve
+        # backward behavior from the previous codebase.
+        url = base_url or os.getenv("OPENAI_BASE_URL") or DEFAULT_OPENAI_BASE_URL
         self._client = AsyncOpenAI(api_key=key, base_url=url)
 
     async def generate(

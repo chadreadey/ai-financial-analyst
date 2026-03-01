@@ -14,6 +14,9 @@ from agents.base import BaseAgent
 
 class RiskAgent(BaseAgent):
     name = "Risk Analyst"
+    prompt_file = "prompts/risk.md"
+    context_limit_env = "MAX_CONTEXT_RISK_CHARS"
+    enrichment_sections = ("market_data", "external_risks")
 
     system_prompt = """You are a senior risk analyst at Bridgewater Associates, \
 applying Ray Dalio's principles-based framework to company risk assessment.
@@ -58,8 +61,8 @@ but also acknowledge genuine strengths in the risk profile."""
             f"Company: {data.get('company_name', 'Unknown')} ({data.get('ticker', '?')})\n",
         ]
 
-        if "financial_summary" in data:
-            parts.append(data["financial_summary"])
+        if "financial_core_summary" in data:
+            parts.append(data["financial_core_summary"])
 
         # Risk agent focuses on balance sheet and leverage
         if "metrics" in data:
@@ -79,4 +82,5 @@ but also acknowledge genuine strengths in the risk profile."""
             parts.append("\n── Historical Net Income (trend stability) ──")
             parts.append(json.dumps(data["historical_net_income"], indent=2))
 
+        self.append_enrichment_sections(parts, data)
         return "\n".join(parts)

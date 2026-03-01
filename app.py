@@ -1,0 +1,279 @@
+import asyncio
+import os
+from pathlib import Path
+
+import streamlit as st  # type: ignore[import-not-found]
+from dotenv import load_dotenv  # type: ignore[import-not-found]
+
+from orchestrator import Orchestrator
+from report import (
+    build_pdf_report,
+    clean_generated_text,
+    list_cached_reports,
+    save_pdf_report,
+    save_report,
+)
+from sec.cache import SECCache
+from sec.client import SECClient
+
+load_dotenv()
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _set_runtime_env(
+    provider: str,
+    model: str,
+    enable_yahoo: bool,
+    enable_tavily: bool,
+    max_agent_context_chars: int,
+    max_agent_output_tokens: int,
+    synthesis_report_max_chars: int,
+    synthesis_input_max_chars: int,
+    max_synthesis_output_tokens: int,
+) -> None:
+    os.environ["LLM_PROVIDER"] = provider
+    if model.strip():
+        os.environ["OPENAI_MODEL"] = model.strip()
+    os.environ["ENABLE_YAHOO"] = "true" if enable_yahoo else "false"
+    os.environ["ENABLE_TAVILY"] = "true" if enable_tavily else "false"
+    os.environ["MAX_AGENT_CONTEXT_CHARS"] = str(max_agent_context_chars)
+    os.environ["MAX_AGENT_OUTPUT_TOKENS"] = str(max_agent_output_tokens)
+    os.environ["SYNTHESIS_REPORT_MAX_CHARS"] = str(synthesis_report_max_chars)
+    os.environ["SYNTHESIS_INPUT_MAX_CHARS"] = str(synthesis_input_max_chars)
+    os.environ["MAX_SYNTHESIS_OUTPUT_TOKENS"] = str(max_synthesis_output_tokens)
+
+
+def _run_analysis_sync(ticker: str, user_agent: str, provider: str, model: str, progress) -> dict:
+    cache = SECCache()
+    sec_client = SECClient(user_agent=user_agent, cache=cache)
+    orchestrator = Orchestrator(
+        sec_client=sec_client,
+        llm_provider_name=provider,
+        model=(model.strip() or None),
+    )
+
+    async def _pipeline() -> dict:
+        progress.write("Fetching SEC/XBRL data and enrichment...")
+        data = orchestrator._prepare_data(ticker)
+        progress.write("Running five analyst agents in parallel...")
+        agent_reports = await orchestrator._run_phase1(data)
+        progress.write("Synthesizing final investment brief...")
+        synthesis = await orchestrator._run_phase2(
+            data["ticker"], data["company_name"], agent_reports
+        )
+        return {
+            "ticker": data["ticker"],
+            "company_name": data["company_name"],
+            "agent_reports": agent_reports,
+            "synthesis": synthesis,
+            "metrics": data["metrics"],
+            "enrichment_warnings": data.get("enrichment_warnings", []),
+            "enrichment_sources": data.get("enrichment_sources", []),
+            "enrichment_filter_stats": data.get("enrichment_filter_stats", {}),
+        }
+
+    try:
+        try:
+            result = asyncio.run(_pipeline())
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            try:
+                result = loop.run_until_complete(_pipeline())
+            finally:
+                loop.close()
+    finally:
+        cache.close()
+    return result
+
+
+def _render_result(result: dict, txt_path: str | None = None, pdf_path: str | None = None) -> None:
+    st.subheader(f"{result['company_name']} ({result['ticker']})")
+    st.markdown(clean_generated_text(result["synthesis"]))
+
+    pdf_bytes = build_pdf_report(result)
+
+    st.download_button(
+        "Download Report (.pdf)",
+        data=pdf_bytes,
+        file_name=f"{result['ticker']}_analysis.pdf",
+        mime="application/pdf",
+        use_container_width=True,
+    )
+
+    if txt_path or pdf_path:
+        parts = []
+        if pdf_path:
+            parts.append(f"PDF saved: `{pdf_path}`")
+        st.caption(" | ".join(parts))
+
+    tab_names = [name for name, _ in result["agent_reports"]] + ["Enrichment & Diagnostics"]
+    tabs = st.tabs(tab_names)
+
+    for idx, (agent_name, analysis) in enumerate(result["agent_reports"]):
+        with tabs[idx]:
+            st.markdown(clean_generated_text(analysis))
+
+    with tabs[-1]:
+        sources = result.get("enrichment_sources", [])
+        warnings = result.get("enrichment_warnings", [])
+        stats = result.get("enrichment_filter_stats", {})
+        st.markdown("### Enrichment Sources")
+        if sources:
+            for source in sources:
+                st.markdown(f"- {source}")
+        else:
+            st.caption("No external enrichment sources captured.")
+        st.markdown("### Enrichment Warnings")
+        if warnings:
+            for warning in warnings:
+                st.warning(warning)
+        else:
+            st.caption("No enrichment warnings.")
+        st.markdown("### Filter Stats")
+        st.json(stats)
+
+
+def _render_cached_report(path: Path) -> None:
+    st.subheader(f"Cached Report: {path.name}")
+    try:
+        text = path.read_text(encoding="utf-8")
+    except Exception as exc:
+        st.error(f"Could not read cached report: {exc}")
+        return
+
+    pdf_path = path.with_suffix(".pdf")
+    if pdf_path.exists():
+        st.download_button(
+            "Download Cached PDF",
+            data=pdf_path.read_bytes(),
+            file_name=pdf_path.name,
+            mime="application/pdf",
+            use_container_width=True,
+        )
+    st.markdown(clean_generated_text(text))
+
+
+def main() -> None:
+    st.set_page_config(page_title="AI Financial Analyst", layout="wide")
+    st.title("AI Financial Analyst")
+    st.caption("Five-agent equity research with provider selection and context budgets.")
+
+    with st.sidebar:
+        st.header("Run Configuration")
+        provider = st.selectbox(
+            "LLM Provider",
+            options=["anthropic", "openai"],
+            index=0 if os.getenv("LLM_PROVIDER", "anthropic") == "anthropic" else 1,
+        )
+        default_model = (
+            "claude-sonnet-4-20250514" if provider == "anthropic" else "gpt-4o-mini"
+        )
+        model = st.text_input("Model (optional override)", value=os.getenv("OPENAI_MODEL", default_model))
+        user_agent = st.text_input(
+            "SEC User-Agent",
+            value=os.getenv("SEC_USER_AGENT", "AIFinancialAnalyst admin@example.com"),
+        )
+
+        st.subheader("Enrichment")
+        enable_yahoo = st.checkbox("Enable Yahoo market data", value=_env_flag("ENABLE_YAHOO", True))
+        enable_tavily = st.checkbox("Enable Tavily research", value=_env_flag("ENABLE_TAVILY", True))
+
+        with st.expander("Budget Guardrails", expanded=False):
+            max_agent_context_chars = st.number_input(
+                "MAX_AGENT_CONTEXT_CHARS", min_value=1000, max_value=20000, step=500,
+                value=int(os.getenv("MAX_AGENT_CONTEXT_CHARS", "7000")),
+            )
+            max_agent_output_tokens = st.number_input(
+                "MAX_AGENT_OUTPUT_TOKENS", min_value=100, max_value=4000, step=100,
+                value=int(os.getenv("MAX_AGENT_OUTPUT_TOKENS", "1200")),
+            )
+            synthesis_report_max_chars = st.number_input(
+                "SYNTHESIS_REPORT_MAX_CHARS", min_value=500, max_value=10000, step=250,
+                value=int(os.getenv("SYNTHESIS_REPORT_MAX_CHARS", "3200")),
+            )
+            synthesis_input_max_chars = st.number_input(
+                "SYNTHESIS_INPUT_MAX_CHARS", min_value=1000, max_value=30000, step=500,
+                value=int(os.getenv("SYNTHESIS_INPUT_MAX_CHARS", "14000")),
+            )
+            max_synthesis_output_tokens = st.number_input(
+                "MAX_SYNTHESIS_OUTPUT_TOKENS", min_value=100, max_value=5000, step=100,
+                value=int(os.getenv("MAX_SYNTHESIS_OUTPUT_TOKENS", "1500")),
+            )
+
+        st.divider()
+        st.subheader("Report Viewer")
+        cached_files = list_cached_reports(limit=50)
+        view_mode = st.radio("View mode", options=["Current run", "Cached reports"], index=0)
+        cached_options = [p.name for p in cached_files]
+        selected_cached = st.selectbox(
+            "Cached report file",
+            options=cached_options if cached_options else ["(none)"],
+            disabled=not cached_options,
+        )
+
+    ticker = st.text_input("Ticker", value="AAPL").strip().upper()
+    col_run, col_hint = st.columns([1, 4])
+    with col_run:
+        run = st.button("Run Analysis", type="primary", use_container_width=True)
+    with col_hint:
+        st.caption("Tip: use CLI `--inspect-context` for no-LLM dry runs.")
+
+    if run:
+        if not ticker:
+            st.error("Please enter a ticker symbol.")
+            return
+
+        _set_runtime_env(
+            provider=provider,
+            model=model,
+            enable_yahoo=enable_yahoo,
+            enable_tavily=enable_tavily,
+            max_agent_context_chars=int(max_agent_context_chars),
+            max_agent_output_tokens=int(max_agent_output_tokens),
+            synthesis_report_max_chars=int(synthesis_report_max_chars),
+            synthesis_input_max_chars=int(synthesis_input_max_chars),
+            max_synthesis_output_tokens=int(max_synthesis_output_tokens),
+        )
+
+        progress = st.status("Running analysis...", expanded=True)
+        try:
+            result = _run_analysis_sync(ticker, user_agent, provider, model, progress)
+            txt_path = save_report(result)
+            pdf_path = save_pdf_report(result, filepath=txt_path.replace(".txt", ".pdf"))
+            st.session_state["latest_result"] = result
+            st.session_state["latest_txt_path"] = txt_path
+            st.session_state["latest_pdf_path"] = pdf_path
+        except Exception as exc:
+            progress.update(label=f"Failed: {exc}", state="error", expanded=True)
+            st.exception(exc)
+            return
+        progress.update(label="Analysis complete", state="complete", expanded=False)
+
+    if view_mode == "Cached reports":
+        if not cached_options:
+            st.info("No cached reports found yet in `reports/`.")
+            return
+        chosen = Path("reports") / selected_cached
+        _render_cached_report(chosen)
+        return
+
+    latest_result = st.session_state.get("latest_result")
+    if not latest_result:
+        st.info("Run an analysis or switch to Cached reports in the sidebar.")
+        return
+    _render_result(
+        latest_result,
+        txt_path=st.session_state.get("latest_txt_path"),
+        pdf_path=st.session_state.get("latest_pdf_path"),
+    )
+
+
+if __name__ == "__main__":
+    main()
+

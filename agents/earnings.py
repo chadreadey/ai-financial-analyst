@@ -13,6 +13,9 @@ from agents.base import BaseAgent
 
 class EarningsAgent(BaseAgent):
     name = "Earnings Analyst"
+    prompt_file = "prompts/earnings.md"
+    context_limit_env = "MAX_CONTEXT_EARNINGS_CHARS"
+    enrichment_sections = ("market_data", "external_company")
 
     system_prompt = """You are a senior equity research analyst at JPMorgan Chase, \
 specializing in earnings analysis and quality assessment.
@@ -53,8 +56,8 @@ Lead with conclusions, then support with data."""
             f"Company: {data.get('company_name', 'Unknown')} ({data.get('ticker', '?')})\n",
         ]
 
-        if "financial_summary" in data:
-            parts.append(data["financial_summary"])
+        if "financial_core_summary" in data:
+            parts.append(data["financial_core_summary"])
 
         # Earnings agent needs trend data
         if "historical_revenue" in data:
@@ -78,4 +81,5 @@ Lead with conclusions, then support with data."""
                 if key in m and m[key] is not None:
                     parts.append(f"  {key}: {m[key]}")
 
+        self.append_enrichment_sections(parts, data)
         return "\n".join(parts)

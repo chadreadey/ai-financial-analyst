@@ -7,13 +7,16 @@ Each agent is defined by:
   - An async analyze() method that calls Claude
 """
 
+import os
 from typing import Any, Dict, Optional
 
+from context_budget import trim_text
 from llm import LLMProvider, get_provider
+from prompt_loader import load_prompt_file, render_prompt
 
 
 DEFAULT_MODEL = None
-DEFAULT_MAX_TOKENS = 4096
+DEFAULT_MAX_TOKENS = None
 
 
 class BaseAgent:
@@ -28,17 +31,21 @@ class BaseAgent:
     """
 
     name: str = "BaseAgent"
+    context_limit_env: Optional[str] = None
     system_prompt: str = "You are a financial analyst."
+    prompt_file: Optional[str] = None
+    max_context_chars: int = 7000
+    enrichment_sections: tuple[str, ...] = ()
 
     def __init__(
         self,
         provider: Optional[LLMProvider] = None,
         model: Optional[str] = DEFAULT_MODEL,
-        max_tokens: int = DEFAULT_MAX_TOKENS,
+        max_tokens: Optional[int] = DEFAULT_MAX_TOKENS,
     ):
         self.provider = provider or get_provider()
         self.model = model or self.provider.default_model
-        self.max_tokens = max_tokens
+        self.max_tokens = max_tokens or int(os.getenv("MAX_AGENT_OUTPUT_TOKENS", "1200"))
 
     def build_context(self, data: Dict[str, Any]) -> str:
         """
@@ -67,15 +74,52 @@ class BaseAgent:
 
         return "\n".join(parts)
 
+    def get_system_prompt(self, data: Dict[str, Any]) -> str:
+        """
+        Return the runtime system prompt.
+        Prefers markdown prompt files, falls back to inline string.
+        """
+        if self.prompt_file:
+            template = load_prompt_file(self.prompt_file)
+            return render_prompt(
+                template,
+                {
+                    "company_name": data.get("company_name", ""),
+                    "ticker": data.get("ticker", ""),
+                },
+            )
+        return self.system_prompt
+
+    def get_context_limit(self) -> int:
+        """Read per-agent context cap, falling back to global/default."""
+        if self.context_limit_env:
+            raw = os.getenv(self.context_limit_env)
+            if raw:
+                return int(raw)
+        return int(os.getenv("MAX_AGENT_CONTEXT_CHARS", str(self.max_context_chars)))
+
+    def trim_context(self, context: str) -> str:
+        return trim_text(context, self.get_context_limit(), marker="\n...[context trimmed]...")
+
+    def append_enrichment_sections(self, parts: list[str], data: Dict[str, Any]) -> None:
+        """Append only the enrichment sections this agent needs."""
+        sections = data.get("enrichment_sections", {}) or {}
+        for section_key in self.enrichment_sections:
+            text = sections.get(section_key)
+            if text:
+                parts.append("")
+                parts.append(text)
+
     async def analyze(self, data: Dict[str, Any]) -> str:
         """
         Run the agent's analysis on the provided data.
         Returns the agent's written analysis as a string.
         """
-        context = self.build_context(data)
+        context = self.trim_context(self.build_context(data))
+        system_prompt = self.get_system_prompt(data)
 
         return await self.provider.generate(
-            system=self.system_prompt,
+            system=system_prompt,
             user=(
                 "Analyze the following company based on the SEC data provided. "
                 f"Provide your professional analysis.\n\n{context}"
