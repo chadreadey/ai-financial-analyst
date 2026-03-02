@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 from anthropic import AsyncAnthropic
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, APIStatusError, NotFoundError
 
 DEFAULT_OPENAI_BASE_URL = "https://cbsai.business.columbia.edu/api/v1"
 
@@ -92,7 +92,7 @@ class OpenAIProvider(LLMProvider):
                 max_output_tokens=max_tokens,
             )
             return response.output_text or ""
-        except Exception:
+        except (NotFoundError, APIStatusError, AttributeError):
             # Fallback for OpenAI-compatible providers that only implement chat.
             chat = await self._client.chat.completions.create(
                 model=selected_model,

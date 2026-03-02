@@ -49,7 +49,9 @@ ai-financial-analyst/
 ├── app.py                # Streamlit UI (same orchestrator core)
 ├── main.py               # CLI entry point
 ├── orchestrator.py        # Phase 1 parallel fan-out + Phase 2 synthesis
-├── report.py              # Output formatting
+├── report.py              # Output formatting (text + PDF)
+├── utils.py               # Shared helpers (env_flag, format_money)
+├── context_budget.py      # Deterministic context trimming
 ├── prompt_loader.py       # Markdown prompt loader + token rendering
 ├── market_enrichment.py   # Optional Yahoo + Tavily enrichment context
 ├── requirements.txt       # Dependencies

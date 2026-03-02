@@ -8,15 +8,12 @@ Each agent is defined by:
 """
 
 import os
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from context_budget import trim_text
 from llm import LLMProvider, get_provider
 from prompt_loader import load_prompt_file, render_prompt
-
-
-DEFAULT_MODEL = None
-DEFAULT_MAX_TOKENS = None
 
 
 class BaseAgent:
@@ -40,8 +37,8 @@ class BaseAgent:
     def __init__(
         self,
         provider: Optional[LLMProvider] = None,
-        model: Optional[str] = DEFAULT_MODEL,
-        max_tokens: Optional[int] = DEFAULT_MAX_TOKENS,
+        model: Optional[str] = None,
+        max_tokens: Optional[int] = None,
     ):
         self.provider = provider or get_provider()
         self.model = model or self.provider.default_model
@@ -52,17 +49,22 @@ class BaseAgent:
         Build the user-message context from SEC data.
         Subclasses can override to select specific data slices.
 
+        The default implementation uses `financial_core_summary` (SEC-only
+        financials) and appends targeted enrichment sections declared in
+        ``self.enrichment_sections``, matching the pattern used by all
+        built-in agent subclasses.
+
         Args:
             data: Dict with keys like 'ticker', 'company_name',
-                  'financial_summary', 'metrics', 'recent_filings',
+                  'financial_core_summary', 'metrics', 'recent_filings',
                   'historical_revenue', 'historical_net_income'.
         """
         parts = [
             f"Company: {data.get('company_name', 'Unknown')} ({data.get('ticker', '?')})\n",
         ]
 
-        if "financial_summary" in data:
-            parts.append(data["financial_summary"])
+        if "financial_core_summary" in data:
+            parts.append(data["financial_core_summary"])
 
         if "recent_filings" in data:
             parts.append("\n── Recent SEC Filings ──")
@@ -72,6 +74,7 @@ class BaseAgent:
                     f"(accession: {f['accessionNumber']})"
                 )
 
+        self.append_enrichment_sections(parts, data)
         return "\n".join(parts)
 
     def get_system_prompt(self, data: Dict[str, Any]) -> str:
@@ -79,7 +82,7 @@ class BaseAgent:
         Return the runtime system prompt.
         Prefers markdown prompt files, falls back to inline string.
         """
-        if self.prompt_file:
+        if self.prompt_file and Path(self.prompt_file).exists():
             template = load_prompt_file(self.prompt_file)
             return render_prompt(
                 template,

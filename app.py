@@ -16,15 +16,9 @@ from report import (
 )
 from sec.cache import SECCache
 from sec.client import SECClient
+from utils import env_flag
 
 load_dotenv()
-
-
-def _env_flag(name: str, default: bool) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _set_runtime_env(
@@ -104,11 +98,11 @@ def _run_analysis_sync(ticker: str, user_agent: str, provider: str, model: str, 
 
     async def _pipeline() -> dict:
         progress.write("Fetching SEC/XBRL data and enrichment...")
-        data = orchestrator._prepare_data(ticker)
+        data = orchestrator.prepare_data(ticker)
         progress.write("Running five analyst agents in parallel...")
-        agent_reports = await orchestrator._run_phase1(data)
+        agent_reports = await orchestrator.run_phase1(data)
         progress.write("Synthesizing final investment brief...")
-        synthesis = await orchestrator._run_phase2(
+        synthesis = await orchestrator.run_phase2(
             data["ticker"], data["company_name"], agent_reports
         )
         return {
@@ -125,7 +119,9 @@ def _run_analysis_sync(ticker: str, user_agent: str, provider: str, model: str, 
     try:
         try:
             result = asyncio.run(_pipeline())
-        except RuntimeError:
+        except RuntimeError as re_err:
+            if "cannot be called from a running event loop" not in str(re_err):
+                raise
             loop = asyncio.new_event_loop()
             try:
                 result = loop.run_until_complete(_pipeline())
@@ -231,8 +227,8 @@ def main() -> None:
         )
 
         st.subheader("Enrichment")
-        enable_yahoo = st.checkbox("Enable Yahoo market data", value=_env_flag("ENABLE_YAHOO", True))
-        enable_tavily = st.checkbox("Enable Tavily research", value=_env_flag("ENABLE_TAVILY", True))
+        enable_yahoo = st.checkbox("Enable Yahoo market data", value=env_flag("ENABLE_YAHOO", True))
+        enable_tavily = st.checkbox("Enable Tavily research", value=env_flag("ENABLE_TAVILY", True))
 
         with st.expander("Budget Guardrails", expanded=False):
             max_agent_context_chars = st.number_input(

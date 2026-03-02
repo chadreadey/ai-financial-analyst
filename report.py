@@ -4,6 +4,7 @@ a clean, readable investment brief.
 """
 
 import io
+import os
 import re
 from pathlib import Path
 from datetime import datetime
@@ -173,7 +174,6 @@ def save_report(result: Dict[str, Any], filepath: Optional[str] = None) -> str:
         filepath = f"reports/{result['ticker']}_{timestamp}.txt"
 
     # Ensure directory exists
-    import os
     os.makedirs(os.path.dirname(filepath) if os.path.dirname(filepath) else ".", exist_ok=True)
 
     with open(filepath, "w") as f:

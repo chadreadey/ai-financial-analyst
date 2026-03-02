@@ -97,7 +97,7 @@ async def main() -> None:
     )
 
     if args.inspect_context:
-        data = orchestrator._prepare_data(ticker)
+        data = orchestrator.prepare_data(ticker)
         print("\n── Context inspection (no LLM calls) ──")
         print(f"Company: {data['company_name']} ({data['ticker']})")
         print(f"financial_summary chars: {len(data.get('financial_summary', ''))}")

@@ -11,25 +11,7 @@ from importlib import import_module
 from typing import Dict, List
 
 from context_budget import trim_text
-
-
-def _env_flag(name: str, default: bool = True) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return raw.strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _format_money(value: float | int | None) -> str:
-    if value is None:
-        return "N/A"
-    if abs(value) >= 1e12:
-        return f"${value / 1e12:.2f}T"
-    if abs(value) >= 1e9:
-        return f"${value / 1e9:.2f}B"
-    if abs(value) >= 1e6:
-        return f"${value / 1e6:.1f}M"
-    return f"${value:,.0f}"
+from utils import env_flag, format_money
 
 
 def _yahoo_section(ticker: str) -> tuple[str, List[str]]:
@@ -51,7 +33,7 @@ def _yahoo_section(ticker: str) -> tuple[str, List[str]]:
     lines = ["=== Live Market Data (Yahoo Finance) ==="]
     if price is not None:
         lines.append(f"Current Price: ${float(price):.2f}")
-    lines.append(f"Market Cap: {_format_money(market_cap)}")
+    lines.append(f"Market Cap: {format_money(market_cap)}")
     if trailing_pe is not None:
         lines.append(f"P/E (TTM): {float(trailing_pe):.2f}")
     if forward_pe is not None:
@@ -201,7 +183,7 @@ def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object
     section_map: Dict[str, str] = {}
     filter_stats: Dict[str, int] = {}
 
-    if _env_flag("ENABLE_YAHOO", True):
+    if env_flag("ENABLE_YAHOO", True):
         try:
             yahoo_text, yahoo_sources = _yahoo_section(ticker)
             sections.append(yahoo_text)
@@ -210,7 +192,7 @@ def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object
         except Exception as exc:
             warnings.append(f"Yahoo enrichment unavailable: {exc}")
 
-    if _env_flag("ENABLE_TAVILY", True):
+    if env_flag("ENABLE_TAVILY", True):
         try:
             tavily_sections, tavily_sources, filter_stats = _tavily_section(ticker, company_name)
             for key in ("external_company", "external_industry", "external_risks"):

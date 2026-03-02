@@ -1,38 +1,67 @@
-# AI Financial Analyst - Full Codebase Walkthrough
+# AI Financial Analyst — Full Codebase Walkthrough
 
-This document explains the current codebase end-to-end so you can merge its functionality into another base repository with minimal ambiguity.
+This document explains the current codebase end-to-end so you can understand, modify, or extend it with minimal ambiguity.
 
 ---
 
 ## 1) What this project does
 
-This app is a Streamlit-based multi-agent equity research system.  
-Input: a company name or ticker (for example, `AAPL` or `Apple`).  
+This is a multi-agent equity research system with both a CLI and a Streamlit web UI.
+
+Input: a stock ticker (e.g. `AAPL`).
 Output: a full research report composed of:
 
-- 9 parallel analyst outputs
-- 1 synthesized executive brief with health score, price target, and rating
-- 1 downloadable PDF report
-- Background prompt auto-improvements that rewrite prompt files for the next run
+- 5 parallel analyst outputs (DCF, Risk, Earnings, Competitive, Pattern)
+- 1 synthesized executive brief with health scores, rating, and verdict
+- Downloadable PDF report
 
 Primary data sources:
 
-- SEC EDGAR filings (`10-K`, `10-Q`, `8-K`)
-- Tavily web research (company/industry/risk queries)
-- Live market data from Yahoo Finance via `yfinance`
+- SEC EDGAR filings (`10-K`, `10-Q`, `8-K`) and XBRL structured financials
+- Optional: Yahoo Finance live market data via `yfinance`
+- Optional: Tavily web research (company/industry/risk queries)
 
 ---
 
 ## 2) Repository map and responsibilities
 
-- `app.py`: Main application entrypoint, Streamlit UI, orchestration, LLM calls, parallel analysis, synthesis, PDF generation, and background prompt improvement.
-- `context_builder.py`: Builds one combined research context string used by all analysis agents.
-- `sec_client.py`: SEC utilities (ticker resolution, filing list retrieval, filing content fetch/cleaning).
-- `tavily_client.py`: Tavily search wrapper for company, industry, and risk research.
-- `prompts/*.md`: Prompt templates for each analysis role + synthesis + prompt improver.
-- `.env.example`: Required/optional environment variables template.
-- `requirements.txt`: Python dependencies.
-- `README.md`: Project-level overview and quick start.
+```
+ai-financial-analyst/
+├── app.py                # Streamlit web UI entry point
+├── main.py               # CLI entry point
+├── orchestrator.py        # Two-phase pipeline: parallel agents → synthesis
+├── report.py              # Text + PDF report formatting
+├── utils.py               # Shared helpers (env_flag, format_money)
+├── context_budget.py      # Deterministic text trimming for context windows
+├── prompt_loader.py       # Loads markdown prompts, replaces [TICKER] etc.
+├── market_enrichment.py   # Optional Yahoo + Tavily enrichment layer
+├── requirements.txt       # Python dependencies
+├── .env.example           # Environment variable template
+├── .streamlit/
+│   ├── config.toml        # Streamlit server config
+│   └── secrets.toml.example
+├── prompts/               # Externalized agent + synthesis prompts
+│   ├── dcf.md
+│   ├── risk.md
+│   ├── earnings.md
+│   ├── competitive.md
+│   ├── pattern.md
+│   └── synthesis.md
+├── llm/
+│   ├── __init__.py
+│   └── providers.py       # LLM provider abstraction (Anthropic / OpenAI)
+├── agents/
+│   ├── base.py            # BaseAgent class (context building, trimming, LLM call)
+│   ├── dcf.py             # DCF Analyst (Morgan Stanley style)
+│   ├── risk.py            # Risk Analyst (Bridgewater style)
+│   ├── earnings.py        # Earnings Analyst (JPMorgan style)
+│   ├── competitive.py     # Competitive & Sector Analyst (Bain style)
+│   └── pattern.py         # Pattern Analyst (Renaissance Tech style)
+└── sec/
+    ├── client.py          # SEC EDGAR API client (rate-limited, cached)
+    ├── xbrl_parser.py     # XBRL JSON → DataFrames + computed metrics
+    └── cache.py           # SQLite cache with TTL expiration
+```
 
 ---
 
@@ -40,421 +69,295 @@ Primary data sources:
 
 ### 3.1 Python and packages
 
-Install dependencies from `requirements.txt`:
+Install from `requirements.txt`:
 
-- `streamlit`
-- `openai`
-- `tavily-python`
-- `requests`
-- `python-dotenv`
-- `beautifulsoup4`
-- `fpdf2`
-- `yfinance`
+- `streamlit` — web UI
+- `anthropic` — Anthropic Claude SDK
+- `openai` — OpenAI SDK (also used for OpenAI-compatible endpoints)
+- `python-dotenv` — `.env` loading
+- `pandas` — financial data manipulation
+- `requests` — SEC API calls
+- `yfinance` — Yahoo Finance market data (optional)
+- `tavily-python` — Tavily search API (optional)
+- `fpdf2` — PDF generation
 
 ### 3.2 Environment variables
 
-Expected in `.env`:
+Copy `.env.example` to `.env` and configure:
 
-- `OPENAI_API_KEY` (required for analysis)
-- `OPENAI_MODEL` (optional, defaults to `gpt-4o-mini`)
-- `TAVILY_API_KEY` (required for Tavily searches)
-- `SEC_API_KEY` (present in template but not used by current code path)
+- `LLM_PROVIDER` — `anthropic` (default) or `openai`
+- `ANTHROPIC_API_KEY` — required for Anthropic mode
+- `OPENAI_API_KEY` — required for OpenAI mode
+- `OPENAI_BASE_URL` — defaults to Columbia CBS endpoint
+- `ENABLE_YAHOO` — `true`/`false` (default: `true`)
+- `ENABLE_TAVILY` — `true`/`false` (default: `true`)
+- `TAVILY_API_KEY` — required if Tavily is enabled
 
-### 3.3 LLM endpoint
+Context budget env vars (all optional, have sensible defaults):
 
-In `app.py`, the OpenAI client is created with:
+- `MAX_AGENT_CONTEXT_CHARS` (default: 7000)
+- `MAX_AGENT_OUTPUT_TOKENS` (default: 1200)
+- `SYNTHESIS_REPORT_MAX_CHARS` (default: 3200)
+- `SYNTHESIS_INPUT_MAX_CHARS` (default: 14000)
+- `MAX_SYNTHESIS_OUTPUT_TOKENS` (default: 1500)
+- Per-agent overrides: `MAX_CONTEXT_DCF_CHARS`, `MAX_CONTEXT_RISK_CHARS`, etc.
 
-- `base_url = "https://cbsai.business.columbia.edu/api/v1"`
-- `api_key = OPENAI_API_KEY`
-- `model = OPENAI_MODEL or gpt-4o-mini`
+### 3.3 SEC API
 
-So this implementation expects an OpenAI-compatible endpoint at that URL.
+The SEC EDGAR API is free and requires no API key. It does require a descriptive `User-Agent` header (handled by `SECClient`). Rate limit: 10 requests/second (client throttles to ~8/s).
 
 ---
 
-## 4) End-to-end execution flow (step-by-step)
+## 4) End-to-end execution flow
 
-This section tracks exactly what happens when the user clicks **Analyze**.
+This section traces what happens when the user runs `python main.py AAPL` or clicks **Run Analysis** in the Streamlit UI.
 
-### Step 1: App starts and loads config (`app.py`)
+### Step 1: Entry point
 
-1. Imports required modules.
-2. Calls `load_dotenv()` to load `.env`.
-3. Initializes logging.
-4. Defines constants:
-   - `BASE_URL`, `API_KEY`, `MODEL`
-   - Prompt paths
-   - `ANALYSES` dictionary (9 analysis configs)
-   - Concurrency and context limits
+**CLI** (`main.py`): Parses args, creates `SECCache` + `SECClient` + `Orchestrator`, calls `orchestrator.run(ticker)`.
 
-### Step 2: Streamlit UI is rendered (`app.py`)
+**Streamlit** (`app.py`): Renders sidebar config (provider, enrichment toggles, budget sliders), then calls `orchestrator.prepare_data()` → `run_phase1()` → `run_phase2()` with progress updates.
 
-1. `st.set_page_config(...)`
-2. `st.title("AI Equity Analyst")`
-3. Renders a form with:
-   - Text input: ticker/company
-   - Analyze submit button
+Both paths converge on the same `Orchestrator` class.
 
-### Step 3: Input validation (`app.py`)
+### Step 2: Data preparation (`orchestrator.prepare_data`)
 
-1. If `OPENAI_API_KEY` missing, app warns and stops.
-2. If form not submitted or input empty, app shows info and stops.
+1. **Ticker resolution** (`sec/client.py`): Maps ticker to CIK via SEC's `company_tickers.json`. Result is cached for 7 days.
+2. **Fetch SEC data** (`sec/client.py`): Pulls recent filings list and full XBRL company facts JSON. Both are cached in SQLite.
+3. **Parse XBRL** (`sec/xbrl_parser.py`): Extracts income statement, balance sheet, and cash flow concepts from raw XBRL. Computes derived metrics (margins, ratios, FCF, growth rates). Produces a human-readable financial summary string.
+4. **Build enrichment** (`market_enrichment.py`): Optionally fetches Yahoo Finance market snapshot and runs Tavily search queries (company analysis, industry overview, risk/bear case). Each section is trimmed to a character budget. Failures are recorded as warnings and do not block the pipeline.
+5. **Assemble data dict**: Combines `financial_core_summary` (SEC-only), `financial_summary` (SEC + enrichment), `metrics`, `historical_revenue`, `historical_net_income`, `recent_filings`, and enrichment metadata into a single dict passed to all agents.
 
-### Step 4: Ticker/company resolution (`sec_client.py`)
+### Step 3: Phase 1 — Parallel agent execution (`orchestrator.run_phase1`)
 
-1. `resolve_ticker(stock_input)` is called.
-2. `resolve_ticker()` behavior:
-   - Normalizes input to uppercase.
-   - Applies alias map (`GOOGLE -> GOOGL`, `FACEBOOK -> META`).
-   - Loads SEC ticker dataset once and caches it (`_fetch_tickers_data()`).
-   - Tries, in order:
-     1) exact ticker
-     2) exact company name
-     3) company name startswith input
-     4) input substring in name
-     5) word-level partial startswith matching
-3. Returns `(ticker, company_name)` or `None`.
-4. If unresolved, app shows error and stops.
+1. Five agent instances are created in `Orchestrator.__init__`, each receiving the same LLM provider and model.
+2. Each agent's `analyze()` method:
+   - Calls `build_context(data)` to select the relevant data slice for its specialty
+   - Calls `trim_context()` to enforce the per-agent character cap
+   - Loads its system prompt from `prompts/*.md` (falls back to inline string if file is missing)
+   - Calls `provider.generate()` with the system prompt + trimmed context
+3. All five agents run concurrently via `asyncio.gather()`.
+4. Returns a list of `(agent_name, analysis_text)` tuples.
 
-### Step 5: Build research context (`context_builder.py`)
+### Step 4: Phase 2 — Synthesis (`orchestrator.run_phase2`)
 
-`build_context(ticker, company_name, on_status=...)` is called.
+1. Each agent report is trimmed to `SYNTHESIS_REPORT_MAX_CHARS` (default 3200).
+2. All reports are concatenated and trimmed to `SYNTHESIS_INPUT_MAX_CHARS` (default 14000).
+3. The synthesis prompt is loaded from `prompts/synthesis.md` with `[COMPANY NAME]` and `[TICKER]` replaced.
+4. The LLM is called with the synthesis system prompt + all agent reports as user content.
+5. Returns the final executive brief string.
 
-Detailed internal sequence:
+### Step 5: Output
 
-1. Creates top header:
-   - `# Research Context: Company (Ticker)`
-   - report date
-2. Fetches live market data via `yfinance.Ticker(ticker).info`:
-   - current price, market cap, valuation multiples, 52-week range, beta, dividend yield, EPS, revenue growth
-   - if unavailable, inserts an "Unavailable" section with error message
-3. Fetches SEC filing list:
-   - calls `get_filings(ticker, form_types=["10-K","10-Q","8-K"], limit=20)`
-   - appends a visible list of latest filings
-4. Selects filings to download:
-   - latest 10-K, latest 10-Q, latest 8-K
-   - keeps only up to `num_filings` (default `2`)
-5. Downloads each selected filing full text:
-   - `fetch_filing_content(filing, max_chars=filing_max_chars)`
-   - default cap per filing: `30,000` chars
-6. Runs 3 Tavily searches:
-   - company analysis: `search_company()`
-   - industry overview: `search_industry()`
-   - risk/bear queries: `search_risks()`
-7. Formats Tavily results with title, URL, published date, and content snippet.
-8. Adds consolidated `Sources Used` list.
-9. Applies hard cap `MAX_TOTAL_CONTEXT = 60,000` characters.
-10. Returns one large string used as LLM context for all agents.
+**CLI**: `report.format_report()` renders a text report. Optionally saved to `reports/` directory.
 
-### Step 6: Load system prompt (`app.py`)
-
-1. `SYSTEM_PROMPT_PATH` points to `prompts/long-term-equity-analyst.md`.
-2. `_load_prompt()` replaces placeholders:
-   - `[STOCK NAME]`
-   - `[COMPANY NAME]`
-   - `[TICKER]`
-3. This loaded prompt is used as the **system instruction** for all analysis calls.
-
-### Step 7: Run nine analyses in parallel (`app.py`)
-
-1. App creates a `ThreadPoolExecutor(max_workers=3)`.
-2. For each key in `ANALYSES`, it submits `_run_single_analysis(...)`.
-3. Each analysis execution:
-   - Creates a fresh OpenAI client (`_make_client()`).
-   - Determines user prompt:
-     - For `initial_memo`: uses inline `user_request`.
-     - For other analyses: loads corresponding prompt file from `prompts/`.
-   - Trims context by analysis-specific cap (`CONTEXT_LIMITS`).
-   - Builds final user payload:
-     - analysis instructions
-     - separator
-     - `RESEARCH CONTEXT`
-   - Calls `_call_llm(...)` with retry/fallback strategy:
-     - First tries `client.responses.create(...)`
-     - On failure, tries `client.chat.completions.create(...)`
-     - Up to 3 attempts with increasing wait
-4. As futures complete, app stores each output in `results[key]`.
-5. If any analysis errors, that key stores `Error: ...`.
-
-### Step 8: Synthesize executive brief (`app.py`)
-
-1. Loads `prompts/synthesis.md`.
-2. Injects all 9 analysis outputs into template placeholders.
-3. Calls `_call_llm(...)` with system role:
-   - `"You are a senior equity research director."`
-4. Receives `brief` (final executive summary block shown in UI).
-
-### Step 9: Start prompt self-improvement in background (`app.py`)
-
-1. Spawns daemon thread calling `_run_prompt_improvement_background(...)`.
-2. For each analysis prompt file:
-   - Loads current prompt text
-   - Uses `prompts/prompt-improver.md` template with:
-     - brief summary (first 2000 chars)
-     - analysis output (first 3000 chars)
-     - current prompt
-   - Calls LLM to generate improved prompt text
-3. Computes unified diff (`_compute_diff()`).
-4. If changed, overwrites that prompt file on disk.
-5. Logs number of prompt files updated.
-
-Important behavior:
-
-- This modifies prompt files automatically.
-- Changes apply to future runs, not current one.
-- This can create noisy git diffs if left enabled during testing.
-
-### Step 10: Generate PDF report (`app.py`)
-
-1. Calls `_build_pdf(...)` with:
-   - company name/ticker
-   - executive brief
-   - all analysis outputs
-2. PDF generation details:
-   - Uses `fpdf2`
-   - Sanitizes Unicode to avoid rendering issues in Latin-1
-   - Adds:
-     - cover page
-     - executive brief section
-     - one page section per analysis output
-   - Includes page header/footer and basic markdown rendering logic
-3. Returns bytes for download button.
-
-### Step 11: Render final UI (`app.py`)
-
-1. Shows header and PDF download button.
-2. Renders executive brief markdown.
-3. Creates tabs:
-   - one tab per analysis output
-   - one tab for full research context
-   - one tab for prompts used
-4. Prompts tab displays every prompt file and synthesis prompt in expanders.
-5. Displays caption about background prompt improvement.
+**Streamlit**: Synthesis is rendered as markdown. Agent reports appear in tabs. PDF is built via `report.build_pdf_report()` and offered as a download button. Reports are also saved to `reports/` for the cached report viewer.
 
 ---
 
 ## 5) Module-level technical details
 
-### 5.1 `sec_client.py`
+### 5.1 `sec/client.py` — SEC EDGAR API client
 
-Core functions:
+- `resolve_ticker(ticker)` → `{cik, cik_padded, name}`. Raises `ValueError` for unknown tickers.
+- `get_submissions(ticker)` → full filing history JSON.
+- `get_recent_filings(ticker, form_types, limit)` → list of filing dicts with `form`, `filingDate`, `accessionNumber`, `primaryDocument`.
+- `get_company_facts(ticker)` → raw XBRL company facts JSON.
+- `fetch_all_data(ticker)` → convenience method combining the above.
+- Rate limiting: enforces 120ms minimum between requests (~8 req/s).
+- All responses cached in SQLite via `SECCache` (default TTL: 24 hours, ticker map: 7 days).
 
-- `_fetch_tickers_data()`: downloads SEC ticker master list and caches it globally.
-- `get_cik_from_ticker()`: ticker -> 10-digit CIK.
-- `resolve_ticker()`: robust input resolver (ticker/name/partial match).
-- `get_filings()`: calls `https://data.sec.gov/submissions/CIK{cik}.json`, filters by forms, builds filing URLs.
-- `fetch_filing_content()`:
-  - for filing dict input, converts primary doc URL to complete submission `.txt` URL
-  - fetches content with SEC-compliant headers
-  - strips SGML/HTML and noisy artifacts
-  - truncates to max chars
+### 5.2 `sec/xbrl_parser.py` — XBRL data extraction
 
-Notable constraints:
+- Extracts ~25 US-GAAP concepts across income statement, balance sheet, and cash flow.
+- `_extract_concept()` handles unit filtering (USD, shares, USD/shares), form filtering (10-K vs 10-Q), and duration filtering (annual vs quarterly periods).
+- `compute_metrics()` → dict of derived metrics: margins, ratios, FCF, EPS, revenue growth.
+- `to_summary_text(metrics)` → formatted text block for LLM prompts. Accepts pre-computed metrics to avoid redundant computation.
+- `get_historical_revenue(years)` / `get_historical_net_income(years)` → lists of `{period_end, fiscal_year, value}` dicts for trend analysis.
 
-- Requires valid SEC `User-Agent` header (`USER_AGENT` constant).
-- Uses network requests without retries beyond default requests behavior.
+### 5.3 `sec/cache.py` — SQLite caching
 
-### 5.2 `tavily_client.py`
+- Keyed by `(namespace, key)` with TTL-based expiration.
+- Uses WAL journal mode for concurrent read safety.
+- Stored at `.sec_cache.db` (gitignored).
 
-Core functions:
+### 5.4 `llm/providers.py` — LLM provider abstraction
 
-- `_get_client()`: validates `TAVILY_API_KEY`.
-- `search_company()`: recent company/stock-specific query (`topic="news"`, `days=90`).
-- `search_industry()`: broader sector query (`topic="general"`, `time_range="month"`).
-- `search_risks()`: negative/risk query variant (`topic="news"`, `days=90`).
+- `LLMProvider` abstract base: defines `async generate(system, user, model, max_tokens) → str`.
+- `AnthropicProvider`: wraps `AsyncAnthropic`. Default model: `claude-sonnet-4-20250514`.
+- `OpenAIProvider`: wraps `AsyncOpenAI`. Default model: `gpt-4o-mini`. Default base URL: Columbia CBS endpoint. Tries the Responses API first, falls back to Chat Completions for compatible providers.
+- `get_provider(name)` → factory function. Reads `LLM_PROVIDER` env var if no name given.
 
-Each function returns a normalized list containing title/url/content/score/published_date.
+### 5.5 `agents/base.py` — Base agent
 
-### 5.3 `context_builder.py`
+- `build_context(data)` → assembles user-message context from `financial_core_summary` + recent filings + targeted enrichment sections.
+- `get_system_prompt(data)` → loads from `prompts/*.md` if the file exists, otherwise uses the inline `system_prompt` string.
+- `trim_context(context)` → applies `trim_text()` to enforce per-agent character budget.
+- `append_enrichment_sections(parts, data)` → appends only the enrichment keys declared in `self.enrichment_sections`.
+- `analyze(data)` → trims context, loads prompt, calls LLM provider.
 
-Purpose: create one context payload balancing breadth and token limits.
+Each subclass overrides `build_context()` to select the specific metrics and historical data relevant to its specialty, and sets `enrichment_sections` to declare which external data sections it needs.
 
-Design choices:
+### 5.6 Agent subclasses
 
-- Mixes fundamental filings + external qualitative context + real-time market snapshot.
-- Limits per filing and total context to prevent model overload.
-- Emits status messages via callback for UI progress updates.
+| Agent | Key context selections | Enrichment sections |
+|---|---|---|
+| DCF (`dcf.py`) | Revenue/income history, FCF/debt/equity metrics | `market_data`, `external_company` |
+| Risk (`risk.py`) | Balance sheet metrics, net income history | `market_data`, `external_risks` |
+| Earnings (`earnings.py`) | Revenue/income history, margin/EPS metrics | `market_data`, `external_company` |
+| Competitive (`competitive.py`) | Revenue history, margin metrics, recent filings | `external_company`, `external_industry` |
+| Pattern (`pattern.py`) | Full revenue/income history, all metrics | `market_data` |
 
-### 5.4 `app.py`
+### 5.7 `orchestrator.py` — Pipeline coordinator
 
-Contains:
+- `prepare_data(ticker)` — synchronous data fetch + parse + enrichment.
+- `run_phase1(data)` — async parallel agent execution.
+- `run_phase2(ticker, company_name, agent_reports)` — synthesis with context trimming.
+- `run(ticker)` — convenience method that chains all three steps.
 
-- UI setup
-- task orchestration
-- LLM helper methods
-- parallel execution
-- synthesis
-- background prompt evolution
-- PDF export pipeline
+### 5.8 `market_enrichment.py` — Optional enrichment
 
-Reliability mechanisms:
+- Yahoo Finance: live price, market cap, P/E, P/S, EV/EBITDA, 52-week range, beta.
+- Tavily: three search queries (company analysis, industry overview, risk/bear case), each returning up to `TAVILY_MAX_RESULTS` results with trimmed snippets.
+- Entirely fail-safe: disabled providers or network errors produce warnings, not crashes.
 
-- LLM retry logic with fallback API method
-- per-analysis try/except (single failure does not crash full run)
-- PDF generation failure is non-fatal
+### 5.9 `report.py` — Output formatting
 
----
+- `clean_generated_text()` — normalizes LLM artifacts (spaced-out letters, excess whitespace, Unicode issues).
+- `format_report()` → plain text investment brief.
+- `build_pdf_report()` → PDF bytes with section formatting, markdown-aware rendering, and Latin-1 safe encoding.
+- `save_report()` / `save_pdf_report()` — persist to `reports/` directory.
+- `list_cached_reports()` — returns recent `.txt` reports sorted by modification time (used by Streamlit cached report viewer).
+- `streamlit_markdown_text()` — escapes `$` signs so dollar amounts don't render as LaTeX.
 
-## 6) Prompt system details (`prompts/`)
+### 5.10 `context_budget.py` — Text trimming
 
-### 6.1 Analysis prompts
+- `trim_text(text, max_chars, marker)` — deterministic truncation with a visible `[trimmed]` marker. Used throughout to enforce context window budgets.
 
-The 9 analyst prompts enforce evidence-first output from provided context:
+### 5.11 `prompt_loader.py` — Prompt loading
 
-1. `long-term-equity-analyst.md` (used as global system prompt)
-2. `bull-case.md`
-3. `bear-case.md`
-4. `quarterly-update.md`
-5. `dcf-analyst.md`
-6. `risk-analyst.md`
-7. `earnings-analyst.md`
-8. `competitive-analysis.md`
-9. `pattern-analysis.md`
+- `load_prompt_file(path)` — reads a UTF-8 markdown file.
+- `render_prompt(template, data)` — replaces `[COMPANY NAME]`, `[STOCK NAME]`, `[TICKER]` tokens.
 
-### 6.2 Synthesis prompt
+### 5.12 `utils.py` — Shared helpers
 
-`synthesis.md`:
-
-- receives the 9 generated outputs
-- enforces exact report shape (health score, up/down cases, target, rating, verdict)
-- includes consistency guardrails (rating must match implied upside/downside)
-
-### 6.3 Prompt improver prompt
-
-`prompt-improver.md`:
-
-- asks the model to improve one prompt based on observed output quality
-- hard cap: improved prompt must be <=40 lines
-- instructs surgical, minimal changes
+- `env_flag(name, default)` — reads a boolean from an env var (`true`/`1`/`yes`/`on`).
+- `format_money(value, abbreviate)` — formats numbers as `$1.23T`, `$4.56B`, `$7.8M`, or `$1,234`.
 
 ---
 
-## 7) Current concurrency model
+## 6) Prompt system (`prompts/`)
 
-- Analysis generation: parallelized with thread pool (`max_workers=3`) across 9 jobs.
-- Prompt improvement: separate daemon thread; internally parallelized (`max_workers=3`) across prompt files.
-- Net effect: faster user response, with deferred self-optimization after visible output.
+Each agent has a corresponding markdown prompt file:
+
+| File | Agent | Key instructions |
+|---|---|---|
+| `dcf.md` | DCF Analyst | Revenue projection, FCF, WACC, terminal value, fair value, BUY/HOLD/SELL |
+| `risk.md` | Risk Analyst | Balance sheet risk, earnings quality, macro sensitivity, tail scenarios, 1-10 risk scores |
+| `earnings.md` | Earnings Analyst | EPS trajectory, margins, cash conversion, forward outlook, STRONG/STABLE/DETERIORATING/WEAK |
+| `competitive.md` | Competitive Analyst | Market position, moat analysis, sector dynamics, Porter's Five Forces, DOMINANT/STRONG/AVERAGE/WEAK |
+| `pattern.md` | Pattern Analyst | Trend analysis, mean reversion, statistical anomalies, ratio dynamics, GROWTH/CYCLICAL/MEAN-REVERTING/DETERIORATING |
+| `synthesis.md` | CIO Synthesis | Cross-reference all 5 reports, top 3 risks + catalysts, STRONG BUY→STRONG SELL rating, 1-10 health scores |
+
+Prompts support `[COMPANY NAME]`, `[STOCK NAME]`, and `[TICKER]` placeholders which are replaced at runtime. If a prompt file is missing, agents fall back to their inline `system_prompt` string.
+
+---
+
+## 7) Concurrency model
+
+- **Agent execution**: 5 agents run concurrently via `asyncio.gather()`. All share the same provider instance (async-safe).
+- **Data fetch**: SEC API calls are synchronous and sequential (rate-limited). They complete before agents start.
+- **Enrichment**: Yahoo and Tavily calls are synchronous, run during data preparation.
 
 ---
 
 ## 8) Data contracts and key structures
 
-### 8.1 `ANALYSES` dict (`app.py`)
+### 8.1 Orchestrator data dict
 
-Each analysis entry contains:
+Produced by `prepare_data()`, consumed by all agents:
 
-- `label`: UI/display name
-- `prompt_file`: markdown file path
-- optional `user_request`: inline request string (used by `initial_memo`)
+```python
+{
+    "ticker": "AAPL",
+    "company_name": "Apple Inc",
+    "financial_core_summary": "=== Financial Summary ... ===",  # SEC-only text
+    "financial_summary": "...",  # SEC text + enrichment text (used by base agent)
+    "metrics": {"revenue": 394328000000, "net_margin": 0.2639, ...},
+    "recent_filings": [{"form": "10-K", "filingDate": "2025-11-01", ...}],
+    "historical_revenue": [{"period_end": "2025-09-27", "fiscal_year": 2025, "revenue": 394328000000}],
+    "historical_net_income": [...],
+    "enrichment_sections": {"market_data": "...", "external_company": "...", ...},
+    "enrichment_warnings": ["Yahoo enrichment unavailable: ..."],
+    "enrichment_sources": ["Article Title - https://..."],
+    "enrichment_filter_stats": {"company_kept": 3, ...},
+}
+```
 
-### 8.2 Filing dict shape (`sec_client.py`)
+### 8.2 Agent reports
 
-Produced by `get_filings()`:
+List of `(agent_name: str, analysis_text: str)` tuples.
 
-- `form`
-- `filing_date`
-- `accession_number`
-- `primary_document`
-- `url`
+### 8.3 Orchestrator result dict
 
-### 8.3 Tavily result shape (`tavily_client.py`)
+Returned by `orchestrator.run()`:
 
-Normalized fields:
-
-- `title`
-- `url`
-- `content`
-- `score`
-- `published_date`
-
----
-
-## 9) Known behavior and merge-sensitive points
-
-When merging into another base codebase, these are the highest-friction parts:
-
-1. **Endpoint compatibility**
-   - This code uses OpenAI-compatible SDK calls and a custom `BASE_URL`.
-2. **Prompt auto-mutation**
-   - Prompt files are rewritten automatically in background after each run.
-3. **Context truncation**
-   - Filing and total context caps can affect analysis quality and determinism.
-4. **Ticker resolution strategy**
-   - Uses SEC ticker JSON heuristic matching logic; not symbol service APIs.
-5. **SEC scraping assumptions**
-   - Relies on SEC submission JSON + filing text clean-up heuristics.
-6. **UI and orchestration coupling**
-   - `app.py` holds both presentation and business pipeline logic.
-
----
-
-## 10) Recommended merge mapping into your classmate's base repo
-
-Since your classmate repo is the base, import this project by capability slices (not one giant merge):
-
-1. **Slice A: Data connectors**
-   - Port `sec_client.py` and `tavily_client.py`.
-2. **Slice B: Context builder**
-   - Port `context_builder.py` with status callback support.
-3. **Slice C: Prompt package**
-   - Copy `prompts/` and placeholder substitution behavior.
-4. **Slice D: Parallel analysis executor**
-   - Port `_run_single_analysis`, `_call_llm`, `_load_prompt`, `CONTEXT_LIMITS`.
-5. **Slice E: Synthesis**
-   - Port `synthesis.md` integration and final rating logic.
-6. **Slice F: PDF**
-   - Port `_build_pdf` (or adapt to their export system).
-7. **Slice G: Prompt auto-improver**
-   - Add last; keep behind a feature flag initially.
-
-For each slice:
-
-- integrate code
-- run automated checks
-- run your manual smoke test
-- commit before moving to next slice
-
----
-
-## 11) Manual test checklist (suggested)
-
-Run these after each merge slice:
-
-1. Input resolution:
-   - test ticker (`AAPL`)
-   - test company name (`Apple`)
-   - test partial string (`Micro`)
-2. Data acquisition:
-   - SEC filings list appears
-   - at least one filing content block loads
-   - Tavily sections populate
-3. Agent execution:
-   - all 9 analyses return output
-   - one forced failure does not crash the app
-4. Synthesis integrity:
-   - health score appears
-   - price target and rating appear
-   - rating direction matches target logic
-5. PDF:
-   - download button works
-   - PDF contains executive brief + all sections
-6. Prompt improvement:
-   - verify whether prompt files changed after run
-   - disable feature if reproducibility is required
-
----
-
-## 12) Commands for local execution
-
-```bash
-pip install -r requirements.txt
-cp .env.example .env
-streamlit run app.py
+```python
+{
+    "ticker": "AAPL",
+    "company_name": "Apple Inc",
+    "agent_reports": [("DCF Analyst", "..."), ...],
+    "synthesis": "...",
+    "metrics": {...},
+    "enrichment_warnings": [...],
+    "enrichment_sources": [...],
+    "enrichment_filter_stats": {...},
+}
 ```
 
 ---
 
-## 13) Short implementation summary
+## 9) Streamlit-specific details (`app.py`)
 
-This codebase is a Streamlit orchestrator over a research-context pipeline and a 9-agent LLM analysis stack, followed by synthesis, PDF export, and background prompt self-improvement. The highest-value merge strategy into your base repo is capability-by-capability integration with test checkpoints after each slice.
+The web UI adds:
 
+- **Sidebar**: LLM provider selector, Anthropic BYOK field, SEC User-Agent, enrichment toggles, context budget sliders, cached report viewer.
+- **Provider handling**: OpenAI uses `OPENAI_CBS_API_KEY` as default. Anthropic requires a user-provided key per run (ephemeral — not stored).
+- **Event loop**: Wraps async pipeline in `asyncio.run()` with fallback for Streamlit's existing event loop.
+- **Session state**: Latest result is stored in `st.session_state` so it persists across reruns.
+- **PDF download**: Built on every successful run via `build_pdf_report()`.
+- **Cached reports**: Lists `.txt` files from `reports/` directory, selectable in sidebar.
+
+### Streamlit Cloud deployment
+
+1. Push to GitHub.
+2. Create app in Streamlit Community Cloud, entrypoint: `app.py`.
+3. Add secrets (see `.streamlit/secrets.toml.example`).
+4. The `_bootstrap_env_from_streamlit_secrets()` function copies secrets into env vars at startup.
+
+---
+
+## 10) CLI-specific details (`main.py`)
+
+```bash
+python main.py TICKER [--save] [--output FILE] [--provider anthropic|openai] [--model MODEL] [--user-agent STR] [--inspect-context] [--preview-chars N]
+```
+
+- `--inspect-context`: Runs data preparation only (no LLM calls). Prints context sizes, enrichment stats, and per-agent payload dimensions. Useful for tuning budgets before spending tokens.
+- `--provider` / `--model`: Override LLM provider and model for this run.
+- `--save`: Auto-save to `reports/{TICKER}_{timestamp}.txt`.
+
+---
+
+## 11) Testing checklist
+
+After making changes, verify:
+
+1. **Ticker resolution**: `python main.py AAPL --inspect-context` resolves and fetches data.
+2. **Context sizing**: Inspect output shows reasonable section sizes and per-agent caps.
+3. **Agent execution**: All 5 agents return output (no crashes from missing data).
+4. **Synthesis**: Executive brief includes rating, health scores, and verdict.
+5. **PDF**: Download button works in Streamlit; PDF contains all sections.
+6. **Enrichment off**: `ENABLE_YAHOO=false ENABLE_TAVILY=false python main.py AAPL` still works with SEC-only data.
+7. **Provider switch**: Both `--provider anthropic` and `--provider openai` produce results.
+8. **Cached reports**: Streamlit sidebar shows saved reports and renders them.

@@ -9,6 +9,8 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
+from utils import format_money
+
 
 # Common US-GAAP concepts we extract
 INCOME_STATEMENT_CONCEPTS = [
@@ -265,12 +267,17 @@ class XBRLParser:
 
         return metrics
 
-    def to_summary_text(self) -> str:
+    def to_summary_text(self, metrics: Optional[Dict[str, Any]] = None) -> str:
         """
         Produce a human-readable text summary of the financials
         suitable for inclusion in an LLM prompt.
+
+        Args:
+            metrics: Pre-computed metrics dict. If None, compute_metrics()
+                     is called internally (kept for backward compatibility).
         """
-        metrics = self.compute_metrics()
+        if metrics is None:
+            metrics = self.compute_metrics()
         lines = [f"=== Financial Summary: {self.entity_name} ===\n"]
 
         def fmt(val: Any, is_dollars: bool = True, is_pct: bool = False) -> str:
@@ -278,12 +285,8 @@ class XBRLParser:
                 return "N/A"
             if is_pct:
                 return f"{val * 100:.1f}%"
-            if is_dollars and isinstance(val, (int, float)):
-                if abs(val) >= 1e9:
-                    return f"${val / 1e9:.2f}B"
-                if abs(val) >= 1e6:
-                    return f"${val / 1e6:.1f}M"
-                return f"${val:,.0f}"
+            if is_dollars:
+                return format_money(val)
             return str(val)
 
         lines.append("── Income Statement (Latest Annual) ──")
