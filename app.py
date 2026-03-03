@@ -99,7 +99,7 @@ def _run_analysis_sync(ticker: str, user_agent: str, provider: str, model: str, 
     async def _pipeline() -> dict:
         progress.write("Fetching SEC/XBRL data and enrichment...")
         data = orchestrator.prepare_data(ticker)
-        progress.write("Running five analyst agents in parallel...")
+        progress.write("Running analyst agents in parallel...")
         agent_reports = await orchestrator.run_phase1(data)
         progress.write("Synthesizing final investment brief...")
         synthesis = await orchestrator.run_phase2(
@@ -203,7 +203,7 @@ def main() -> None:
     st.set_page_config(page_title="AI Financial Analyst", layout="wide")
     _bootstrap_env_from_streamlit_secrets()
     st.title("AI Financial Analyst")
-    st.caption("Five-agent equity research with provider selection and context budgets.")
+    st.caption("Multi-agent equity research with provider selection and context budgets.")
 
     with st.sidebar:
         st.header("Run Configuration")

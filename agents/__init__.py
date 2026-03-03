@@ -4,6 +4,7 @@ from agents.risk import RiskAgent
 from agents.earnings import EarningsAgent
 from agents.competitive import CompetitiveAgent
 from agents.pattern import PatternAgent
+from agents.macro import MacroAgent
 
 __all__ = [
     "BaseAgent",
@@ -12,4 +13,5 @@ __all__ = [
     "EarningsAgent",
     "CompetitiveAgent",
     "PatternAgent",
+    "MacroAgent",
 ]

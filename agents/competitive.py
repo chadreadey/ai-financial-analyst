@@ -15,7 +15,12 @@ class CompetitiveAgent(BaseAgent):
     name = "Competitive & Sector Analyst"
     prompt_file = "prompts/competitive.md"
     context_limit_env = "MAX_CONTEXT_COMPETITIVE_CHARS"
-    enrichment_sections = ("external_company", "external_industry")
+    enrichment_sections = (
+        "external_company",
+        "external_industry",
+        "peer_comparison",
+        "filing_business",
+    )
 
     system_prompt = """You are a senior partner at Bain & Company, specializing in \
 competitive strategy and sector analysis for investor clients.
@@ -75,11 +80,17 @@ margins, growth rates, and R&D spend reveal competitive dynamics."""
             m = data["metrics"]
             for key in [
                 "revenue", "revenue_growth_yoy",
+                "revenue_cagr_3y", "revenue_cagr_5y",
                 "gross_margin", "operating_margin", "net_margin",
                 "gross_profit", "operating_income",
+                "operating_leverage_5y",
             ]:
                 if key in m and m[key] is not None:
                     parts.append(f"  {key}: {m[key]}")
+
+        if data.get("margin_trends"):
+            parts.append("\n── Historical Margin Trends ──")
+            parts.append(json.dumps(data["margin_trends"][:5], indent=2))
 
         if "recent_filings" in data:
             parts.append("\n── Recent SEC Filings ──")

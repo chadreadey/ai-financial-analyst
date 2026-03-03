@@ -1,8 +1,8 @@
 """
 Orchestrator: Phase 1 fan-out + Phase 2 synthesis.
 
-Phase 1: Run all 5 analyst agents in parallel via asyncio.gather().
-Phase 2: Feed all agent outputs to a 6th synthesis agent that
+Phase 1: Run all analyst agents (5 core + optional Macro) in parallel via asyncio.gather().
+Phase 2: Feed all agent outputs to a synthesis agent that
          cross-references findings and produces the final brief.
 """
 
@@ -17,13 +17,16 @@ from agents import (
     EarningsAgent,
     CompetitiveAgent,
     PatternAgent,
+    MacroAgent,
 )
 from context_budget import trim_text
 from llm import LLMProvider, get_provider
 from market_enrichment import build_enrichment_context
 from prompt_loader import load_prompt_file, render_prompt
 from sec.client import SECClient
+from sec.filing_parser import parse_filing_sections
 from sec.xbrl_parser import XBRLParser
+from utils import env_flag
 
 
 SYNTHESIS_PROMPT_FILE = Path("prompts/synthesis.md")
@@ -55,6 +58,10 @@ class Orchestrator:
             CompetitiveAgent(provider=self.provider, model=self.synthesis_model),
             PatternAgent(provider=self.provider, model=self.synthesis_model),
         ]
+        if env_flag("ENABLE_MACRO_AGENT", True):
+            self.agents.append(
+                MacroAgent(provider=self.provider, model=self.synthesis_model)
+            )
 
     def prepare_data(self, ticker: str) -> Dict[str, Any]:
         """
@@ -71,6 +78,40 @@ class Orchestrator:
         metrics = parser.compute_metrics()
         financial_summary = parser.to_summary_text(metrics=metrics)
 
+        quarterly_metrics = parser.compute_quarterly_metrics(quarters=8)
+        quarterly_summary = parser.get_quarterly_summary_text(quarterly_metrics)
+        margin_trends = parser.get_historical_margins(years=8)
+        cash_flow_trends = parser.get_historical_cash_flow(years=8)
+
+        filing_sections: dict = {"mda": "", "risk_factors": "", "business_description": ""}
+        if env_flag("ENABLE_FILING_TEXT", True):
+            try:
+                tenk_filings = [
+                    f for f in raw["recent_filings"]
+                    if f.get("form") == "10-K" and f.get("primaryDocument")
+                ]
+                if tenk_filings:
+                    latest_10k = tenk_filings[0]
+                    print("  Fetching 10-K filing text for narrative extraction...")
+                    html = self.sec_client.get_filing_text(
+                        raw["ticker"],
+                        latest_10k["accessionNumber"],
+                        latest_10k["primaryDocument"],
+                    )
+                    filing_sections = parse_filing_sections(html)
+                    section_count = sum(1 for v in filing_sections.values() if v)
+                    print(f"  Extracted {section_count}/3 filing sections")
+            except Exception as exc:
+                print(f"  Warning: filing text extraction failed: {exc}")
+
+        enrichment_sections = enrichment.get("sections", {})
+        if filing_sections.get("mda"):
+            enrichment_sections["filing_mda"] = f"=== 10-K MD&A ===\n{filing_sections['mda']}"
+        if filing_sections.get("risk_factors"):
+            enrichment_sections["filing_risk_factors"] = f"=== 10-K Risk Factors ===\n{filing_sections['risk_factors']}"
+        if filing_sections.get("business_description"):
+            enrichment_sections["filing_business"] = f"=== 10-K Business Description ===\n{filing_sections['business_description']}"
+
         data = {
             "ticker": raw["ticker"],
             "company_name": raw["company_name"],
@@ -84,7 +125,11 @@ class Orchestrator:
             "recent_filings": raw["recent_filings"],
             "historical_revenue": parser.get_historical_revenue(years=8),
             "historical_net_income": parser.get_historical_net_income(years=8),
-            "enrichment_sections": enrichment.get("sections", {}),
+            "margin_trends": margin_trends,
+            "cash_flow_trends": cash_flow_trends,
+            "quarterly_metrics": quarterly_metrics,
+            "quarterly_summary": quarterly_summary,
+            "enrichment_sections": enrichment_sections,
             "enrichment_warnings": enrichment.get("warnings", []),
             "enrichment_sources": enrichment.get("sources", []),
             "enrichment_filter_stats": enrichment.get("filter_stats", {}),
@@ -125,7 +170,7 @@ class Orchestrator:
 
         # Build the synthesis prompt with all agent reports
         report_sections = []
-        per_report_cap = int(os.getenv("SYNTHESIS_REPORT_MAX_CHARS", "3200"))
+        per_report_cap = int(os.getenv("SYNTHESIS_REPORT_MAX_CHARS", "4500"))
         for agent_name, analysis in agent_reports:
             trimmed_analysis = trim_text(
                 analysis,
@@ -142,7 +187,7 @@ class Orchestrator:
         combined_reports = "\n\n".join(report_sections)
         combined_reports = trim_text(
             combined_reports,
-            int(os.getenv("SYNTHESIS_INPUT_MAX_CHARS", "14000")),
+            int(os.getenv("SYNTHESIS_INPUT_MAX_CHARS", "22000")),
             marker="\n...[synthesis input trimmed]...",
         )
         synthesis_template = load_prompt_file(str(SYNTHESIS_PROMPT_FILE))
@@ -151,11 +196,12 @@ class Orchestrator:
             {"company_name": company_name, "ticker": ticker},
         )
 
+        agent_count = len(agent_reports)
         synthesis_text = await self.provider.generate(
             system=synthesis_system_prompt,
             user=(
                 f"Company: {company_name} ({ticker})\n\n"
-                "Below are the five analyst reports. "
+                f"Below are the {agent_count} analyst reports. "
                 "Synthesize them into a unified investment brief.\n\n"
                 f"{combined_reports}"
             ),

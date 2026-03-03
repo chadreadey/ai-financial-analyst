@@ -16,7 +16,14 @@ class RiskAgent(BaseAgent):
     name = "Risk Analyst"
     prompt_file = "prompts/risk.md"
     context_limit_env = "MAX_CONTEXT_RISK_CHARS"
-    enrichment_sections = ("market_data", "external_risks")
+    enrichment_sections = (
+        "market_data",
+        "external_risks",
+        "macro_data",
+        "price_history",
+        "filing_risk_factors",
+        "filing_mda",
+    )
 
     system_prompt = """You are a senior risk analyst at Bridgewater Associates, \
 applying Ray Dalio's principles-based framework to company risk assessment.
@@ -81,6 +88,13 @@ but also acknowledge genuine strengths in the risk profile."""
         if "historical_net_income" in data:
             parts.append("\n── Historical Net Income (trend stability) ──")
             parts.append(json.dumps(data["historical_net_income"], indent=2))
+
+        if data.get("cash_flow_trends"):
+            parts.append("\n── Historical Cash Flow ──")
+            parts.append(json.dumps(data["cash_flow_trends"][:5], indent=2))
+
+        if data.get("quarterly_summary"):
+            parts.append(f"\n{data['quarterly_summary']}")
 
         self.append_enrichment_sections(parts, data)
         return "\n".join(parts)

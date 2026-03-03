@@ -168,6 +168,26 @@ class XBRLParser:
             return None
         return float(df.iloc[0]["val"])
 
+    def _annual_series(self, concept: str, years: int = 8) -> pd.DataFrame:
+        """Get annual 10-K series for a concept, sorted newest-first."""
+        df = self._extract_concept(concept, form_filter=["10-K"])
+        if df.empty:
+            return df
+        return df.head(years)
+
+    def _resolve_revenue_df(self, form_filter: Optional[List[str]] = None) -> pd.DataFrame:
+        if form_filter is None:
+            form_filter = ["10-K"]
+        for concept in [
+            "Revenues",
+            "RevenueFromContractWithCustomerExcludingAssessedTax",
+            "SalesRevenueNet",
+        ]:
+            df = self._extract_concept(concept, form_filter=form_filter)
+            if not df.empty:
+                return df
+        return pd.DataFrame()
+
     def compute_metrics(self) -> Dict[str, Any]:
         """
         Compute derived financial metrics from XBRL data.
@@ -252,20 +272,171 @@ class XBRLParser:
             "CommonStockSharesOutstanding"
         )
 
-        # Revenue growth (YoY)
-        revenue_df = self._extract_concept("Revenues", form_filter=["10-K"])
-        if revenue_df.empty:
-            revenue_df = self._extract_concept(
-                "RevenueFromContractWithCustomerExcludingAssessedTax",
-                form_filter=["10-K"],
-            )
+        # Revenue growth (YoY) and multi-year CAGRs
+        revenue_df = self._resolve_revenue_df(form_filter=["10-K"])
         if len(revenue_df) >= 2:
             latest = float(revenue_df.iloc[0]["val"])
             prior = float(revenue_df.iloc[1]["val"])
             if prior != 0:
                 metrics["revenue_growth_yoy"] = round((latest - prior) / prior, 4)
 
+        metrics["revenue_cagr_3y"] = self._compute_cagr(revenue_df, 3)
+        metrics["revenue_cagr_5y"] = self._compute_cagr(revenue_df, 5)
+
+        ni_df = self._annual_series("NetIncomeLoss", years=8)
+        metrics["net_income_cagr_3y"] = self._compute_cagr(ni_df, 3)
+        metrics["net_income_cagr_5y"] = self._compute_cagr(ni_df, 5)
+
+        oi_df = self._annual_series("OperatingIncomeLoss", years=8)
+        rev_cagr = metrics.get("revenue_cagr_5y")
+        oi_cagr = self._compute_cagr(oi_df, 5)
+        if rev_cagr is not None and oi_cagr is not None and rev_cagr != 0:
+            metrics["operating_leverage_5y"] = round(oi_cagr / rev_cagr, 2)
+        else:
+            metrics["operating_leverage_5y"] = None
+
         return metrics
+
+    @staticmethod
+    def _compute_cagr(df: pd.DataFrame, years: int) -> Optional[float]:
+        if df.empty or len(df) < years + 1:
+            return None
+        end_val = float(df.iloc[0]["val"])
+        start_val = float(df.iloc[years]["val"])
+        if start_val <= 0 or end_val <= 0:
+            return None
+        return round((end_val / start_val) ** (1.0 / years) - 1, 4)
+
+    def get_historical_margins(self, years: int = 8) -> List[Dict[str, Any]]:
+        """Return per-year gross/operating/net margins."""
+        revenue_df = self._resolve_revenue_df(form_filter=["10-K"]).head(years)
+        gp_df = self._annual_series("GrossProfit", years)
+        oi_df = self._annual_series("OperatingIncomeLoss", years)
+        ni_df = self._annual_series("NetIncomeLoss", years)
+
+        if revenue_df.empty:
+            return []
+
+        results = []
+        for _, rev_row in revenue_df.iterrows():
+            fy = rev_row.get("fiscal_year")
+            end = str(rev_row["end"].date()) if pd.notna(rev_row["end"]) else None
+            rev = float(rev_row["val"])
+            if rev == 0:
+                continue
+
+            entry: Dict[str, Any] = {"fiscal_year": fy, "period_end": end}
+
+            for label, src_df, concept_col in [
+                ("gross_margin", gp_df, "val"),
+                ("operating_margin", oi_df, "val"),
+                ("net_margin", ni_df, "val"),
+            ]:
+                matched = src_df[src_df["fiscal_year"] == fy] if not src_df.empty and "fiscal_year" in src_df.columns else pd.DataFrame()
+                if not matched.empty:
+                    entry[label] = round(float(matched.iloc[0][concept_col]) / rev, 4)
+
+            results.append(entry)
+        return results
+
+    def get_historical_cash_flow(self, years: int = 8) -> List[Dict[str, Any]]:
+        """Return per-year operating CF, capex, and FCF."""
+        ocf_df = self._annual_series("NetCashProvidedByUsedInOperatingActivities", years)
+        capex_df = self._annual_series("PaymentsToAcquirePropertyPlantAndEquipment", years)
+
+        if ocf_df.empty:
+            return []
+
+        results = []
+        for _, row in ocf_df.iterrows():
+            fy = row.get("fiscal_year")
+            end = str(row["end"].date()) if pd.notna(row["end"]) else None
+            ocf = float(row["val"])
+
+            entry: Dict[str, Any] = {
+                "fiscal_year": fy,
+                "period_end": end,
+                "operating_cf": ocf,
+            }
+
+            matched = capex_df[capex_df["fiscal_year"] == fy] if not capex_df.empty and "fiscal_year" in capex_df.columns else pd.DataFrame()
+            if not matched.empty:
+                cx = float(matched.iloc[0]["val"])
+                entry["capex"] = cx
+                entry["fcf"] = ocf - cx
+
+            results.append(entry)
+        return results
+
+    def compute_quarterly_metrics(self, quarters: int = 8) -> List[Dict[str, Any]]:
+        """Extract the last N quarters of key income metrics from 10-Q filings."""
+        revenue_df = self._resolve_revenue_df(form_filter=["10-Q"]).head(quarters)
+        ni_df = self._extract_concept("NetIncomeLoss", form_filter=["10-Q"]).head(quarters)
+        oi_df = self._extract_concept("OperatingIncomeLoss", form_filter=["10-Q"]).head(quarters)
+        eps_df = self._extract_concept("EarningsPerShareDiluted", form_filter=["10-Q"]).head(quarters)
+
+        if revenue_df.empty:
+            return []
+
+        results = []
+        for _, row in revenue_df.iterrows():
+            fy = row.get("fiscal_year")
+            fp = row.get("fiscal_period")
+            end = str(row["end"].date()) if pd.notna(row["end"]) else None
+            rev = float(row["val"])
+
+            entry: Dict[str, Any] = {
+                "fiscal_year": fy,
+                "fiscal_period": fp,
+                "period_end": end,
+                "revenue": rev,
+            }
+
+            for label, src_df in [("net_income", ni_df), ("operating_income", oi_df), ("eps_diluted", eps_df)]:
+                if src_df.empty:
+                    continue
+                match = src_df[(src_df.get("fiscal_year", pd.Series()) == fy) & (src_df.get("fiscal_period", pd.Series()) == fp)]
+                if not match.empty:
+                    entry[label] = float(match.iloc[0]["val"])
+
+            if rev != 0 and "operating_income" in entry:
+                entry["operating_margin"] = round(entry["operating_income"] / rev, 4)
+
+            results.append(entry)
+
+        # Compute QoQ and YoY growth (results are newest-first)
+        for i, entry in enumerate(results):
+            if i + 1 < len(results) and results[i + 1].get("revenue", 0) != 0:
+                entry["revenue_qoq_growth"] = round(
+                    (entry["revenue"] - results[i + 1]["revenue"]) / abs(results[i + 1]["revenue"]), 4
+                )
+            if i + 4 < len(results) and results[i + 4].get("revenue", 0) != 0:
+                entry["revenue_yoy_growth"] = round(
+                    (entry["revenue"] - results[i + 4]["revenue"]) / abs(results[i + 4]["revenue"]), 4
+                )
+        return results
+
+    def get_quarterly_summary_text(self, quarterly: Optional[List[Dict[str, Any]]] = None) -> str:
+        """Format quarterly metrics into a compact text block."""
+        if quarterly is None:
+            quarterly = self.compute_quarterly_metrics()
+        if not quarterly:
+            return ""
+        lines = ["=== Recent Quarterly Trends ==="]
+        for q in quarterly:
+            period = f"FY{q.get('fiscal_year', '?')} {q.get('fiscal_period', '?')}"
+            rev_str = format_money(q.get("revenue"))
+            parts = [f"  {period}: Rev {rev_str}"]
+            if "operating_margin" in q:
+                parts.append(f"OpMgn {q['operating_margin']*100:.1f}%")
+            if "eps_diluted" in q:
+                parts.append(f"EPS ${q['eps_diluted']:.2f}")
+            if "revenue_qoq_growth" in q:
+                parts.append(f"QoQ {q['revenue_qoq_growth']*100:+.1f}%")
+            if "revenue_yoy_growth" in q:
+                parts.append(f"YoY {q['revenue_yoy_growth']*100:+.1f}%")
+            lines.append(" | ".join(parts))
+        return "\n".join(lines)
 
     def to_summary_text(self, metrics: Optional[Dict[str, Any]] = None) -> str:
         """
@@ -325,6 +496,27 @@ class XBRLParser:
         lines.append("")
 
         lines.append(f"  Shares Out:       {fmt(metrics.get('shares_outstanding'), is_dollars=False)}")
+
+        # Trend summary block
+        lines.append("")
+        lines.append("── Trends ──")
+        lines.append(f"  Revenue CAGR (3Y): {fmt(metrics.get('revenue_cagr_3y'), is_pct=True)}")
+        lines.append(f"  Revenue CAGR (5Y): {fmt(metrics.get('revenue_cagr_5y'), is_pct=True)}")
+        lines.append(f"  Net Income CAGR (3Y): {fmt(metrics.get('net_income_cagr_3y'), is_pct=True)}")
+        lines.append(f"  Net Income CAGR (5Y): {fmt(metrics.get('net_income_cagr_5y'), is_pct=True)}")
+        ol = metrics.get("operating_leverage_5y")
+        lines.append(f"  Operating Leverage (5Y): {ol if ol is not None else 'N/A'}")
+
+        margins = self.get_historical_margins(years=5)
+        if margins:
+            gm_vals = [m["gross_margin"] for m in margins if "gross_margin" in m]
+            om_vals = [m["operating_margin"] for m in margins if "operating_margin" in m]
+            if len(gm_vals) >= 2:
+                direction = "expanding" if gm_vals[0] > gm_vals[-1] else ("contracting" if gm_vals[0] < gm_vals[-1] else "stable")
+                lines.append(f"  Gross Margin Direction (5Y): {direction}")
+            if len(om_vals) >= 2:
+                direction = "expanding" if om_vals[0] > om_vals[-1] else ("contracting" if om_vals[0] < om_vals[-1] else "stable")
+                lines.append(f"  Operating Margin Direction (5Y): {direction}")
 
         return "\n".join(lines)
 

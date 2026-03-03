@@ -16,7 +16,11 @@ class PatternAgent(BaseAgent):
     name = "Pattern Analyst"
     prompt_file = "prompts/pattern.md"
     context_limit_env = "MAX_CONTEXT_PATTERN_CHARS"
-    enrichment_sections = ("market_data",)
+    enrichment_sections = (
+        "market_data",
+        "price_history",
+        "analyst_estimates",
+    )
 
     system_prompt = """You are a quantitative analyst at Renaissance Technologies, \
 applying systematic pattern recognition to fundamental financial data.
@@ -74,10 +78,20 @@ in the data."""
 
         if "metrics" in data:
             parts.append("\n── Current Metrics (latest snapshot) ──")
-            # Give all metrics to the pattern agent
             for key, val in data["metrics"].items():
                 if val is not None:
                     parts.append(f"  {key}: {val}")
+
+        if data.get("margin_trends"):
+            parts.append("\n── Historical Margin Trends ──")
+            parts.append(json.dumps(data["margin_trends"], indent=2))
+
+        if data.get("cash_flow_trends"):
+            parts.append("\n── Historical Cash Flow ──")
+            parts.append(json.dumps(data["cash_flow_trends"], indent=2))
+
+        if data.get("quarterly_summary"):
+            parts.append(f"\n{data['quarterly_summary']}")
 
         self.append_enrichment_sections(parts, data)
         return "\n".join(parts)

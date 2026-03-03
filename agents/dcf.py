@@ -15,7 +15,15 @@ class DCFAgent(BaseAgent):
     name = "DCF Analyst"
     prompt_file = "prompts/dcf.md"
     context_limit_env = "MAX_CONTEXT_DCF_CHARS"
-    enrichment_sections = ("market_data", "external_company")
+    enrichment_sections = (
+        "market_data",
+        "external_company",
+        "analyst_estimates",
+        "price_history",
+        "macro_data",
+        "peer_comparison",
+        "filing_mda",
+    )
 
     system_prompt = """You are a senior equity research analyst at Morgan Stanley, \
 specializing in Discounted Cash Flow (DCF) valuation.
@@ -71,9 +79,23 @@ Be rigorous but concise. Use actual numbers from the provided financials."""
                 "free_cash_flow", "operating_cash_flow", "capex",
                 "long_term_debt", "cash", "stockholders_equity",
                 "shares_outstanding", "revenue_growth_yoy",
+                "revenue_cagr_3y", "revenue_cagr_5y",
+                "net_income_cagr_3y", "net_income_cagr_5y",
+                "operating_leverage_5y",
             ]:
                 if key in m and m[key] is not None:
                     parts.append(f"  {key}: {m[key]}")
+
+        if data.get("margin_trends"):
+            parts.append("\n── Historical Margin Trends ──")
+            parts.append(json.dumps(data["margin_trends"][:5], indent=2))
+
+        if data.get("cash_flow_trends"):
+            parts.append("\n── Historical Cash Flow ──")
+            parts.append(json.dumps(data["cash_flow_trends"][:5], indent=2))
+
+        if data.get("quarterly_summary"):
+            parts.append(f"\n{data['quarterly_summary']}")
 
         self.append_enrichment_sections(parts, data)
         return "\n".join(parts)

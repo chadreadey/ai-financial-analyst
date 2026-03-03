@@ -31,7 +31,7 @@ class BaseAgent:
     context_limit_env: Optional[str] = None
     system_prompt: str = "You are a financial analyst."
     prompt_file: Optional[str] = None
-    max_context_chars: int = 7000
+    max_context_chars: int = 12000
     enrichment_sections: tuple[str, ...] = ()
 
     def __init__(

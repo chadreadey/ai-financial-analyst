@@ -15,7 +15,13 @@ class EarningsAgent(BaseAgent):
     name = "Earnings Analyst"
     prompt_file = "prompts/earnings.md"
     context_limit_env = "MAX_CONTEXT_EARNINGS_CHARS"
-    enrichment_sections = ("market_data", "external_company")
+    enrichment_sections = (
+        "market_data",
+        "external_company",
+        "analyst_estimates",
+        "peer_comparison",
+        "filing_mda",
+    )
 
     system_prompt = """You are a senior equity research analyst at JPMorgan Chase, \
 specializing in earnings analysis and quality assessment.
@@ -77,9 +83,19 @@ Lead with conclusions, then support with data."""
                 "gross_margin", "operating_margin", "net_margin",
                 "revenue_growth_yoy", "operating_cash_flow", "free_cash_flow",
                 "roe", "roa",
+                "revenue_cagr_3y", "revenue_cagr_5y",
+                "net_income_cagr_3y", "net_income_cagr_5y",
+                "operating_leverage_5y",
             ]:
                 if key in m and m[key] is not None:
                     parts.append(f"  {key}: {m[key]}")
+
+        if data.get("margin_trends"):
+            parts.append("\n── Historical Margin Trends ──")
+            parts.append(json.dumps(data["margin_trends"][:5], indent=2))
+
+        if data.get("quarterly_summary"):
+            parts.append(f"\n{data['quarterly_summary']}")
 
         self.append_enrichment_sections(parts, data)
         return "\n".join(parts)
