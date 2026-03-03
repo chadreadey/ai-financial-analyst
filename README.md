@@ -1,27 +1,34 @@
 # AI Financial Analyst
 
-An agentic financial analysis system that pulls real SEC filings and runs them through five specialist AI analysts — each modeled after a top-tier firm's methodology — then synthesizes their findings into a unified investment brief.
+An agentic financial analysis system that pulls real SEC filings, market data, and external research, then runs them through six specialist AI analysts — each modeled after a top-tier firm's methodology — and synthesizes their findings into a unified investment brief.
 
 ## How It Works
 
 1. You input a stock ticker
-2. The system fetches SEC data (10-K, 10-Q, XBRL financials) via EDGAR, then optionally enriches with Yahoo market data and Tavily external research
-3. Five analyst agents run in parallel, each examining the data through a different lens
-4. A synthesis agent cross-references all five reports and produces a final investment brief with health scores
+2. The system fetches SEC data (10-K, 10-Q, XBRL financials) via EDGAR, extracts 10-K narrative sections (MD&A, Risk Factors, Business Description), and enriches with Yahoo market data (price history, analyst estimates, macro indicators), dynamic peer comparisons, and Tavily external research
+3. Six analyst agents run in parallel, each examining the data through a different lens
+4. A synthesis agent cross-references all six reports and produces a final investment brief with health scores
 
 ```
 User Input (ticker)
        │
        ▼
- SEC Data Layer ─── fetch, parse, cache
+ SEC Data Layer ─── XBRL financials + 10-K filing text extraction
        │
-       ├── Optional Enrichment ─── Yahoo market snapshot + Tavily research
+       ├── Multi-Year Metrics ─── 3Y/5Y CAGRs, margin trends, quarterly data
+       │
+       ├── Enrichment Layer
+       │   ├── Yahoo Finance ─── price history, analyst estimates, market data
+       │   ├── Peer Comparison ─── dynamic industry-matched peers with medians
+       │   ├── Macro Data ─── treasury yields, VIX, sector ETF, S&P 500
+       │   └── Tavily ─── external research (company, industry, risks)
        │
        ├── DCF Analyst (Morgan Stanley)
        ├── Risk Analyst (Bridgewater)
        ├── Earnings Analyst (JPMorgan)
        ├── Competitive Analyst (Bain)
-       └── Pattern Analyst (Renaissance Tech)
+       ├── Pattern Analyst (Renaissance Tech)
+       └── Macro Strategist (Goldman Sachs)
        │
        ▼
  Synthesis Agent ─── cross-reference, resolve contradictions
@@ -39,21 +46,39 @@ User Input (ticker)
 | Earnings Analyst | JPMorgan | EPS trajectory, margin analysis, earnings quality |
 | Competitive Analyst | Bain & Company | Moat analysis, Porter's Five Forces, sector dynamics |
 | Pattern Analyst | Renaissance Tech | Quantitative trends, mean reversion, statistical anomalies |
+| Macro Strategist | Goldman Sachs | Macro regime, monetary policy impact, sector positioning |
 
-The synthesis agent acts as a CIO — it reads all five reports, flags where analysts agree or contradict each other, and delivers a final rating (Strong Buy → Strong Sell) with a 1-10 health score across each dimension.
+The synthesis agent acts as a CIO — it reads all reports, flags where analysts agree or contradict each other, and delivers a final rating (Strong Buy → Strong Sell) with a 1-10 health score across each dimension including macro environment.
+
+## Data Pipeline
+
+The system enriches raw SEC filings with multiple data sources before feeding agents:
+
+| Data Source | What It Provides |
+|---|---|
+| SEC EDGAR (XBRL) | 8 years of annual financials, 8 quarters of quarterly data, multi-year CAGRs, margin trends, FCF series |
+| SEC 10-K Filing Text | MD&A narrative, Risk Factors, Business Description (extracted via BeautifulSoup) |
+| Yahoo Finance | Current price, multiples, 2-year price history, 50/200 SMA, volatility, volume trends |
+| Yahoo Analyst Data | Consensus price targets, EPS/revenue estimates, earnings revisions, growth estimates |
+| Dynamic Peer Discovery | Industry-matched peers with market cap proximity scoring, sector medians for key multiples |
+| Macro Indicators | Treasury yields (10Y/5Y/13W), VIX, S&P 500, sector ETF performance |
+| Tavily Search | Company developments, industry landscape, risk/bear case research |
+
+Each agent receives only the enrichment sections relevant to its analysis via targeted routing.
 
 ## Project Structure
 
 ```
 ai-financial-analyst/
-├── app.py                # Streamlit UI (same orchestrator core)
+├── app.py                # Streamlit UI
 ├── main.py               # CLI entry point
 ├── orchestrator.py        # Phase 1 parallel fan-out + Phase 2 synthesis
+├── market_enrichment.py   # Yahoo, Tavily, price history, macro, estimates
+├── peer_enrichment.py     # Dynamic peer discovery + comparison tables
 ├── report.py              # Output formatting (text + PDF)
 ├── utils.py               # Shared helpers (env_flag, format_money)
 ├── context_budget.py      # Deterministic context trimming
 ├── prompt_loader.py       # Markdown prompt loader + token rendering
-├── market_enrichment.py   # Optional Yahoo + Tavily enrichment context
 ├── requirements.txt       # Dependencies
 ├── .streamlit/
 │   ├── config.toml
@@ -64,6 +89,7 @@ ai-financial-analyst/
 │   ├── earnings.md
 │   ├── competitive.md
 │   ├── pattern.md
+│   ├── macro.md
 │   └── synthesis.md
 ├── llm/
 │   ├── __init__.py
@@ -74,10 +100,12 @@ ai-financial-analyst/
 │   ├── risk.py            # Risk Analyst
 │   ├── earnings.py        # Earnings Analyst
 │   ├── competitive.py     # Competitive & Sector Analyst
-│   └── pattern.py         # Pattern Analyst
+│   ├── pattern.py         # Pattern Analyst
+│   └── macro.py           # Macro Strategist
 └── sec/
     ├── client.py          # SEC EDGAR API client + rate limiting
     ├── xbrl_parser.py     # XBRL → structured financials + computed metrics
+    ├── filing_parser.py   # 10-K HTML → MD&A, Risk Factors, Business Desc
     └── cache.py           # SQLite caching layer
 ```
 
@@ -110,29 +138,48 @@ ANTHROPIC_API_KEY=your-anthropic-key
 OPENAI_API_KEY=your-openai-key
 # Optional override. Default is:
 # OPENAI_BASE_URL=https://cbsai.business.columbia.edu/api/v1
+TAVILY_API_KEY=your-tavily-key
+
+# --- Feature toggles (all default to true) ---
 ENABLE_YAHOO=true
 ENABLE_TAVILY=true
-TAVILY_API_KEY=your-tavily-key
+ENABLE_PRICE_HISTORY=true
+ENABLE_MACRO=true
+ENABLE_ESTIMATES=true
+ENABLE_PEERS=true
+ENABLE_FILING_TEXT=true
+ENABLE_MACRO_AGENT=true
+
+# --- Context budgets ---
 TAVILY_MAX_RESULTS=3
-TAVILY_SNIPPET_CHARS=220
-ENRICHMENT_MAX_CHARS=3500
-MAX_MARKET_SECTION_CHARS=900
-MAX_EXTERNAL_COMPANY_SECTION_CHARS=1200
-MAX_EXTERNAL_INDUSTRY_SECTION_CHARS=1200
-MAX_EXTERNAL_RISKS_SECTION_CHARS=1200
-MAX_AGENT_CONTEXT_CHARS=7000
-MAX_CONTEXT_DCF_CHARS=7000
-MAX_CONTEXT_RISK_CHARS=7000
-MAX_CONTEXT_EARNINGS_CHARS=7000
-MAX_CONTEXT_COMPETITIVE_CHARS=7000
-MAX_CONTEXT_PATTERN_CHARS=7000
+TAVILY_SNIPPET_CHARS=600
+ENRICHMENT_MAX_CHARS=8000
+MAX_MARKET_SECTION_CHARS=1200
+MAX_EXTERNAL_COMPANY_SECTION_CHARS=2500
+MAX_EXTERNAL_INDUSTRY_SECTION_CHARS=2500
+MAX_EXTERNAL_RISKS_SECTION_CHARS=2500
+MAX_PRICE_HISTORY_CHARS=1500
+MAX_MACRO_SECTION_CHARS=1500
+MAX_ESTIMATES_SECTION_CHARS=1200
+MAX_PEER_SECTION_CHARS=2500
+MAX_MDA_CHARS=4000
+MAX_RISK_FACTORS_CHARS=3000
+MAX_BIZ_DESC_CHARS=2000
+MAX_AGENT_CONTEXT_CHARS=12000
 MAX_AGENT_OUTPUT_TOKENS=1200
-SYNTHESIS_REPORT_MAX_CHARS=3200
-SYNTHESIS_INPUT_MAX_CHARS=14000
+SYNTHESIS_REPORT_MAX_CHARS=4500
+SYNTHESIS_INPUT_MAX_CHARS=22000
 MAX_SYNTHESIS_OUTPUT_TOKENS=1500
+# Per-agent overrides (optional):
+# MAX_CONTEXT_DCF_CHARS=12000
+# MAX_CONTEXT_RISK_CHARS=12000
+# MAX_CONTEXT_EARNINGS_CHARS=12000
+# MAX_CONTEXT_COMPETITIVE_CHARS=12000
+# MAX_CONTEXT_PATTERN_CHARS=12000
+# MAX_CONTEXT_MACRO_CHARS=12000
 ```
 
-No other SEC configuration needed. The SEC EDGAR API is free and requires no key.
+No SEC configuration needed. The SEC EDGAR API is free and requires no key.
 
 ### Prompt customization
 
@@ -212,8 +259,9 @@ python main.py AAPL --user-agent "YourName your@email.com"
 ## Tech Stack
 
 - **LLM**: Provider-selectable Anthropic Claude or OpenAI-compatible APIs
-- **Data**: SEC EDGAR API (filings + XBRL structured financials)
-- **Optional enrichment**: Yahoo Finance + Tavily research
+- **Data**: SEC EDGAR API (XBRL structured financials + 10-K filing text)
+- **Enrichment**: Yahoo Finance (price history, estimates, macro), dynamic peer comparison, Tavily research
+- **Filing parsing**: BeautifulSoup + lxml for 10-K HTML section extraction
 - **Orchestration**: Python `asyncio.gather()` for parallel agent execution
 - **Caching**: SQLite for SEC data (avoids redundant API calls across runs)
-- **Data processing**: pandas for financial data manipulation
+- **Data processing**: pandas + numpy for financial data manipulation
