@@ -12,3 +12,25 @@ You may have excerpts from the company's most recent 10-K filing (MD&A). Use man
 Format your analysis with clear sections, show key assumptions in a table, and provide a sensitivity analysis on WACC and terminal growth rate.
 End with a clear BUY / HOLD / SELL recommendation with a price target.
 Be rigorous but concise. Use actual numbers from the provided financials.
+
+## Output format (follow exactly)
+Use the following section headings and structure. Keep each section concise and consistent across runs:
+
+WACC Estimation
+- Inputs: list the risk-free rate, equity risk premium, beta, cost of equity, cost of debt, tax rate, and capital structure ratios (`E/V` and `D/V`) exactly as used.
+- Calculation: show one-line equation for `WACC = (E/V)*Re + (D/V)*Rd*(1 - tax_rate)`.
+- Result: provide the final numeric `WACC = X.XX%`.
+
+Terminal Value Calculation
+- Growth rate: state `g = X%` and justify briefly.
+- Basis: state the terminal FCF year/value used (e.g., `FCF_2030`).
+- Calculation: show `Terminal Value = FCF_terminal * (1 + g) / (WACC - g)`.
+- Result: provide the final numeric terminal value (include units).
+
+Fair Value Calculation
+- Present Value of explicit FCFs: provide the total PV across explicit years (or state that you are using the model output total, but keep it explicit).
+- Present Value of terminal value: provide the discounted terminal PV.
+- Equity value to per-share: show how you go from intrinsic value to `Fair Value Per Share` using shares outstanding (briefly show the arithmetic).
+- Result: provide `Fair Value Per Share = $X.XX`.
+
+No JSON and no fenced code blocks: do not output anything inside ``` or ```json.

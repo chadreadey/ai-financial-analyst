@@ -71,6 +71,16 @@ def clean_generated_text(text: str) -> str:
         return ""
     cleaned = text.replace("\u2217", "*").replace("\u00a0", " ")
     cleaned = cleaned.replace("\r\n", "\n")
+    # Some models leak structured outputs as fenced ```json blocks.
+    # Strip them so they never render in the app UI.
+    cleaned = re.sub(
+        r"```\s*json\s*.*?```",
+        "",
+        cleaned,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    # Fix artifacts like "Terminal\\ Value" (backslash + whitespace) -> "Terminal Value".
+    cleaned = re.sub(r"\\\s+", " ", cleaned)
     cleaned = _merge_single_char_lines(cleaned)
     cleaned = _collapse_spaced_letters(cleaned)
     cleaned = re.sub(r"[ \t]+\n", "\n", cleaned)
