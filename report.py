@@ -12,6 +12,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from fpdf import FPDF  # pyright: ignore[reportMissingModuleSource]
 
+from sec.cache import SECCache
+
 
 DIVIDER = "=" * 70
 SECTION_DIVIDER = "-" * 70
@@ -94,6 +96,64 @@ def streamlit_markdown_text(text: str) -> str:
     return cleaned.replace("$", r"\$")
 
 
+def _format_history_delta(ticker: str) -> Optional[str]:
+    """
+    Compare the two most recent analyses and produce a delta summary.
+    Returns None if fewer than 2 analyses exist.
+    """
+    try:
+        cache = SECCache()
+        history = cache.get_analysis_history(ticker, limit=2)
+        cache.close()
+    except Exception:
+        return None
+
+    if len(history) < 2:
+        return None
+
+    current = history[0]
+    previous = history[1]
+
+    lines = ["ANALYSIS DRIFT (vs. prior run)", SECTION_DIVIDER]
+
+    prev_date = datetime.fromtimestamp(previous["run_at"]).strftime("%Y-%m-%d %H:%M")
+    lines.append(f"Compared to analysis on {prev_date}:")
+
+    if current.get("verdict") != previous.get("verdict"):
+        lines.append(
+            f"  Verdict: {previous.get('verdict', '?')} → {current.get('verdict', '?')}"
+        )
+    else:
+        lines.append(f"  Verdict: unchanged ({current.get('verdict', '?')})")
+
+    if current.get("conviction") != previous.get("conviction"):
+        lines.append(
+            f"  Conviction: {previous.get('conviction', '?')} → {current.get('conviction', '?')}"
+        )
+
+    cur_score = current.get("composite_score")
+    prev_score = previous.get("composite_score")
+    if cur_score is not None and prev_score is not None:
+        delta = cur_score - prev_score
+        lines.append(f"  Overall Score: {prev_score:.1f} → {cur_score:.1f} ({delta:+.1f})")
+
+    cur_hs = current.get("health_scores", {})
+    prev_hs = previous.get("health_scores", {})
+    changed_dims = []
+    for dim in ["valuation", "risk_profile", "earnings_quality",
+                 "competitive_position", "quantitative_signals", "macro_environment"]:
+        c = cur_hs.get(dim)
+        p = prev_hs.get(dim)
+        if c is not None and p is not None and c != p:
+            changed_dims.append(f"    {dim}: {p} → {c} ({c - p:+d})")
+
+    if changed_dims:
+        lines.append("  Changed dimensions:")
+        lines.extend(changed_dims)
+
+    return "\n".join(lines)
+
+
 def format_report(result: Dict[str, Any]) -> str:
     """
     Format the full orchestrator result into a readable text report.
@@ -120,6 +180,12 @@ def format_report(result: Dict[str, Any]) -> str:
     lines.append(SECTION_DIVIDER)
     lines.append(cleaned_result["synthesis"])
     lines.append("")
+
+    # Analysis drift vs. prior run
+    delta_text = _format_history_delta(cleaned_result.get("ticker", ""))
+    if delta_text:
+        lines.append(delta_text)
+        lines.append("")
 
     enrichment_sources = cleaned_result.get("enrichment_sources", [])
     if enrichment_sources:

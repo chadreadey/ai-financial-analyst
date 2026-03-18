@@ -10,3 +10,7 @@ fpdf2>=2.8.0
 beautifulsoup4>=4.12.0
 lxml>=5.0.0
 numpy>=1.24.0
+fredapi>=0.5
+edgartools>=2.0
+scipy>=1.10
+qdrant-client>=1.7

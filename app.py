@@ -1,5 +1,6 @@
 import asyncio
 import os
+from datetime import datetime
 from pathlib import Path
 
 import streamlit as st  # type: ignore[import-not-found]
@@ -56,6 +57,8 @@ def _bootstrap_env_from_streamlit_secrets() -> None:
             "OPENAI_CBS_API_KEY",
             "OPENAI_BASE_URL",
             "TAVILY_API_KEY",
+            "FRED_API_KEY",
+            "EDGAR_IDENTITY",
         ]
         for key in secret_keys:
             if not os.getenv(key) and key in st.secrets:
@@ -132,8 +135,60 @@ def _run_analysis_sync(ticker: str, user_agent: str, provider: str, model: str, 
     return result
 
 
+def _render_history_sidebar(ticker: str) -> None:
+    """Show analysis history for the current ticker in the sidebar."""
+    try:
+        cache = SECCache()
+        history = cache.get_analysis_history(ticker, limit=10)
+        cache.close()
+    except Exception:
+        return
+
+    if not history:
+        return
+
+    st.sidebar.markdown("---")
+    st.sidebar.subheader(f"Analysis History: {ticker}")
+
+    for entry in history:
+        run_date = datetime.fromtimestamp(entry["run_at"]).strftime("%Y-%m-%d %H:%M")
+        verdict = entry.get("verdict", "?")
+        score = entry.get("composite_score")
+        conviction = entry.get("conviction", "")
+
+        score_str = f" | Score: {score:.0f}/10" if score is not None else ""
+        conv_str = f" ({conviction})" if conviction else ""
+        st.sidebar.text(f"{run_date}: {verdict}{conv_str}{score_str}")
+
+    # Score trend if we have enough data points
+    scores = [
+        (e["run_at"], e["composite_score"])
+        for e in reversed(history)
+        if e.get("composite_score") is not None
+    ]
+    if len(scores) >= 2:
+        import pandas as pd
+        df = pd.DataFrame(scores, columns=["date", "score"])
+        df["date"] = pd.to_datetime(df["date"], unit="s")
+        st.sidebar.line_chart(df.set_index("date")["score"], height=120)
+
+
 def _render_result(result: dict, txt_path: str | None = None, pdf_path: str | None = None) -> None:
     st.subheader(f"{result['company_name']} ({result['ticker']})")
+
+    # Show structured verdict banner if available
+    sv = result.get("structured_verdict")
+    if sv:
+        verdict = sv.get("verdict", "")
+        conviction = sv.get("conviction", "")
+        score = sv.get("health_scores", {}).get("overall")
+        badge_parts = [verdict]
+        if conviction:
+            badge_parts.append(f"Conviction: {conviction}")
+        if score is not None:
+            badge_parts.append(f"Score: {score}/10")
+        st.info(" | ".join(badge_parts))
+
     st.markdown(streamlit_markdown_text(result["synthesis"]))
 
     pdf_bytes = build_pdf_report(result)
@@ -151,6 +206,9 @@ def _render_result(result: dict, txt_path: str | None = None, pdf_path: str | No
         if pdf_path:
             parts.append(f"PDF saved: `{pdf_path}`")
         st.caption(" | ".join(parts))
+
+    # Render history sidebar
+    _render_history_sidebar(result["ticker"])
 
     tab_names = [name for name, _ in result["agent_reports"]] + ["Enrichment & Diagnostics"]
     tabs = st.tabs(tab_names)

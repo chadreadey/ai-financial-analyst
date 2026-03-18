@@ -6,9 +6,11 @@ free cash flow projections, WACC estimation, and fair-value derivation.
 """
 
 import json
-from typing import Any, Dict
+import os
+from typing import Any, Dict, Optional
 
 from agents.base import BaseAgent
+from utils import env_flag
 
 
 class DCFAgent(BaseAgent):
@@ -23,6 +25,8 @@ class DCFAgent(BaseAgent):
         "macro_data",
         "peer_comparison",
         "filing_mda",
+        "segment_data",
+        "rag_research",
     )
 
     system_prompt = """You are a senior equity research analyst at Morgan Stanley, \
@@ -97,5 +101,28 @@ Be rigorous but concise. Use actual numbers from the provided financials."""
         if data.get("quarterly_summary"):
             parts.append(f"\n{data['quarterly_summary']}")
 
+        if env_flag("ENABLE_WACC_HELPERS", True):
+            wacc_block = self._build_wacc_context()
+            if wacc_block:
+                parts.append(f"\n{wacc_block}")
+
         self.append_enrichment_sections(parts, data)
         return "\n".join(parts)
+
+    @staticmethod
+    def _build_wacc_context() -> Optional[str]:
+        """Compute and format WACC inputs from FRED yield curve data."""
+        try:
+            from quant.discount_rate import (
+                get_risk_free_rate,
+                get_yield_curve_snapshot,
+                format_wacc_context,
+            )
+
+            risk_free = get_risk_free_rate(maturity_years=10.0)
+            curve = get_yield_curve_snapshot()
+            if risk_free is None and curve is None:
+                return None
+            return format_wacc_context("", risk_free, curve)
+        except Exception:
+            return None

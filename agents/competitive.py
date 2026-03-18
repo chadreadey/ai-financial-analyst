@@ -20,6 +20,8 @@ class CompetitiveAgent(BaseAgent):
         "external_industry",
         "peer_comparison",
         "filing_business",
+        "segment_data",
+        "rag_research",
     )
 
     system_prompt = """You are a senior partner at Bain & Company, specializing in \

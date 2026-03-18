@@ -22,6 +22,7 @@ class MacroAgent(BaseAgent):
         "filing_mda",
         "peer_comparison",
         "external_industry",
+        "rag_research",
     )
 
     system_prompt = """You are a senior macro strategist at Goldman Sachs Global \

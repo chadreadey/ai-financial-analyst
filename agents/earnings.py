@@ -21,6 +21,7 @@ class EarningsAgent(BaseAgent):
         "analyst_estimates",
         "peer_comparison",
         "filing_mda",
+        "rag_research",
     )
 
     system_prompt = """You are a senior equity research analyst at JPMorgan Chase, \

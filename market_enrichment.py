@@ -320,28 +320,100 @@ def _price_history_section(ticker: str) -> tuple[str, List[str]]:
     return section, ["Yahoo Finance (price history)"]
 
 
+def _fred_macro_data() -> tuple[List[str], List[str]]:
+    """Fetch authoritative macro indicators from FRED (Federal Reserve)."""
+    from fredapi import Fred
+
+    api_key = os.getenv("FRED_API_KEY", "").strip()
+    if not api_key:
+        return [], []
+
+    fred = Fred(api_key=api_key)
+    lines: List[str] = []
+    sources: List[str] = ["FRED (Federal Reserve Economic Data)"]
+
+    series_map = {
+        "DGS10": ("10-Year Treasury Yield", "%"),
+        "DGS2": ("2-Year Treasury Yield", "%"),
+        "FEDFUNDS": ("Fed Funds Rate", "%"),
+        "CPIAUCSL": ("CPI (Inflation Index)", ""),
+        "UNRATE": ("Unemployment Rate", "%"),
+        "BAMLH0A0HYM2": ("High Yield Credit Spread", "%"),
+        "BAMLC0A0CM": ("IG Credit Spread", "%"),
+        "UMCSENT": ("Consumer Sentiment (UMich)", ""),
+    }
+
+    from datetime import datetime, timedelta
+    one_year_ago = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+
+    for series_id, (label, unit) in series_map.items():
+        try:
+            data = fred.get_series(series_id, observation_start=one_year_ago)
+            data = data.dropna()
+            if data.empty:
+                continue
+            current = float(data.iloc[-1])
+            prior = float(data.iloc[0])
+            delta = current - prior
+            if unit == "%":
+                lines.append(f"  {label}: {current:.2f}% (1Y chg: {delta:+.2f}pp)")
+            else:
+                lines.append(f"  {label}: {current:,.1f} (1Y chg: {delta:+,.1f})")
+        except Exception:
+            continue
+
+    # Yield curve inversion signal
+    try:
+        dgs10 = fred.get_series("DGS10", observation_start=one_year_ago).dropna()
+        dgs2 = fred.get_series("DGS2", observation_start=one_year_ago).dropna()
+        if not dgs10.empty and not dgs2.empty:
+            spread = float(dgs10.iloc[-1]) - float(dgs2.iloc[-1])
+            state = "INVERTED" if spread < 0 else "NORMAL"
+            lines.append(f"  2s10s Spread: {spread:+.2f}pp ({state})")
+    except Exception:
+        pass
+
+    return lines, sources
+
+
 def _macro_section(ticker: str) -> tuple[str, List[str]]:
-    """Current macro environment: yields, indices, sector ETF."""
+    """Current macro environment: FRED primary, Yahoo for indices/sector ETF."""
     import yfinance as yf
     from datetime import datetime
 
     lines = ["=== Macro Environment ==="]
-    sources: List[str] = ["Yahoo Finance (macro)"]
+    sources: List[str] = []
 
-    yield_tickers = {
-        "^TNX": "10-Year Treasury Yield",
-        "^FVX": "5-Year Treasury Yield",
-        "^IRX": "13-Week T-Bill Rate",
-    }
-    for sym, label in yield_tickers.items():
+    # Primary: FRED for rates, credit spreads, economic indicators
+    if env_flag("ENABLE_FRED", True):
         try:
-            info = yf.Ticker(sym).info or {}
-            val = info.get("regularMarketPrice") or info.get("previousClose")
-            if val is not None:
-                lines.append(f"  {label}: {float(val):.2f}%")
+            fred_lines, fred_sources = _fred_macro_data()
+            if fred_lines:
+                lines.append("-- Rates & Economic Indicators (FRED) --")
+                lines.extend(fred_lines)
+                sources.extend(fred_sources)
         except Exception:
             pass
 
+    # Yahoo fallback for yields if FRED produced nothing
+    if not any("Treasury" in l for l in lines):
+        sources.append("Yahoo Finance (macro)")
+        yield_tickers = {
+            "^TNX": "10-Year Treasury Yield",
+            "^FVX": "5-Year Treasury Yield",
+            "^IRX": "13-Week T-Bill Rate",
+        }
+        for sym, label in yield_tickers.items():
+            try:
+                info = yf.Ticker(sym).info or {}
+                val = info.get("regularMarketPrice") or info.get("previousClose")
+                if val is not None:
+                    lines.append(f"  {label}: {float(val):.2f}%")
+            except Exception:
+                pass
+
+    # Yahoo for real-time market indices (FRED doesn't serve these)
+    lines.append("-- Market Indices --")
     index_tickers = {"^GSPC": "S&P 500", "^VIX": "VIX"}
     for sym, label in index_tickers.items():
         try:
@@ -357,6 +429,7 @@ def _macro_section(ticker: str) -> tuple[str, List[str]]:
         except Exception:
             pass
 
+    # Sector ETF performance
     try:
         stock_info = yf.Ticker(ticker).info or {}
         sector = stock_info.get("sector", "")
@@ -370,6 +443,7 @@ def _macro_section(ticker: str) -> tuple[str, List[str]]:
     except Exception:
         pass
 
+    # Tavily macro narrative
     if env_flag("ENABLE_TAVILY", True):
         try:
             client = _tavily_client()
@@ -472,6 +546,17 @@ def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object
                 sources.extend(macro_sources)
         except Exception as exc:
             warnings.append(f"Macro data unavailable: {exc}")
+
+    if env_flag("ENABLE_RAG", False):
+        try:
+            from rag_enrichment import fetch_rag_section
+            rag_text = fetch_rag_section(ticker)
+            if rag_text:
+                sections.append(rag_text)
+                section_map["rag_research"] = rag_text
+                sources.append("RAG Vector DB")
+        except Exception as exc:
+            warnings.append(f"RAG enrichment unavailable: {exc}")
 
     if warnings:
         warn_text = "\n".join(f"- {w}" for w in warnings)

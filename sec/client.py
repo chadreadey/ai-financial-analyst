@@ -9,14 +9,30 @@ Key endpoints used:
 SEC requires:
   - A descriptive User-Agent header
   - Max 10 requests / second
+
+When ENABLE_EDGARTOOLS is set, edgartools is used as a parallel enrichment
+path for filing section extraction and financial data gap-filling.
 """
 
+import os
 import time
 from typing import Any, Dict, List, Optional
 
 import requests
 
 from sec.cache import SECCache
+from utils import env_flag
+
+# Set edgartools identity on import (must happen before any edgartools calls)
+_edgar_identity = os.getenv(
+    "EDGAR_IDENTITY",
+    os.getenv("SEC_USER_AGENT", "AIFinancialAnalyst admin@example.com"),
+)
+try:
+    from edgar import set_identity
+    set_identity(_edgar_identity)
+except Exception:
+    pass
 
 
 BASE_URL = "https://data.sec.gov"
@@ -200,6 +216,59 @@ class SECClient:
         # Cache filing text for 7 days (filings don't change)
         self.cache.set("documents", cache_key, text, ttl=86400 * 7)
         return text
+
+    # ── edgartools integration ──────────────────────────────────────
+
+    def get_edgartools_company(self, ticker: str):
+        """
+        Return an edgartools Company object for the ticker, cached.
+        Returns None if edgartools is disabled or fails.
+        """
+        if not env_flag("ENABLE_EDGARTOOLS", True):
+            return None
+
+        cache_key = f"edgar_company_{ticker.upper()}"
+        cached = self.cache.get("edgartools", cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            from edgar import Company
+            company = Company(ticker.upper())
+            if company.not_found:
+                return None
+            # Don't cache the Company object itself (not serializable),
+            # just confirm it's valid. Each call is cheap after identity set.
+            return company
+        except Exception:
+            return None
+
+    def get_edgartools_tenk(self, ticker: str):
+        """
+        Return the latest 10-K TenK object via edgartools.
+        Returns None on failure.
+        """
+        try:
+            company = self.get_edgartools_company(ticker)
+            if company is None:
+                return None
+            tenk = company.latest_tenk
+            return tenk
+        except Exception:
+            return None
+
+    def get_edgartools_financials(self, ticker: str):
+        """
+        Return edgartools Financials object for gap-filling.
+        Returns None on failure.
+        """
+        try:
+            company = self.get_edgartools_company(ticker)
+            if company is None:
+                return None
+            return company.get_financials()
+        except Exception:
+            return None
 
     # ── convenience: gather all data for a ticker ─────────────────
 

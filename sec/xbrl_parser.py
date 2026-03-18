@@ -556,3 +556,69 @@ class XBRLParser:
                 }
             )
         return rows
+
+    def supplement_with_edgartools(self, ticker: str, metrics: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Use edgartools financials to fill gaps in the XBRL-parsed metrics.
+        Adds segment data, geographic breakdown, and any missing line items.
+        Returns the augmented metrics dict; never removes existing values.
+        """
+        try:
+            from edgar import Company
+
+            company = Company(ticker.upper())
+            if company.not_found:
+                return metrics
+
+            financials = company.get_financials()
+            if financials is None:
+                return metrics
+
+            supplemented = dict(metrics)
+
+            # Try to get segment/geographic data as summary text
+            try:
+                income = financials.income_statement()
+                if income is not None:
+                    df = income.to_dataframe()
+                    if df is not None and not df.empty:
+                        # Fill any missing core metrics from edgartools
+                        label_map = {
+                            "Revenue": "revenue",
+                            "Net Income": "net_income",
+                            "Gross Profit": "gross_profit",
+                            "Operating Income": "operating_income",
+                        }
+                        for label, key in label_map.items():
+                            if supplemented.get(key) is None:
+                                for col_label in df.index:
+                                    if label.lower() in str(col_label).lower():
+                                        val = df.iloc[df.index.get_loc(col_label), 0]
+                                        if pd.notna(val):
+                                            supplemented[key] = float(val)
+                                        break
+            except Exception:
+                pass
+
+            # Segment data (if available via edgartools financials detailed view)
+            try:
+                detailed = financials.income_statement(view="detailed")
+                if detailed is not None:
+                    df_det = detailed.to_dataframe()
+                    if df_det is not None and not df_det.empty:
+                        segment_keywords = ["segment", "geographic", "region", "product line"]
+                        segment_lines = []
+                        for idx_label in df_det.index:
+                            label_lower = str(idx_label).lower()
+                            if any(kw in label_lower for kw in segment_keywords):
+                                val = df_det.iloc[df_det.index.get_loc(idx_label), 0]
+                                if pd.notna(val):
+                                    segment_lines.append(f"  {idx_label}: {format_money(float(val))}")
+                        if segment_lines:
+                            supplemented["_segment_data"] = "\n".join(segment_lines)
+            except Exception:
+                pass
+
+            return supplemented
+        except Exception:
+            return metrics

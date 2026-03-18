@@ -7,9 +7,82 @@ and data-driven pattern identification.
 """
 
 import json
-from typing import Any, Dict
+import os
+from typing import Any, Dict, Optional
 
 from agents.base import BaseAgent
+from utils import env_flag
+
+
+def _compute_risk_metrics(ticker: str) -> Optional[str]:
+    """Compute risk-adjusted return metrics from 2-year daily price history."""
+    try:
+        import yfinance as yf
+        import numpy as np
+
+        hist = yf.Ticker(ticker).history(period="2y", interval="1d")
+        if hist.empty or len(hist) < 60:
+            return None
+
+        close = hist["Close"]
+        returns = close.pct_change().dropna()
+        if len(returns) < 60:
+            return None
+
+        ann_factor = 252
+        mean_ret = float(returns.mean())
+        std_ret = float(returns.std())
+
+        # Sharpe (assuming risk-free ~ 0 for simplicity; agents have FRED data)
+        sharpe = (mean_ret * ann_factor) / (std_ret * np.sqrt(ann_factor)) if std_ret > 0 else 0.0
+
+        # Sortino (downside deviation only)
+        downside = returns[returns < 0]
+        downside_std = float(downside.std()) if len(downside) > 1 else std_ret
+        sortino = (mean_ret * ann_factor) / (downside_std * np.sqrt(ann_factor)) if downside_std > 0 else 0.0
+
+        # Max drawdown
+        cumulative = (1 + returns).cumprod()
+        running_max = cumulative.cummax()
+        drawdowns = (cumulative - running_max) / running_max
+        max_dd = float(drawdowns.min())
+
+        # Calmar (annualized return / abs max drawdown)
+        ann_ret = float((cumulative.iloc[-1]) ** (ann_factor / len(returns)) - 1)
+        calmar = ann_ret / abs(max_dd) if max_dd != 0 else 0.0
+
+        # Value at Risk (95th percentile)
+        var_95 = float(np.percentile(returns, 5))
+
+        # Distribution shape
+        skew = float(returns.skew())
+        kurt = float(returns.kurtosis())
+
+        # Best/worst periods
+        monthly_returns = close.resample("ME").last().pct_change().dropna()
+        best_month = float(monthly_returns.max()) if len(monthly_returns) > 0 else None
+        worst_month = float(monthly_returns.min()) if len(monthly_returns) > 0 else None
+
+        lines = [
+            "=== Quantitative Risk Metrics ===",
+            f"  Sharpe Ratio (ann.): {sharpe:.2f}",
+            f"  Sortino Ratio (ann.): {sortino:.2f}",
+            f"  Max Drawdown: {max_dd*100:.1f}%",
+            f"  Calmar Ratio: {calmar:.2f}",
+            f"  Value at Risk (95%): {var_95*100:.2f}% daily",
+            f"  Return Skewness: {skew:.2f}",
+            f"  Return Kurtosis: {kurt:.2f}",
+            f"  Annualized Return: {ann_ret*100:.1f}%",
+            f"  Annualized Volatility: {std_ret * np.sqrt(ann_factor)*100:.1f}%",
+        ]
+        if best_month is not None:
+            lines.append(f"  Best Month: {best_month*100:+.1f}%")
+        if worst_month is not None:
+            lines.append(f"  Worst Month: {worst_month*100:+.1f}%")
+
+        return "\n".join(lines)
+    except Exception:
+        return None
 
 
 class PatternAgent(BaseAgent):
@@ -20,6 +93,7 @@ class PatternAgent(BaseAgent):
         "market_data",
         "price_history",
         "analyst_estimates",
+        "rag_research",
     )
 
     system_prompt = """You are a quantitative analyst at Renaissance Technologies, \
@@ -67,7 +141,6 @@ in the data."""
         if "financial_core_summary" in data:
             parts.append(data["financial_core_summary"])
 
-        # Pattern agent needs as much historical data as possible
         if "historical_revenue" in data:
             parts.append("\n── Historical Revenue (full series) ──")
             parts.append(json.dumps(data["historical_revenue"], indent=2))
@@ -92,6 +165,13 @@ in the data."""
 
         if data.get("quarterly_summary"):
             parts.append(f"\n{data['quarterly_summary']}")
+
+        if env_flag("ENABLE_QUANTSTATS", True):
+            ticker = data.get("ticker", "")
+            if ticker:
+                risk_block = _compute_risk_metrics(ticker)
+                if risk_block:
+                    parts.append(f"\n{risk_block}")
 
         self.append_enrichment_sections(parts, data)
         return "\n".join(parts)

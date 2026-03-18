@@ -37,6 +37,20 @@ class SECCache:
             )
             """
         )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS analysis_history (
+                ticker          TEXT NOT NULL,
+                run_at          REAL NOT NULL,
+                verdict         TEXT,
+                conviction      TEXT,
+                time_horizon    TEXT,
+                composite_score REAL,
+                health_scores   TEXT,
+                PRIMARY KEY (ticker, run_at)
+            )
+            """
+        )
         self._conn.commit()
 
     def get(self, namespace: str, key: str) -> Optional[Any]:
@@ -80,6 +94,66 @@ class SECCache:
         """Remove all cached data."""
         self._conn.execute("DELETE FROM cache")
         self._conn.commit()
+
+    # ── analysis history ─────────────────────────────────────────
+
+    def save_analysis(
+        self,
+        ticker: str,
+        verdict: str,
+        conviction: str = "",
+        time_horizon: str = "",
+        composite_score: Optional[float] = None,
+        health_scores: Optional[dict] = None,
+    ) -> None:
+        """Persist a structured analysis result for drift tracking."""
+        self._conn.execute(
+            """
+            INSERT OR REPLACE INTO analysis_history
+                (ticker, run_at, verdict, conviction, time_horizon,
+                 composite_score, health_scores)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                ticker.upper(),
+                time.time(),
+                verdict,
+                conviction,
+                time_horizon,
+                composite_score,
+                json.dumps(health_scores) if health_scores else None,
+            ),
+        )
+        self._conn.commit()
+
+    def get_analysis_history(
+        self, ticker: str, limit: int = 10
+    ) -> list[dict]:
+        """Return recent analysis history for a ticker, newest first."""
+        rows = self._conn.execute(
+            """
+            SELECT run_at, verdict, conviction, time_horizon,
+                   composite_score, health_scores
+            FROM analysis_history
+            WHERE ticker = ?
+            ORDER BY run_at DESC
+            LIMIT ?
+            """,
+            (ticker.upper(), limit),
+        ).fetchall()
+
+        results = []
+        for row in rows:
+            run_at, verdict, conviction, time_horizon, score, hs_json = row
+            results.append({
+                "run_at": run_at,
+                "verdict": verdict,
+                "conviction": conviction,
+                "time_horizon": time_horizon,
+                "composite_score": score,
+                "health_scores": json.loads(hs_json) if hs_json else {},
+            })
+        return results
 
     def close(self) -> None:
         self._conn.close()

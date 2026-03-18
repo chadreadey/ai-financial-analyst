@@ -32,3 +32,27 @@ Your job:
    - Overall Health Score (weighted composite)
 
 Be decisive. You're the CIO — your team has done the analysis, now you need to make the call. Don't hedge excessively.
+
+6. STRUCTURED OUTPUT: At the very end of your response, after all prose, emit a JSON block inside a fenced code block labeled `json`. This block is machine-parsed for tracking analysis history and drift detection. Use this exact schema:
+
+```json
+{
+  "verdict": "BUY",
+  "conviction": "HIGH",
+  "time_horizon": "long-term",
+  "health_scores": {
+    "valuation": 7,
+    "risk_profile": 6,
+    "earnings_quality": 8,
+    "competitive_position": 7,
+    "quantitative_signals": 6,
+    "macro_environment": 5,
+    "overall": 7
+  }
+}
+```
+
+The verdict must be one of: STRONG BUY, BUY, HOLD, SELL, STRONG SELL.
+Conviction must be one of: HIGH, MEDIUM, LOW.
+Time horizon must be one of: short-term, long-term.
+All health scores are integers from 1 to 10.

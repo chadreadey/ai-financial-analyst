@@ -7,7 +7,9 @@ Phase 2: Feed all agent outputs to a synthesis agent that
 """
 
 import asyncio
+import json
 import os
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -27,6 +29,25 @@ from sec.client import SECClient
 from sec.filing_parser import parse_filing_sections
 from sec.xbrl_parser import XBRLParser
 from utils import env_flag
+
+
+def _extract_structured_block(synthesis_text: str) -> Tuple[Optional[dict], str]:
+    """
+    Extract the structured JSON block from the end of synthesis output.
+    Returns (parsed_dict_or_None, prose_text_with_json_removed).
+    """
+    pattern = r"```json\s*\n(\{.*?\})\s*\n```"
+    match = re.search(pattern, synthesis_text, re.DOTALL)
+    if not match:
+        return None, synthesis_text
+
+    try:
+        data = json.loads(match.group(1))
+    except (json.JSONDecodeError, ValueError):
+        return None, synthesis_text
+
+    prose = synthesis_text[:match.start()].rstrip()
+    return data, prose
 
 
 SYNTHESIS_PROMPT_FILE = Path("prompts/synthesis.md")
@@ -76,6 +97,14 @@ class Orchestrator:
         print("  Building optional market/research enrichment...")
         enrichment = build_enrichment_context(raw["ticker"], raw["company_name"])
         metrics = parser.compute_metrics()
+
+        if env_flag("ENABLE_EDGARTOOLS", True):
+            try:
+                metrics = parser.supplement_with_edgartools(raw["ticker"], metrics)
+                print("  Supplemented metrics via edgartools")
+            except Exception as exc:
+                print(f"  edgartools supplement skipped: {exc}")
+
         financial_summary = parser.to_summary_text(metrics=metrics)
 
         quarterly_metrics = parser.compute_quarterly_metrics(quarters=8)
@@ -98,7 +127,7 @@ class Orchestrator:
                         latest_10k["accessionNumber"],
                         latest_10k["primaryDocument"],
                     )
-                    filing_sections = parse_filing_sections(html)
+                    filing_sections = parse_filing_sections(html, ticker=raw["ticker"])
                     section_count = sum(1 for v in filing_sections.values() if v)
                     print(f"  Extracted {section_count}/3 filing sections")
             except Exception as exc:
@@ -111,6 +140,11 @@ class Orchestrator:
             enrichment_sections["filing_risk_factors"] = f"=== 10-K Risk Factors ===\n{filing_sections['risk_factors']}"
         if filing_sections.get("business_description"):
             enrichment_sections["filing_business"] = f"=== 10-K Business Description ===\n{filing_sections['business_description']}"
+
+        # If edgartools provided segment data, include it as enrichment
+        segment_data = metrics.pop("_segment_data", None)
+        if segment_data:
+            enrichment_sections["segment_data"] = f"=== Revenue Segments ===\n{segment_data}"
 
         data = {
             "ticker": raw["ticker"],
@@ -223,6 +257,7 @@ class Orchestrator:
                 - agent_reports: list of (name, analysis) tuples
                 - synthesis: the final cross-referenced brief
                 - metrics: raw computed metrics
+                - structured_verdict: parsed JSON block from synthesis (if any)
         """
         # Fetch and prepare data (sync — must complete before agents run)
         data = self.prepare_data(ticker)
@@ -231,17 +266,37 @@ class Orchestrator:
         agent_reports = await self.run_phase1(data)
 
         # Phase 2: synthesis
-        synthesis = await self.run_phase2(
+        raw_synthesis = await self.run_phase2(
             data["ticker"],
             data["company_name"],
             agent_reports,
         )
+
+        # Extract structured verdict and clean prose
+        structured, synthesis = _extract_structured_block(raw_synthesis)
+
+        # Persist to analysis history if structured data was extracted
+        if structured:
+            try:
+                health = structured.get("health_scores", {})
+                self.sec_client.cache.save_analysis(
+                    ticker=data["ticker"],
+                    verdict=structured.get("verdict", ""),
+                    conviction=structured.get("conviction", ""),
+                    time_horizon=structured.get("time_horizon", ""),
+                    composite_score=health.get("overall"),
+                    health_scores=health,
+                )
+                print("  ✓ Analysis saved to history")
+            except Exception as exc:
+                print(f"  Warning: failed to save analysis history: {exc}")
 
         return {
             "ticker": data["ticker"],
             "company_name": data["company_name"],
             "agent_reports": agent_reports,
             "synthesis": synthesis,
+            "structured_verdict": structured,
             "metrics": data["metrics"],
             "enrichment_warnings": data.get("enrichment_warnings", []),
             "enrichment_sources": data.get("enrichment_sources", []),
