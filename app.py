@@ -38,8 +38,9 @@ def _set_runtime_env(
 ) -> None:
     os.environ["LLM_PROVIDER"] = provider
     if provider == "openai":
-        if settings.openai_cbs_api_key:
-            os.environ["OPENAI_API_KEY"] = settings.openai_cbs_api_key
+        cbs_key = os.getenv("OPENAI_CBS_API_KEY") or os.getenv("OPENAI_API_KEY")
+        if cbs_key:
+            os.environ["OPENAI_API_KEY"] = cbs_key
     os.environ["ENABLE_YAHOO"] = "true" if enable_yahoo else "false"
     os.environ["ENABLE_TAVILY"] = "true" if enable_tavily else "false"
     os.environ["MAX_AGENT_CONTEXT_CHARS"] = str(max_agent_context_chars)
@@ -354,7 +355,7 @@ def main() -> None:
             max_synthesis_output_tokens=int(max_synthesis_output_tokens),
         )
 
-        if provider == "openai" and not settings.openai_api_key:
+        if provider == "openai" and not os.getenv("OPENAI_API_KEY"):
             st.error("OpenAI provider selected but no API key is available.")
             st.info("Configure OPENAI_CBS_API_KEY in deployment secrets.")
             return
