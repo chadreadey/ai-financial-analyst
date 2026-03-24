@@ -37,6 +37,20 @@ User Input (ticker)
  Investment Brief ─── verdict, health scores, risks, catalysts
 ```
 
+## Architecture
+
+Configuration and types are centralized so the app stays predictable across CLI, Streamlit, and tests:
+
+| Layer | Role |
+|-------|------|
+| **`config.py`** | Single **`Settings`** object (Pydantic `BaseSettings`) — all environment variables, feature flags, and context budgets load once from `.env` / the process environment. |
+| **`models.py`** | Pydantic models for **`AnalysisData`**, **`AnalysisResult`**, **`AgentReport`**, **`FilingInfo`** — typed payloads between the orchestrator, agents, and reports. |
+| **`orchestrator.py`** | **`prepare_data`** builds SEC + enrichment; **`run`** loads data with **`asyncio.to_thread`** so blocking I/O does not stall the event loop, runs agents with **`asyncio.gather`**, then synthesis. |
+| **`yahoo_cache.py`** | Per-run, thread-safe cache for Yahoo **`.info`** lookups to avoid duplicate calls across enrichment sections. |
+| **Logging** | Standard **`logging`** (level from **`LOG_LEVEL`**, default `INFO`) — no ad-hoc prints in the pipeline. |
+
+**Performance (enrichment):** After ticker resolution, market enrichment runs **in parallel** with SEC filings + XBRL fact fetch (overlap). Inside **`build_enrichment_context`**, enabled sections (Yahoo, Tavily, peers, estimates, price history, macro, optional RAG) run on a bounded thread pool; Tavily triple-search, FRED series, and peer validation/metrics are parallelized where safe. Tune concurrency with **`ENRICHMENT_MAX_WORKERS`**, **`FRED_MAX_WORKERS`**, and **`PEER_VALIDATION_MAX_WORKERS`** (see `.env.example`). SEC HTTP stays on a **single thread** so EDGAR rate limits are respected.
+
 ## Analyst Agents
 
 | Agent | Style | Focus |
@@ -70,16 +84,21 @@ Each agent receives only the enrichment sections relevant to its analysis via ta
 
 ```
 ai-financial-analyst/
-├── app.py                # Streamlit UI
-├── main.py               # CLI entry point
-├── orchestrator.py        # Phase 1 parallel fan-out + Phase 2 synthesis
-├── market_enrichment.py   # Yahoo, Tavily, price history, macro, estimates
+├── app.py                 # Streamlit UI
+├── main.py                # CLI entry point
+├── orchestrator.py        # prepare_data + Phase 1 parallel fan-out + Phase 2 synthesis
+├── config.py              # Pydantic Settings (env-driven configuration)
+├── models.py              # AnalysisData, AnalysisResult, AgentReport, FilingInfo
+├── market_enrichment.py   # Yahoo, Tavily, price history, macro, estimates (parallel sections)
 ├── peer_enrichment.py     # Dynamic peer discovery + comparison tables
+├── yahoo_cache.py         # Per-run Yahoo .info cache (shared across enrichment)
 ├── report.py              # Output formatting (text + PDF)
-├── utils.py               # Shared helpers (env_flag, format_money)
+├── utils.py               # Shared helpers (format_money, etc.)
 ├── context_budget.py      # Deterministic context trimming
 ├── prompt_loader.py       # Markdown prompt loader + token rendering
-├── requirements.txt       # Dependencies
+├── pyproject.toml         # Project metadata, dependencies, pytest config
+├── requirements.txt       # Editable install: -e .[dev]
+├── tests/                 # pytest suite (models, orchestrator, providers, xbrl, enrichment, …)
 ├── .streamlit/
 │   ├── config.toml
 │   └── secrets.toml.example
@@ -113,7 +132,7 @@ ai-financial-analyst/
 
 ### Requirements
 
-- Python 3.9+
+- Python **3.11+** (see `requires-python` in `pyproject.toml`)
 - An [Anthropic API key](https://console.anthropic.com/) or OpenAI-compatible API key
 
 ### Install
@@ -122,7 +141,10 @@ ai-financial-analyst/
 git clone https://github.com/chadreadey/ai-financial-analyst.git
 cd ai-financial-analyst
 pip install -r requirements.txt
+# installs the package in editable mode with dev deps (pytest, pytest-asyncio)
 ```
+
+Alternatively: `pip install -e ".[dev]"` from the repo root.
 
 ### Configure provider and API keys
 
@@ -181,6 +203,8 @@ MAX_SYNTHESIS_OUTPUT_TOKENS=1500
 
 No SEC configuration needed. The SEC EDGAR API is free and requires no key.
 
+**Secrets:** Keep real keys in `.env` (gitignored) or Streamlit Cloud **Secrets**. Do not commit `.env` or `.streamlit/secrets.toml`. Use `.env.example` and `.streamlit/secrets.toml.example` as templates only.
+
 ### Prompt customization
 
 All agent/synthesis prompts live in `prompts/` as Markdown files. You can edit these directly without changing Python code. Supported placeholder tokens:
@@ -201,11 +225,19 @@ The UI exposes provider selection, enrichment toggles, budget guardrails, PDF do
 OpenAI mode uses `OPENAI_CBS_API_KEY` as the default deployed key (fallback to `OPENAI_API_KEY` if needed).
 Anthropic mode is BYOK in the UI: users must paste their own Anthropic key per run.
 
+### Run tests
+
+```bash
+pytest
+# or
+python -m pytest tests/
+```
+
 ### Deploy on Streamlit Community Cloud
 
 1. Push this repository to GitHub.
-2. In Streamlit Community Cloud, create a new app and set entrypoint to `app.py`.
-3. Add secrets in app settings (use `.streamlit/secrets.toml.example` as template):
+2. In Streamlit Community Cloud, create a new app and set entrypoint to `app.py` (optionally point a **staging branch** at the same repo for previews).
+3. Add secrets in app settings (use `.streamlit/secrets.toml.example` as template — paste values in the Cloud UI, not into a committed file):
    - `OPENAI_CBS_API_KEY` (default OpenAI key fallback)
    - `OPENAI_BASE_URL` (if using CBS endpoint)
    - `OPENAI_API_KEY` (optional fallback)
@@ -259,9 +291,11 @@ python main.py AAPL --user-agent "YourName your@email.com"
 ## Tech Stack
 
 - **LLM**: Provider-selectable Anthropic Claude or OpenAI-compatible APIs
+- **Config & models**: Pydantic v2 + pydantic-settings for env and typed **`AnalysisData`** / **`AnalysisResult`**
 - **Data**: SEC EDGAR API (XBRL structured financials + 10-K filing text)
-- **Enrichment**: Yahoo Finance (price history, estimates, macro), dynamic peer comparison, Tavily research
+- **Enrichment**: Yahoo Finance (price history, estimates, macro), dynamic peer comparison, Tavily research; parallel section fetch + overlap with SEC I/O where safe
 - **Filing parsing**: BeautifulSoup + lxml for 10-K HTML section extraction
-- **Orchestration**: Python `asyncio.gather()` for parallel agent execution
-- **Caching**: SQLite for SEC data (avoids redundant API calls across runs)
+- **Orchestration**: `asyncio.to_thread(prepare_data)` + `asyncio.gather()` for parallel agents and synthesis
+- **Caching**: SQLite for SEC data (avoids redundant API calls across runs); in-memory Yahoo `.info` cache per enrichment run
 - **Data processing**: pandas + numpy for financial data manipulation
+- **Tests**: pytest + pytest-asyncio (`tests/`)
