@@ -30,7 +30,7 @@ class AnalysisData(BaseModel):
     historical_net_income: list[Any] = Field(default_factory=list)
     margin_trends: list[Any] = Field(default_factory=list)
     cash_flow_trends: list[Any] = Field(default_factory=list)
-    quarterly_metrics: dict[str, Any] = Field(default_factory=dict)
+    quarterly_metrics: list[Any] = Field(default_factory=list)
     quarterly_summary: str = ""
     enrichment_sections: dict[str, str] = Field(default_factory=dict)
     enrichment_warnings: list[str] = Field(default_factory=list)
