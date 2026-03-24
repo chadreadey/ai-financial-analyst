@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 
+import sentry_sdk
 import streamlit as st  # type: ignore[import-not-found]
 from dotenv import load_dotenv  # type: ignore[import-not-found]
 
@@ -63,6 +64,7 @@ def _bootstrap_env_from_streamlit_secrets() -> None:
             "TAVILY_API_KEY",
             "FRED_API_KEY",
             "EDGAR_IDENTITY",
+            "SENTRY_DSN",
         ]
         for key in secret_keys:
             if not os.getenv(key) and key in st.secrets:
@@ -73,6 +75,19 @@ def _bootstrap_env_from_streamlit_secrets() -> None:
             os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_CBS_API_KEY", "")
     except Exception:
         pass
+
+
+def _init_sentry() -> None:
+    """Initialize Sentry error tracking if SENTRY_DSN is configured."""
+    dsn = os.getenv("SENTRY_DSN", "")
+    if not dsn:
+        return
+    sentry_sdk.init(
+        dsn=dsn,
+        environment=os.getenv("SENTRY_ENVIRONMENT", "production"),
+        traces_sample_rate=0.2,
+        send_default_pii=False,
+    )
 
 
 def _with_ephemeral_env(env_overrides: dict[str, str], fn):
@@ -271,6 +286,7 @@ def main() -> None:
     )
     st.set_page_config(page_title="AI Financial Analyst", layout="wide")
     _bootstrap_env_from_streamlit_secrets()
+    _init_sentry()
     st.title("AI Financial Analyst")
     st.caption("Multi-agent equity research with provider selection and context budgets.")
 
