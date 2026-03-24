@@ -6,11 +6,14 @@ free cash flow projections, WACC estimation, and fair-value derivation.
 """
 
 import json
-import os
-from typing import Any, Dict, Optional
+import logging
+from typing import Optional
 
 from agents.base import BaseAgent
-from utils import env_flag
+from config import settings
+from models import AnalysisData
+
+logger = logging.getLogger(__name__)
 
 
 class DCFAgent(BaseAgent):
@@ -59,26 +62,25 @@ End with a clear BUY / HOLD / SELL recommendation with a price target.
 
 Be rigorous but concise. Use actual numbers from the provided financials."""
 
-    def build_context(self, data: Dict[str, Any]) -> str:
+    def build_context(self, data: AnalysisData) -> str:
         parts = [
-            f"Company: {data.get('company_name', 'Unknown')} ({data.get('ticker', '?')})\n",
+            f"Company: {data.company_name} ({data.ticker})\n",
         ]
 
-        if "financial_core_summary" in data:
-            parts.append(data["financial_core_summary"])
+        if data.financial_core_summary:
+            parts.append(data.financial_core_summary)
 
-        # DCF agent needs historical trends for projection
-        if "historical_revenue" in data:
+        if data.historical_revenue:
             parts.append("\n── Historical Revenue ──")
-            parts.append(json.dumps(data["historical_revenue"], indent=2))
+            parts.append(json.dumps(data.historical_revenue, indent=2))
 
-        if "historical_net_income" in data:
+        if data.historical_net_income:
             parts.append("\n── Historical Net Income ──")
-            parts.append(json.dumps(data["historical_net_income"], indent=2))
+            parts.append(json.dumps(data.historical_net_income, indent=2))
 
-        if "metrics" in data:
+        if data.metrics:
             parts.append("\n── Key Metrics ──")
-            m = data["metrics"]
+            m = data.metrics
             for key in [
                 "free_cash_flow", "operating_cash_flow", "capex",
                 "long_term_debt", "cash", "stockholders_equity",
@@ -90,18 +92,18 @@ Be rigorous but concise. Use actual numbers from the provided financials."""
                 if key in m and m[key] is not None:
                     parts.append(f"  {key}: {m[key]}")
 
-        if data.get("margin_trends"):
+        if data.margin_trends:
             parts.append("\n── Historical Margin Trends ──")
-            parts.append(json.dumps(data["margin_trends"][:5], indent=2))
+            parts.append(json.dumps(data.margin_trends[:5], indent=2))
 
-        if data.get("cash_flow_trends"):
+        if data.cash_flow_trends:
             parts.append("\n── Historical Cash Flow ──")
-            parts.append(json.dumps(data["cash_flow_trends"][:5], indent=2))
+            parts.append(json.dumps(data.cash_flow_trends[:5], indent=2))
 
-        if data.get("quarterly_summary"):
-            parts.append(f"\n{data['quarterly_summary']}")
+        if data.quarterly_summary:
+            parts.append(f"\n{data.quarterly_summary}")
 
-        if env_flag("ENABLE_WACC_HELPERS", True):
+        if settings.enable_wacc_helpers:
             wacc_block = self._build_wacc_context()
             if wacc_block:
                 parts.append(f"\n{wacc_block}")

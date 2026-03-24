@@ -8,8 +8,9 @@ Phase 2: Feed all agent outputs to a synthesis agent that
 
 import asyncio
 import json
-import os
+import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -21,14 +22,17 @@ from agents import (
     PatternAgent,
     MacroAgent,
 )
+from config import settings
 from context_budget import trim_text
 from llm import LLMProvider, get_provider
 from market_enrichment import build_enrichment_context
+from models import AgentReport, AnalysisData, AnalysisResult, FilingInfo
 from prompt_loader import load_prompt_file, render_prompt
 from sec.client import SECClient
 from sec.filing_parser import parse_filing_sections
 from sec.xbrl_parser import XBRLParser
-from utils import env_flag
+
+logger = logging.getLogger(__name__)
 
 
 def _extract_structured_block(synthesis_text: str) -> Tuple[Optional[dict], str]:
@@ -79,31 +83,45 @@ class Orchestrator:
             CompetitiveAgent(provider=self.provider, model=self.synthesis_model),
             PatternAgent(provider=self.provider, model=self.synthesis_model),
         ]
-        if env_flag("ENABLE_MACRO_AGENT", True):
+        if settings.enable_macro_agent:
             self.agents.append(
                 MacroAgent(provider=self.provider, model=self.synthesis_model)
             )
 
-    def prepare_data(self, ticker: str) -> Dict[str, Any]:
+    def prepare_data(self, ticker: str) -> AnalysisData:
         """
         Fetch and parse all SEC data for a ticker.
-        Returns the unified data dict that agents consume.
+        Returns the unified AnalysisData that agents consume.
         """
-        print(f"  Fetching SEC data for {ticker.upper()}...")
-        raw = self.sec_client.fetch_all_data(ticker)
+        logger.info("Fetching SEC data for %s...", ticker.upper())
+        info = self.sec_client.resolve_ticker(ticker)
+        ticker_upper = ticker.upper()
+        # Overlap enrichment (Yahoo/Tavily/peers/etc.) with SEC filings + facts.
+        with ThreadPoolExecutor(max_workers=1) as overlap_pool:
+            enrich_future = overlap_pool.submit(
+                build_enrichment_context, ticker_upper, info["name"]
+            )
+            filings, company_facts = self.sec_client.fetch_filings_and_facts(ticker)
+        enrichment = enrich_future.result()
 
-        print("  Parsing XBRL financial data...")
+        raw = {
+            "ticker": ticker_upper,
+            "company_name": info["name"],
+            "cik": info["cik"],
+            "recent_filings": filings,
+            "company_facts": company_facts,
+        }
+
+        logger.info("Parsing XBRL financial data...")
         parser = XBRLParser(raw["company_facts"])
-        print("  Building optional market/research enrichment...")
-        enrichment = build_enrichment_context(raw["ticker"], raw["company_name"])
         metrics = parser.compute_metrics()
 
-        if env_flag("ENABLE_EDGARTOOLS", True):
+        if settings.enable_edgartools:
             try:
                 metrics = parser.supplement_with_edgartools(raw["ticker"], metrics)
-                print("  Supplemented metrics via edgartools")
-            except Exception as exc:
-                print(f"  edgartools supplement skipped: {exc}")
+                logger.info("Supplemented metrics via edgartools")
+            except (ImportError, AttributeError, ValueError, RuntimeError) as exc:
+                logger.warning("edgartools supplement skipped: %s", exc)
 
         financial_summary = parser.to_summary_text(metrics=metrics)
 
@@ -113,7 +131,7 @@ class Orchestrator:
         cash_flow_trends = parser.get_historical_cash_flow(years=8)
 
         filing_sections: dict = {"mda": "", "risk_factors": "", "business_description": ""}
-        if env_flag("ENABLE_FILING_TEXT", True):
+        if settings.enable_filing_text:
             try:
                 tenk_filings = [
                     f for f in raw["recent_filings"]
@@ -121,7 +139,7 @@ class Orchestrator:
                 ]
                 if tenk_filings:
                     latest_10k = tenk_filings[0]
-                    print("  Fetching 10-K filing text for narrative extraction...")
+                    logger.info("Fetching 10-K filing text for narrative extraction...")
                     html = self.sec_client.get_filing_text(
                         raw["ticker"],
                         latest_10k["accessionNumber"],
@@ -129,9 +147,9 @@ class Orchestrator:
                     )
                     filing_sections = parse_filing_sections(html, ticker=raw["ticker"])
                     section_count = sum(1 for v in filing_sections.values() if v)
-                    print(f"  Extracted {section_count}/3 filing sections")
+                    logger.info("Extracted %d/3 filing sections", section_count)
             except Exception as exc:
-                print(f"  Warning: filing text extraction failed: {exc}")
+                logger.warning("Filing text extraction failed: %s", exc)
 
         enrichment_sections = enrichment.get("sections", {})
         if filing_sections.get("mda"):
@@ -141,49 +159,51 @@ class Orchestrator:
         if filing_sections.get("business_description"):
             enrichment_sections["filing_business"] = f"=== 10-K Business Description ===\n{filing_sections['business_description']}"
 
-        # If edgartools provided segment data, include it as enrichment
         segment_data = metrics.pop("_segment_data", None)
         if segment_data:
             enrichment_sections["segment_data"] = f"=== Revenue Segments ===\n{segment_data}"
 
-        data = {
-            "ticker": raw["ticker"],
-            "company_name": raw["company_name"],
-            "financial_core_summary": financial_summary,
-            "financial_summary": (
+        recent_filings = [
+            FilingInfo(**f) for f in raw["recent_filings"]
+        ]
+
+        return AnalysisData(
+            ticker=raw["ticker"],
+            company_name=raw["company_name"],
+            financial_core_summary=financial_summary,
+            financial_summary=(
                 f"{financial_summary}\n\n{enrichment.get('text', '')}".strip()
                 if enrichment.get("text")
                 else financial_summary
             ),
-            "metrics": metrics,
-            "recent_filings": raw["recent_filings"],
-            "historical_revenue": parser.get_historical_revenue(years=8),
-            "historical_net_income": parser.get_historical_net_income(years=8),
-            "margin_trends": margin_trends,
-            "cash_flow_trends": cash_flow_trends,
-            "quarterly_metrics": quarterly_metrics,
-            "quarterly_summary": quarterly_summary,
-            "enrichment_sections": enrichment_sections,
-            "enrichment_warnings": enrichment.get("warnings", []),
-            "enrichment_sources": enrichment.get("sources", []),
-            "enrichment_filter_stats": enrichment.get("filter_stats", {}),
-        }
-        return data
+            metrics=metrics,
+            recent_filings=recent_filings,
+            historical_revenue=parser.get_historical_revenue(years=8),
+            historical_net_income=parser.get_historical_net_income(years=8),
+            margin_trends=margin_trends,
+            cash_flow_trends=cash_flow_trends,
+            quarterly_metrics=quarterly_metrics,
+            quarterly_summary=quarterly_summary,
+            enrichment_sections=enrichment_sections,
+            enrichment_warnings=enrichment.get("warnings", []),
+            enrichment_sources=enrichment.get("sources", []),
+            enrichment_filter_stats=enrichment.get("filter_stats", {}),
+        )
 
     async def run_phase1(
-        self, data: Dict[str, Any]
-    ) -> List[Tuple[str, str]]:
+        self, data: AnalysisData
+    ) -> List[AgentReport]:
         """
         Phase 1: Run all agents in parallel.
-        Returns list of (agent_name, analysis_text) tuples.
+        Returns list of AgentReport instances.
         """
-        print("\n── Phase 1: Running analyst agents in parallel ──")
+        logger.info("Phase 1: Running analyst agents in parallel")
 
         async def run_agent(agent):
-            print(f"  → {agent.name} analyzing...")
+            logger.info("  %s analyzing...", agent.name)
             result = await agent.analyze(data)
-            print(f"  ✓ {agent.name} complete")
-            return (agent.name, result)
+            logger.info("  %s complete", agent.name)
+            return AgentReport(agent_name=agent.name, analysis=result)
 
         results = await asyncio.gather(
             *[run_agent(agent) for agent in self.agents]
@@ -194,26 +214,25 @@ class Orchestrator:
         self,
         ticker: str,
         company_name: str,
-        agent_reports: List[Tuple[str, str]],
+        agent_reports: List[AgentReport],
     ) -> str:
         """
         Phase 2: Synthesis agent cross-references all reports.
         Returns the final synthesized analysis.
         """
-        print("\n── Phase 2: Synthesis & cross-referencing ──")
+        logger.info("Phase 2: Synthesis & cross-referencing")
 
-        # Build the synthesis prompt with all agent reports
         report_sections = []
-        per_report_cap = int(os.getenv("SYNTHESIS_REPORT_MAX_CHARS", "4500"))
-        for agent_name, analysis in agent_reports:
+        per_report_cap = settings.synthesis_report_max_chars
+        for report in agent_reports:
             trimmed_analysis = trim_text(
-                analysis,
+                report.analysis,
                 per_report_cap,
                 marker="\n...[agent report trimmed]...",
             )
             report_sections.append(
                 f"{'=' * 60}\n"
-                f"REPORT FROM: {agent_name}\n"
+                f"REPORT FROM: {report.agent_name}\n"
                 f"{'=' * 60}\n\n"
                 f"{trimmed_analysis}\n"
             )
@@ -221,7 +240,7 @@ class Orchestrator:
         combined_reports = "\n\n".join(report_sections)
         combined_reports = trim_text(
             combined_reports,
-            int(os.getenv("SYNTHESIS_INPUT_MAX_CHARS", "22000")),
+            settings.synthesis_input_max_chars,
             marker="\n...[synthesis input trimmed]...",
         )
         synthesis_template = load_prompt_file(str(SYNTHESIS_PROMPT_FILE))
@@ -240,65 +259,51 @@ class Orchestrator:
                 f"{combined_reports}"
             ),
             model=self.synthesis_model,
-            max_tokens=int(os.getenv("MAX_SYNTHESIS_OUTPUT_TOKENS", "1500")),
+            max_tokens=settings.max_synthesis_output_tokens,
         )
 
-        print("  ✓ Synthesis complete")
+        logger.info("Synthesis complete")
         return synthesis_text
 
-    async def run(self, ticker: str) -> Dict[str, Any]:
+    async def run(self, ticker: str) -> AnalysisResult:
         """
         Execute the full two-phase analysis pipeline for a ticker.
-
-        Returns:
-            Dict with keys:
-                - ticker
-                - company_name
-                - agent_reports: list of (name, analysis) tuples
-                - synthesis: the final cross-referenced brief
-                - metrics: raw computed metrics
-                - structured_verdict: parsed JSON block from synthesis (if any)
         """
-        # Fetch and prepare data (sync — must complete before agents run)
-        data = self.prepare_data(ticker)
+        data = await asyncio.to_thread(self.prepare_data, ticker)
 
-        # Phase 1: parallel agent execution
         agent_reports = await self.run_phase1(data)
 
-        # Phase 2: synthesis
         raw_synthesis = await self.run_phase2(
-            data["ticker"],
-            data["company_name"],
+            data.ticker,
+            data.company_name,
             agent_reports,
         )
 
-        # Extract structured verdict and clean prose
         structured, synthesis = _extract_structured_block(raw_synthesis)
 
-        # Persist to analysis history if structured data was extracted
         if structured:
             try:
                 health = structured.get("health_scores", {})
                 self.sec_client.cache.save_analysis(
-                    ticker=data["ticker"],
+                    ticker=data.ticker,
                     verdict=structured.get("verdict", ""),
                     conviction=structured.get("conviction", ""),
                     time_horizon=structured.get("time_horizon", ""),
                     composite_score=health.get("overall"),
                     health_scores=health,
                 )
-                print("  ✓ Analysis saved to history")
+                logger.info("Analysis saved to history")
             except Exception as exc:
-                print(f"  Warning: failed to save analysis history: {exc}")
+                logger.warning("Failed to save analysis history: %s", exc)
 
-        return {
-            "ticker": data["ticker"],
-            "company_name": data["company_name"],
-            "agent_reports": agent_reports,
-            "synthesis": synthesis,
-            "structured_verdict": structured,
-            "metrics": data["metrics"],
-            "enrichment_warnings": data.get("enrichment_warnings", []),
-            "enrichment_sources": data.get("enrichment_sources", []),
-            "enrichment_filter_stats": data.get("enrichment_filter_stats", {}),
-        }
+        return AnalysisResult(
+            ticker=data.ticker,
+            company_name=data.company_name,
+            agent_reports=agent_reports,
+            synthesis=synthesis,
+            structured_verdict=structured,
+            metrics=data.metrics,
+            enrichment_warnings=data.enrichment_warnings,
+            enrichment_sources=data.enrichment_sources,
+            enrichment_filter_stats=data.enrichment_filter_stats,
+        )

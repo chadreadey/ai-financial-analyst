@@ -5,11 +5,14 @@ Transforms raw XBRL JSON from the SEC API into structured
 DataFrames and computed financial metrics that agents consume.
 """
 
+import logging
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
 from utils import format_money
+
+logger = logging.getLogger(__name__)
 
 
 # Common US-GAAP concepts we extract
@@ -598,9 +601,8 @@ class XBRLParser:
                                             supplemented[key] = float(val)
                                         break
             except Exception:
-                pass
+                logger.debug("edgartools income_statement gap-fill failed", exc_info=True)
 
-            # Segment data (if available via edgartools financials detailed view)
             try:
                 detailed = financials.income_statement(view="detailed")
                 if detailed is not None:
@@ -617,8 +619,8 @@ class XBRLParser:
                         if segment_lines:
                             supplemented["_segment_data"] = "\n".join(segment_lines)
             except Exception:
-                pass
+                logger.debug("edgartools segment data extraction failed", exc_info=True)
 
             return supplemented
-        except Exception:
+        except (ImportError, AttributeError, ValueError):
             return metrics

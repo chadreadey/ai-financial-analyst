@@ -6,14 +6,19 @@ classification, market cap range, and validated ticker resolution.
 Formats a structured comparison table with sector medians.
 """
 
-import os
+import logging
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from importlib import import_module
 from statistics import median
 from typing import Any, Dict, List, Optional, Tuple
 
+from config import settings
 from context_budget import trim_text
-from utils import env_flag, format_money
+from utils import format_money
+from yahoo_cache import YahooLookupCache
+
+logger = logging.getLogger(__name__)
 
 
 PEER_METRICS = [
@@ -28,7 +33,6 @@ PEER_METRICS = [
     ("revenueGrowth", "Rev Growth"),
 ]
 
-# Common English words / abbreviations that look like tickers but aren't
 TICKER_BLOCKLIST = {
     "THE", "AND", "FOR", "ARE", "BUT", "NOT", "YOU", "ALL", "CAN", "HAD",
     "HER", "WAS", "ONE", "OUR", "OUT", "ITS", "HAS", "HIS", "HOW", "TOP",
@@ -42,18 +46,23 @@ TICKER_BLOCKLIST = {
 }
 
 
-def _validate_ticker(sym: str) -> Optional[Dict[str, Any]]:
+def _validate_ticker(
+    sym: str, cache: Optional[YahooLookupCache] = None
+) -> Optional[Dict[str, Any]]:
     """Check that a string is a real tradeable ticker and return its info."""
     import yfinance as yf
 
     if sym in TICKER_BLOCKLIST or len(sym) < 2:
         return None
     try:
-        info = yf.Ticker(sym).info or {}
+        if cache is not None:
+            info = cache.get_info(sym)
+        else:
+            info = yf.Ticker(sym).info or {}
         if info.get("marketCap") and info.get("quoteType") in ("EQUITY", None):
             return info
     except Exception:
-        pass
+        logger.debug("Ticker validation failed for %s", sym, exc_info=True)
     return None
 
 
@@ -63,16 +72,11 @@ def _industry_match_score(
     target_industry: str,
     target_sector: str,
 ) -> int:
-    """
-    Score how closely a candidate matches the target's industry.
-    3 = exact industry match, 2 = overlapping industry keywords,
-    1 = same sector, 0 = different sector.
-    """
     if candidate_industry == target_industry:
         return 3
 
-    target_words = set(target_industry.lower().replace("-", " ").replace("—", " ").split())
-    cand_words = set(candidate_industry.lower().replace("-", " ").replace("—", " ").split())
+    target_words = set(target_industry.lower().replace("-", " ").replace("\u2014", " ").split())
+    cand_words = set(candidate_industry.lower().replace("-", " ").replace("\u2014", " ").split())
     filler = {"", "and", "of", "the", "other", "general", "diversified", "specialty"}
     target_words -= filler
     cand_words -= filler
@@ -86,7 +90,6 @@ def _industry_match_score(
 
 
 def _market_cap_proximity(subject_cap: float, peer_cap: float) -> float:
-    """Return a 0-1 score for how close two market caps are (log-scale)."""
     import math
     if subject_cap <= 0 or peer_cap <= 0:
         return 0.0
@@ -98,29 +101,24 @@ def discover_peers(
     ticker: str,
     company_name: str,
     max_peers: int = 5,
+    cache: Optional[YahooLookupCache] = None,
 ) -> List[str]:
     """
-    Dynamically discover peer tickers for each request using:
-    1. yfinance recommendedSymbols (pre-validated by Yahoo)
-    2. Tavily search with industry-specific queries
-    3. Candidate validation: verify each ticker, filter by industry
-       match and market cap proximity
-
-    No static industry lists are used. Every comparison set is
-    built fresh from the subject company's actual characteristics.
+    Dynamically discover peer tickers for each request.
     """
     import yfinance as yf
 
     ticker = ticker.upper()
-    stock = yf.Ticker(ticker)
-    info = stock.info or {}
+    if cache is not None:
+        info = cache.get_info(ticker)
+    else:
+        info = yf.Ticker(ticker).info or {}
     sector = info.get("sector", "")
     industry = info.get("industry", "")
     subject_cap = info.get("marketCap", 0) or 0
 
     raw_candidates: List[str] = []
 
-    # --- Source 1: yfinance recommended symbols (usually high quality) ---
     recommended = info.get("recommendedSymbols") or []
     if isinstance(recommended, list):
         for item in recommended:
@@ -129,8 +127,7 @@ def discover_peers(
             if sym and sym != ticker and sym not in raw_candidates:
                 raw_candidates.append(sym)
 
-    # --- Source 2: Tavily search with industry-specific queries ---
-    if env_flag("ENABLE_TAVILY", True):
+    if settings.enable_tavily:
         queries = []
         if industry:
             queries.append(
@@ -143,7 +140,7 @@ def discover_peers(
         )
 
         try:
-            key = os.getenv("TAVILY_API_KEY", "").strip()
+            key = settings.tavily_api_key.strip()
             if key:
                 tavily_module = import_module("tavily")
                 client = getattr(tavily_module, "TavilyClient")(api_key=key)
@@ -170,17 +167,29 @@ def discover_peers(
                             ):
                                 raw_candidates.append(t)
         except Exception:
-            pass
+            logger.debug("Tavily peer discovery failed", exc_info=True)
 
-    # --- Validate and score each candidate ---
-    scored: List[Tuple[float, str, Dict[str, Any]]] = []
-    seen = set()
+    unique_ordered: List[str] = []
+    seen_syms = set()
     for sym in raw_candidates:
-        if sym in seen:
+        if sym in seen_syms:
             continue
-        seen.add(sym)
+        seen_syms.add(sym)
+        unique_ordered.append(sym)
 
-        peer_info = _validate_ticker(sym)
+    validated_map: Dict[str, Optional[Dict[str, Any]]] = {}
+    max_val_workers = max(1, settings.peer_validation_max_workers)
+    with ThreadPoolExecutor(max_workers=max_val_workers) as pool:
+        future_to_sym = {
+            pool.submit(_validate_ticker, sym, cache): sym for sym in unique_ordered
+        }
+        for fut in as_completed(future_to_sym):
+            sym = future_to_sym[fut]
+            validated_map[sym] = fut.result()
+
+    scored: List[Tuple[float, str, Dict[str, Any]]] = []
+    for sym in unique_ordered:
+        peer_info = validated_map.get(sym)
         if peer_info is None:
             continue
 
@@ -193,14 +202,12 @@ def discover_peers(
         )
         cap_score = _market_cap_proximity(subject_cap, peer_cap) if subject_cap else 0.5
 
-        # Composite: industry match is 3x more important than cap proximity
         composite = ind_score * 3.0 + cap_score
 
         scored.append((composite, sym, peer_info))
 
     scored.sort(key=lambda x: x[0], reverse=True)
 
-    # Prefer industry matches; if we have none, take the best available
     result = [sym for _, sym, _ in scored[:max_peers]]
 
     if result:
@@ -212,21 +219,27 @@ def discover_peers(
         )
         peer_ind = scored[0][2].get("industry", "unknown")
         match_label = {3: "exact", 2: "related", 1: "same sector", 0: "cross-sector"}
-        print(
-            f"  Peer discovery: {len(result)} peers found, "
-            f"best match: {match_label.get(best_ind_score, '?')} "
-            f"({peer_ind})"
+        logger.info(
+            "Peer discovery: %d peers found, best match: %s (%s)",
+            len(result),
+            match_label.get(best_ind_score, "?"),
+            peer_ind,
         )
 
     return result
 
 
-def _fetch_peer_metrics(peer_ticker: str) -> Optional[Dict[str, Any]]:
+def _fetch_peer_metrics(
+    peer_ticker: str, cache: Optional[YahooLookupCache] = None
+) -> Optional[Dict[str, Any]]:
     """Fetch key metrics for a single peer ticker."""
     import yfinance as yf
 
     try:
-        info = yf.Ticker(peer_ticker).info or {}
+        if cache is not None:
+            info = cache.get_info(peer_ticker)
+        else:
+            info = yf.Ticker(peer_ticker).info or {}
         if not info.get("marketCap"):
             return None
         result: Dict[str, Any] = {"ticker": peer_ticker}
@@ -237,6 +250,7 @@ def _fetch_peer_metrics(peer_ticker: str) -> Optional[Dict[str, Any]]:
         result["sector"] = info.get("sector", "")
         return result
     except Exception:
+        logger.debug("Failed to fetch peer metrics for %s", peer_ticker, exc_info=True)
         return None
 
 
@@ -244,6 +258,7 @@ def build_peer_comparison(
     ticker: str,
     company_name: str,
     peers: Optional[List[str]] = None,
+    cache: Optional[YahooLookupCache] = None,
 ) -> tuple[str, List[str]]:
     """
     Build a formatted peer comparison section.
@@ -253,21 +268,33 @@ def build_peer_comparison(
 
     ticker = ticker.upper()
     if peers is None:
-        peers = discover_peers(ticker, company_name)
+        peers = discover_peers(ticker, company_name, cache=cache)
 
     if not peers:
         return "", []
 
-    subject_info = yf.Ticker(ticker).info or {}
+    if cache is not None:
+        subject_info = cache.get_info(ticker)
+    else:
+        subject_info = yf.Ticker(ticker).info or {}
     subject: Dict[str, Any] = {"ticker": ticker, "shortName": company_name}
     for key, _ in PEER_METRICS:
         subject[key] = subject_info.get(key)
     subject_industry = subject_info.get("industry", "Unknown")
     subject_sector = subject_info.get("sector", "Unknown")
 
+    max_workers = max(1, settings.peer_validation_max_workers)
     peer_data: List[Dict[str, Any]] = []
+    metrics_by_ticker: Dict[str, Optional[Dict[str, Any]]] = {}
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        fut_to_peer = {
+            pool.submit(_fetch_peer_metrics, p, cache): p for p in peers
+        }
+        for fut in as_completed(fut_to_peer):
+            p = fut_to_peer[fut]
+            metrics_by_ticker[p] = fut.result()
     for p in peers:
-        data = _fetch_peer_metrics(p)
+        data = metrics_by_ticker.get(p)
         if data:
             peer_data.append(data)
 
@@ -330,5 +357,5 @@ def build_peer_comparison(
         lines.append(f"  {d['ticker']} ({name}): {cap} | {pe} | {gm}{ind_tag}")
 
     section = "\n".join(lines)
-    section = trim_text(section, int(os.getenv("MAX_PEER_SECTION_CHARS", "2500")))
+    section = trim_text(section, settings.max_peer_section_chars)
     return section, ["Yahoo Finance (peer data)"]

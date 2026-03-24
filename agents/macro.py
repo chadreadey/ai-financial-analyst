@@ -7,9 +7,9 @@ geopolitical factors, and a TAILWIND / NEUTRAL / HEADWIND verdict.
 """
 
 import json
-from typing import Any, Dict
 
 from agents.base import BaseAgent
+from models import AnalysisData
 
 
 class MacroAgent(BaseAgent):
@@ -38,17 +38,17 @@ Framework:
 
 Use actual rates and market data. Be specific about transmission mechanisms."""
 
-    def build_context(self, data: Dict[str, Any]) -> str:
+    def build_context(self, data: AnalysisData) -> str:
         parts = [
-            f"Company: {data.get('company_name', 'Unknown')} ({data.get('ticker', '?')})\n",
+            f"Company: {data.company_name} ({data.ticker})\n",
         ]
 
-        if "financial_core_summary" in data:
-            parts.append(data["financial_core_summary"])
+        if data.financial_core_summary:
+            parts.append(data.financial_core_summary)
 
-        if "metrics" in data:
+        if data.metrics:
             parts.append("\n── Macro-Relevant Metrics ──")
-            m = data["metrics"]
+            m = data.metrics
             for key in [
                 "revenue", "revenue_growth_yoy", "revenue_cagr_3y",
                 "operating_margin", "net_margin",
@@ -58,9 +58,9 @@ Use actual rates and market data. Be specific about transmission mechanisms."""
                 if key in m and m[key] is not None:
                     parts.append(f"  {key}: {m[key]}")
 
-        if "historical_revenue" in data:
+        if data.historical_revenue:
             parts.append("\n── Historical Revenue ──")
-            parts.append(json.dumps(data["historical_revenue"][:5], indent=2))
+            parts.append(json.dumps(data.historical_revenue[:5], indent=2))
 
         self.append_enrichment_sections(parts, data)
         return "\n".join(parts)

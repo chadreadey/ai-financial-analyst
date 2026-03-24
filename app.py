@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 from datetime import datetime
 from pathlib import Path
@@ -6,6 +7,10 @@ from pathlib import Path
 import streamlit as st  # type: ignore[import-not-found]
 from dotenv import load_dotenv  # type: ignore[import-not-found]
 
+load_dotenv()
+
+from config import settings
+from models import AnalysisResult, AgentReport
 from orchestrator import Orchestrator
 from report import (
     build_pdf_report,
@@ -17,9 +22,8 @@ from report import (
 )
 from sec.cache import SECCache
 from sec.client import SECClient
-from utils import env_flag
 
-load_dotenv()
+logger = logging.getLogger(__name__)
 
 
 def _set_runtime_env(
@@ -34,9 +38,8 @@ def _set_runtime_env(
 ) -> None:
     os.environ["LLM_PROVIDER"] = provider
     if provider == "openai":
-        # Always prioritize CBS deployment key as default for app users.
-        if os.getenv("OPENAI_CBS_API_KEY"):
-            os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_CBS_API_KEY", "")
+        if settings.openai_cbs_api_key:
+            os.environ["OPENAI_API_KEY"] = settings.openai_cbs_api_key
     os.environ["ENABLE_YAHOO"] = "true" if enable_yahoo else "false"
     os.environ["ENABLE_TAVILY"] = "true" if enable_tavily else "false"
     os.environ["MAX_AGENT_CONTEXT_CHARS"] = str(max_agent_context_chars)
@@ -68,7 +71,6 @@ def _bootstrap_env_from_streamlit_secrets() -> None:
         if os.getenv("OPENAI_CBS_API_KEY"):
             os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_CBS_API_KEY", "")
     except Exception:
-        # Ignore secret bootstrap errors in local/dev runs.
         pass
 
 
@@ -90,7 +92,7 @@ def _with_ephemeral_env(env_overrides: dict[str, str], fn):
                 os.environ[key] = old
 
 
-def _run_analysis_sync(ticker: str, user_agent: str, provider: str, model: str, progress) -> dict:
+def _run_analysis_sync(ticker: str, user_agent: str, provider: str, model: str, progress) -> AnalysisResult:
     cache = SECCache()
     sec_client = SECClient(user_agent=user_agent, cache=cache)
     orchestrator = Orchestrator(
@@ -99,25 +101,28 @@ def _run_analysis_sync(ticker: str, user_agent: str, provider: str, model: str, 
         model=(model.strip() or None),
     )
 
-    async def _pipeline() -> dict:
+    async def _pipeline() -> AnalysisResult:
         progress.write("Fetching SEC/XBRL data and enrichment...")
         data = orchestrator.prepare_data(ticker)
         progress.write("Running analyst agents in parallel...")
         agent_reports = await orchestrator.run_phase1(data)
         progress.write("Synthesizing final investment brief...")
-        synthesis = await orchestrator.run_phase2(
-            data["ticker"], data["company_name"], agent_reports
+        raw_synthesis = await orchestrator.run_phase2(
+            data.ticker, data.company_name, agent_reports
         )
-        return {
-            "ticker": data["ticker"],
-            "company_name": data["company_name"],
-            "agent_reports": agent_reports,
-            "synthesis": synthesis,
-            "metrics": data["metrics"],
-            "enrichment_warnings": data.get("enrichment_warnings", []),
-            "enrichment_sources": data.get("enrichment_sources", []),
-            "enrichment_filter_stats": data.get("enrichment_filter_stats", {}),
-        }
+        from orchestrator import _extract_structured_block
+        structured, synthesis = _extract_structured_block(raw_synthesis)
+        return AnalysisResult(
+            ticker=data.ticker,
+            company_name=data.company_name,
+            agent_reports=agent_reports,
+            synthesis=synthesis,
+            structured_verdict=structured,
+            metrics=data.metrics,
+            enrichment_warnings=data.enrichment_warnings,
+            enrichment_sources=data.enrichment_sources,
+            enrichment_filter_stats=data.enrichment_filter_stats,
+        )
 
     try:
         try:
@@ -160,7 +165,6 @@ def _render_history_sidebar(ticker: str) -> None:
         conv_str = f" ({conviction})" if conviction else ""
         st.sidebar.text(f"{run_date}: {verdict}{conv_str}{score_str}")
 
-    # Score trend if we have enough data points
     scores = [
         (e["run_at"], e["composite_score"])
         for e in reversed(history)
@@ -173,11 +177,10 @@ def _render_history_sidebar(ticker: str) -> None:
         st.sidebar.line_chart(df.set_index("date")["score"], height=120)
 
 
-def _render_result(result: dict, txt_path: str | None = None, pdf_path: str | None = None) -> None:
-    st.subheader(f"{result['company_name']} ({result['ticker']})")
+def _render_result(result: AnalysisResult, txt_path: str | None = None, pdf_path: str | None = None) -> None:
+    st.subheader(f"{result.company_name} ({result.ticker})")
 
-    # Show structured verdict banner if available
-    sv = result.get("structured_verdict")
+    sv = result.structured_verdict
     if sv:
         verdict = sv.get("verdict", "")
         conviction = sv.get("conviction", "")
@@ -189,14 +192,18 @@ def _render_result(result: dict, txt_path: str | None = None, pdf_path: str | No
             badge_parts.append(f"Score: {score}/10")
         st.info(" | ".join(badge_parts))
 
-    st.markdown(streamlit_markdown_text(result["synthesis"]))
+    st.markdown(streamlit_markdown_text(result.synthesis))
 
-    pdf_bytes = build_pdf_report(result)
+    result_dict = result.model_dump()
+    result_dict["agent_reports"] = [
+        (r.agent_name, r.analysis) for r in result.agent_reports
+    ]
+    pdf_bytes = build_pdf_report(result_dict)
 
     st.download_button(
         "Download Report (.pdf)",
         data=pdf_bytes,
-        file_name=f"{result['ticker']}_analysis.pdf",
+        file_name=f"{result.ticker}_analysis.pdf",
         mime="application/pdf",
         use_container_width=True,
     )
@@ -207,20 +214,19 @@ def _render_result(result: dict, txt_path: str | None = None, pdf_path: str | No
             parts.append(f"PDF saved: `{pdf_path}`")
         st.caption(" | ".join(parts))
 
-    # Render history sidebar
-    _render_history_sidebar(result["ticker"])
+    _render_history_sidebar(result.ticker)
 
-    tab_names = [name for name, _ in result["agent_reports"]] + ["Enrichment & Diagnostics"]
+    tab_names = [r.agent_name for r in result.agent_reports] + ["Enrichment & Diagnostics"]
     tabs = st.tabs(tab_names)
 
-    for idx, (agent_name, analysis) in enumerate(result["agent_reports"]):
+    for idx, report in enumerate(result.agent_reports):
         with tabs[idx]:
-            st.markdown(streamlit_markdown_text(analysis))
+            st.markdown(streamlit_markdown_text(report.analysis))
 
     with tabs[-1]:
-        sources = result.get("enrichment_sources", [])
-        warnings = result.get("enrichment_warnings", [])
-        stats = result.get("enrichment_filter_stats", {})
+        sources = result.enrichment_sources
+        warnings = result.enrichment_warnings
+        stats = result.enrichment_filter_stats
         st.markdown("### Enrichment Sources")
         if sources:
             for source in sources:
@@ -258,6 +264,10 @@ def _render_cached_report(path: Path) -> None:
 
 
 def main() -> None:
+    logging.basicConfig(
+        format="%(levelname)s | %(name)s | %(message)s",
+        level=getattr(logging, settings.log_level.upper(), logging.INFO),
+    )
     st.set_page_config(page_title="AI Financial Analyst", layout="wide")
     _bootstrap_env_from_streamlit_secrets()
     st.title("AI Financial Analyst")
@@ -268,7 +278,7 @@ def main() -> None:
         provider = st.selectbox(
             "LLM Provider",
             options=["openai", "anthropic"],
-            index=0 if os.getenv("LLM_PROVIDER", "openai") == "openai" else 1,
+            index=0 if settings.llm_provider == "openai" else 1,
         )
         if provider == "openai":
             st.caption("Using default OpenAI model and deployment CBS key.")
@@ -281,33 +291,33 @@ def main() -> None:
         )
         user_agent = st.text_input(
             "SEC User-Agent",
-            value=os.getenv("SEC_USER_AGENT", "AIFinancialAnalyst admin@example.com"),
+            value=settings.sec_user_agent,
         )
 
         st.subheader("Enrichment")
-        enable_yahoo = st.checkbox("Enable Yahoo market data", value=env_flag("ENABLE_YAHOO", True))
-        enable_tavily = st.checkbox("Enable Tavily research", value=env_flag("ENABLE_TAVILY", True))
+        enable_yahoo = st.checkbox("Enable Yahoo market data", value=settings.enable_yahoo)
+        enable_tavily = st.checkbox("Enable Tavily research", value=settings.enable_tavily)
 
         with st.expander("Budget Guardrails", expanded=False):
             max_agent_context_chars = st.number_input(
                 "MAX_AGENT_CONTEXT_CHARS", min_value=1000, max_value=20000, step=500,
-                value=int(os.getenv("MAX_AGENT_CONTEXT_CHARS", "7000")),
+                value=settings.max_agent_context_chars,
             )
             max_agent_output_tokens = st.number_input(
                 "MAX_AGENT_OUTPUT_TOKENS", min_value=100, max_value=4000, step=100,
-                value=int(os.getenv("MAX_AGENT_OUTPUT_TOKENS", "1200")),
+                value=settings.max_agent_output_tokens,
             )
             synthesis_report_max_chars = st.number_input(
                 "SYNTHESIS_REPORT_MAX_CHARS", min_value=500, max_value=10000, step=250,
-                value=int(os.getenv("SYNTHESIS_REPORT_MAX_CHARS", "3200")),
+                value=settings.synthesis_report_max_chars,
             )
             synthesis_input_max_chars = st.number_input(
                 "SYNTHESIS_INPUT_MAX_CHARS", min_value=1000, max_value=30000, step=500,
-                value=int(os.getenv("SYNTHESIS_INPUT_MAX_CHARS", "14000")),
+                value=settings.synthesis_input_max_chars,
             )
             max_synthesis_output_tokens = st.number_input(
                 "MAX_SYNTHESIS_OUTPUT_TOKENS", min_value=100, max_value=5000, step=100,
-                value=int(os.getenv("MAX_SYNTHESIS_OUTPUT_TOKENS", "1500")),
+                value=settings.max_synthesis_output_tokens,
             )
 
         st.divider()
@@ -344,7 +354,7 @@ def main() -> None:
             max_synthesis_output_tokens=int(max_synthesis_output_tokens),
         )
 
-        if provider == "openai" and not os.getenv("OPENAI_API_KEY"):
+        if provider == "openai" and not settings.openai_api_key:
             st.error("OpenAI provider selected but no API key is available.")
             st.info("Configure OPENAI_CBS_API_KEY in deployment secrets.")
             return
@@ -362,8 +372,12 @@ def main() -> None:
                 )
             else:
                 result = _run_analysis_sync(ticker, user_agent, provider, "", progress)
-            txt_path = save_report(result)
-            pdf_path = save_pdf_report(result, filepath=txt_path.replace(".txt", ".pdf"))
+            result_dict = result.model_dump()
+            result_dict["agent_reports"] = [
+                (r.agent_name, r.analysis) for r in result.agent_reports
+            ]
+            txt_path = save_report(result_dict)
+            pdf_path = save_pdf_report(result_dict, filepath=txt_path.replace(".txt", ".pdf"))
             st.session_state["latest_result"] = result
             st.session_state["latest_txt_path"] = txt_path
             st.session_state["latest_pdf_path"] = pdf_path
@@ -401,4 +415,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

@@ -7,11 +7,14 @@ and data-driven pattern identification.
 """
 
 import json
-import os
-from typing import Any, Dict, Optional
+import logging
+from typing import Optional
 
 from agents.base import BaseAgent
-from utils import env_flag
+from config import settings
+from models import AnalysisData
+
+logger = logging.getLogger(__name__)
 
 
 def _compute_risk_metrics(ticker: str) -> Optional[str]:
@@ -33,32 +36,25 @@ def _compute_risk_metrics(ticker: str) -> Optional[str]:
         mean_ret = float(returns.mean())
         std_ret = float(returns.std())
 
-        # Sharpe (assuming risk-free ~ 0 for simplicity; agents have FRED data)
         sharpe = (mean_ret * ann_factor) / (std_ret * np.sqrt(ann_factor)) if std_ret > 0 else 0.0
 
-        # Sortino (downside deviation only)
         downside = returns[returns < 0]
         downside_std = float(downside.std()) if len(downside) > 1 else std_ret
         sortino = (mean_ret * ann_factor) / (downside_std * np.sqrt(ann_factor)) if downside_std > 0 else 0.0
 
-        # Max drawdown
         cumulative = (1 + returns).cumprod()
         running_max = cumulative.cummax()
         drawdowns = (cumulative - running_max) / running_max
         max_dd = float(drawdowns.min())
 
-        # Calmar (annualized return / abs max drawdown)
         ann_ret = float((cumulative.iloc[-1]) ** (ann_factor / len(returns)) - 1)
         calmar = ann_ret / abs(max_dd) if max_dd != 0 else 0.0
 
-        # Value at Risk (95th percentile)
         var_95 = float(np.percentile(returns, 5))
 
-        # Distribution shape
         skew = float(returns.skew())
         kurt = float(returns.kurtosis())
 
-        # Best/worst periods
         monthly_returns = close.resample("ME").last().pct_change().dropna()
         best_month = float(monthly_returns.max()) if len(monthly_returns) > 0 else None
         worst_month = float(monthly_returns.min()) if len(monthly_returns) > 0 else None
@@ -133,41 +129,41 @@ let the numbers speak. Present findings as observations with statistical \
 backing wherever possible. Renaissance succeeds by finding what others miss \
 in the data."""
 
-    def build_context(self, data: Dict[str, Any]) -> str:
+    def build_context(self, data: AnalysisData) -> str:
         parts = [
-            f"Company: {data.get('company_name', 'Unknown')} ({data.get('ticker', '?')})\n",
+            f"Company: {data.company_name} ({data.ticker})\n",
         ]
 
-        if "financial_core_summary" in data:
-            parts.append(data["financial_core_summary"])
+        if data.financial_core_summary:
+            parts.append(data.financial_core_summary)
 
-        if "historical_revenue" in data:
+        if data.historical_revenue:
             parts.append("\n── Historical Revenue (full series) ──")
-            parts.append(json.dumps(data["historical_revenue"], indent=2))
+            parts.append(json.dumps(data.historical_revenue, indent=2))
 
-        if "historical_net_income" in data:
+        if data.historical_net_income:
             parts.append("\n── Historical Net Income (full series) ──")
-            parts.append(json.dumps(data["historical_net_income"], indent=2))
+            parts.append(json.dumps(data.historical_net_income, indent=2))
 
-        if "metrics" in data:
+        if data.metrics:
             parts.append("\n── Current Metrics (latest snapshot) ──")
-            for key, val in data["metrics"].items():
+            for key, val in data.metrics.items():
                 if val is not None:
                     parts.append(f"  {key}: {val}")
 
-        if data.get("margin_trends"):
+        if data.margin_trends:
             parts.append("\n── Historical Margin Trends ──")
-            parts.append(json.dumps(data["margin_trends"], indent=2))
+            parts.append(json.dumps(data.margin_trends, indent=2))
 
-        if data.get("cash_flow_trends"):
+        if data.cash_flow_trends:
             parts.append("\n── Historical Cash Flow ──")
-            parts.append(json.dumps(data["cash_flow_trends"], indent=2))
+            parts.append(json.dumps(data.cash_flow_trends, indent=2))
 
-        if data.get("quarterly_summary"):
-            parts.append(f"\n{data['quarterly_summary']}")
+        if data.quarterly_summary:
+            parts.append(f"\n{data.quarterly_summary}")
 
-        if env_flag("ENABLE_QUANTSTATS", True):
-            ticker = data.get("ticker", "")
+        if settings.enable_quantstats:
+            ticker = data.ticker
             if ticker:
                 risk_block = _compute_risk_metrics(ticker)
                 if risk_block:

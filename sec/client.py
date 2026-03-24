@@ -14,26 +14,22 @@ When ENABLE_EDGARTOOLS is set, edgartools is used as a parallel enrichment
 path for filing section extraction and financial data gap-filling.
 """
 
-import os
+import logging
 import time
 from typing import Any, Dict, List, Optional
 
 import requests
 
+from config import settings
 from sec.cache import SECCache
-from utils import env_flag
 
-# Set edgartools identity on import (must happen before any edgartools calls)
-_edgar_identity = os.getenv(
-    "EDGAR_IDENTITY",
-    os.getenv("SEC_USER_AGENT", "AIFinancialAnalyst admin@example.com"),
-)
+logger = logging.getLogger(__name__)
+
 try:
     from edgar import set_identity
-    set_identity(_edgar_identity)
-except Exception:
+    set_identity(settings.resolved_edgar_identity)
+except (ImportError, AttributeError):
     pass
-
 
 BASE_URL = "https://data.sec.gov"
 SEC_WWW = "https://www.sec.gov"
@@ -94,7 +90,6 @@ class SECClient:
         url = f"{SEC_WWW}/files/company_tickers.json"
         data = self._get(url)
 
-        # Build a dict keyed by uppercase ticker
         ticker_map: Dict[str, Dict] = {}
         for entry in data.values():
             ticker_map[entry["ticker"].upper()] = {
@@ -213,7 +208,6 @@ class SECClient:
         )
         text = self._get_text(url)
 
-        # Cache filing text for 7 days (filings don't change)
         self.cache.set("documents", cache_key, text, ttl=86400 * 7)
         return text
 
@@ -224,7 +218,7 @@ class SECClient:
         Return an edgartools Company object for the ticker, cached.
         Returns None if edgartools is disabled or fails.
         """
-        if not env_flag("ENABLE_EDGARTOOLS", True):
+        if not settings.enable_edgartools:
             return None
 
         cache_key = f"edgar_company_{ticker.upper()}"
@@ -237,10 +231,8 @@ class SECClient:
             company = Company(ticker.upper())
             if company.not_found:
                 return None
-            # Don't cache the Company object itself (not serializable),
-            # just confirm it's valid. Each call is cheap after identity set.
             return company
-        except Exception:
+        except (ImportError, AttributeError, ValueError):
             return None
 
     def get_edgartools_tenk(self, ticker: str):
@@ -254,7 +246,7 @@ class SECClient:
                 return None
             tenk = company.latest_tenk
             return tenk
-        except Exception:
+        except (ImportError, AttributeError, ValueError):
             return None
 
     def get_edgartools_financials(self, ticker: str):
@@ -267,10 +259,29 @@ class SECClient:
             if company is None:
                 return None
             return company.get_financials()
-        except Exception:
+        except (ImportError, AttributeError, ValueError):
             return None
 
     # ── convenience: gather all data for a ticker ─────────────────
+
+    def fetch_filings_and_facts(
+        self,
+        ticker: str,
+        form_types: Optional[List[str]] = None,
+        filings_limit: int = 10,
+    ) -> tuple[List[Dict[str, str]], Dict[str, Any]]:
+        """
+        Fetch recent filings + XBRL company facts (two EDGAR calls after resolve).
+
+        Used by the orchestrator to overlap market enrichment with SEC I/O.
+        """
+        if form_types is None:
+            form_types = ["10-K", "10-Q", "8-K"]
+        filings = self.get_recent_filings(
+            ticker, form_types=form_types, limit=filings_limit
+        )
+        company_facts = self.get_company_facts(ticker)
+        return filings, company_facts
 
     def fetch_all_data(self, ticker: str) -> Dict[str, Any]:
         """
@@ -278,8 +289,7 @@ class SECClient:
         Returns a dict with company info, recent filings, and XBRL facts.
         """
         info = self.resolve_ticker(ticker)
-        filings = self.get_recent_filings(ticker, form_types=["10-K", "10-Q", "8-K"])
-        company_facts = self.get_company_facts(ticker)
+        filings, company_facts = self.fetch_filings_and_facts(ticker)
 
         return {
             "ticker": ticker.upper(),

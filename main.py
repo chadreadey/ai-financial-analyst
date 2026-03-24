@@ -10,17 +10,28 @@ Usage:
 
 import argparse
 import asyncio
-import os
+import logging
 import sys
 
 from dotenv import load_dotenv
 
+load_dotenv()
+
+from config import settings
 from orchestrator import Orchestrator
 from report import format_report, save_report
 from sec.client import SECClient
 from sec.cache import SECCache
 
-load_dotenv()
+logger = logging.getLogger(__name__)
+
+
+def _setup_logging() -> None:
+    logging.basicConfig(
+        format="%(levelname)s | %(name)s | %(message)s",
+        level=getattr(logging, settings.log_level.upper(), logging.INFO),
+    )
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
@@ -76,20 +87,17 @@ def parse_args() -> argparse.Namespace:
 
 
 async def main() -> None:
+    _setup_logging()
     args = parse_args()
     ticker = args.ticker.upper()
 
-    print(f"\n{'=' * 50}")
-    print(f"  AI Financial Analyst")
-    print(f"  Analyzing: {ticker}")
-    print(f"{'=' * 50}\n")
+    logger.info("AI Financial Analyst")
+    logger.info("Analyzing: %s", ticker)
 
-    # Set up SEC client with caching
     cache = SECCache()
     sec_client = SECClient(user_agent=args.user_agent, cache=cache)
 
-    # Run the orchestrator
-    provider_name = args.provider or os.getenv("LLM_PROVIDER")
+    provider_name = args.provider or settings.llm_provider
     orchestrator = Orchestrator(
         sec_client=sec_client,
         llm_provider_name=provider_name,
@@ -98,62 +106,61 @@ async def main() -> None:
 
     if args.inspect_context:
         data = orchestrator.prepare_data(ticker)
-        print("\n── Context inspection (no LLM calls) ──")
-        print(f"Company: {data['company_name']} ({data['ticker']})")
-        print(f"financial_summary chars: {len(data.get('financial_summary', ''))}")
-        print(f"historical_revenue points: {len(data.get('historical_revenue', []))}")
-        print(f"historical_net_income points: {len(data.get('historical_net_income', []))}")
-        print(f"metrics count: {len(data.get('metrics', {}))}")
-        sections = data.get("enrichment_sections", {}) or {}
-        section_sizes = {k: len(v) for k, v in sections.items()}
-        print(f"enrichment section sizes: {section_sizes}")
-        print(f"enrichment filter stats: {data.get('enrichment_filter_stats', {})}")
-        print(f"enrichment sources: {len(data.get('enrichment_sources', []))}")
-        print(f"enrichment warnings: {len(data.get('enrichment_warnings', []))}")
-        print("\nPer-agent estimated payload sizes:")
+        logger.debug("Context inspection (no LLM calls)")
+        logger.debug("Company: %s (%s)", data.company_name, data.ticker)
+        logger.debug("financial_summary chars: %d", len(data.financial_summary))
+        logger.debug("historical_revenue points: %d", len(data.historical_revenue))
+        logger.debug("historical_net_income points: %d", len(data.historical_net_income))
+        logger.debug("metrics count: %d", len(data.metrics))
+        section_sizes = {k: len(v) for k, v in data.enrichment_sections.items()}
+        logger.debug("enrichment section sizes: %s", section_sizes)
+        logger.debug("enrichment filter stats: %s", data.enrichment_filter_stats)
+        logger.debug("enrichment sources: %d", len(data.enrichment_sources))
+        logger.debug("enrichment warnings: %d", len(data.enrichment_warnings))
+        logger.debug("Per-agent estimated payload sizes:")
         for agent in orchestrator.agents:
             context = agent.build_context(data)
             trimmed = agent.trim_context(context)
             system = agent.get_system_prompt(data)
-            print(
-                f"  - {agent.name}: "
-                f"system={len(system)} chars, context_raw={len(context)} chars, "
-                f"context_sent={len(trimmed)} chars, "
-                f"context_cap={agent.get_context_limit()} chars"
+            logger.debug(
+                "  - %s: system=%d chars, context_raw=%d chars, "
+                "context_sent=%d chars, context_cap=%d chars",
+                agent.name, len(system), len(context),
+                len(trimmed), agent.get_context_limit(),
             )
         preview_chars = max(200, args.preview_chars)
-        summary = data.get("financial_summary", "")
-        print("\n--- financial_summary preview ---")
-        print(summary[:preview_chars])
-        print("--- end preview ---")
+        summary = data.financial_summary
+        logger.debug("--- financial_summary preview ---")
+        logger.debug(summary[:preview_chars])
+        logger.debug("--- end preview ---")
         cache.close()
         return
 
     try:
         result = await orchestrator.run(ticker)
     except ValueError as e:
-        print(f"\nError: {e}", file=sys.stderr)
+        logger.error("Error: %s", e)
         sys.exit(1)
     except Exception as e:
-        print(f"\nUnexpected error: {e}", file=sys.stderr)
+        logger.error("Unexpected error: %s", e)
         raise
 
-    # Format and display the report
-    report = format_report(result)
+    result_dict = result.model_dump()
+    result_dict["agent_reports"] = [
+        (r.agent_name, r.analysis) for r in result.agent_reports
+    ]
+    report = format_report(result_dict)
     print(f"\n{report}")
 
-    warnings = result.get("enrichment_warnings", [])
-    if warnings:
+    if result.enrichment_warnings:
         print("\n[Enrichment warnings]")
-        for warning in warnings:
+        for warning in result.enrichment_warnings:
             print(f"  - {warning}")
 
-    # Save if requested
     if args.save or args.output:
-        filepath = save_report(result, filepath=args.output)
-        print(f"\nReport saved to: {filepath}")
+        filepath = save_report(result_dict, filepath=args.output)
+        logger.info("Report saved to: %s", filepath)
 
-    # Clean up
     cache.close()
 
 

@@ -6,10 +6,14 @@ Replaces the need for QuantLib with lightweight equivalents that
 are practically identical for equity research discount rate estimation.
 """
 
-import os
+import logging
 from typing import Dict, Optional, Tuple
 
 import numpy as np
+
+from config import settings
+
+logger = logging.getLogger(__name__)
 
 
 # Standard Treasury maturities (years) mapped to FRED series IDs
@@ -33,14 +37,10 @@ def get_risk_free_rate(
     """
     Interpolate the risk-free rate from the Treasury yield curve.
 
-    Uses FRED data for the latest yields across the maturity spectrum,
-    then applies cubic spline interpolation to get the rate at any
-    arbitrary maturity.
-
     Returns the annualized yield as a decimal (e.g. 0.045 for 4.5%),
     or None if data is unavailable.
     """
-    api_key = fred_api_key or os.getenv("FRED_API_KEY", "").strip()
+    api_key = fred_api_key or settings.fred_api_key.strip()
     if not api_key:
         return None
 
@@ -60,6 +60,7 @@ def get_risk_free_rate(
                     maturities.append(mat)
                     yields_pct.append(float(data.iloc[-1]))
             except Exception:
+                logger.debug("FRED series %s unavailable", series_id, exc_info=True)
                 continue
 
         if len(maturities) < 3:
@@ -79,7 +80,8 @@ def get_risk_free_rate(
         rate_pct = float(interp_fn(clamped_maturity))
         return rate_pct / 100.0
 
-    except Exception:
+    except (ImportError, ValueError) as exc:
+        logger.debug("Risk-free rate computation failed: %s", exc)
         return None
 
 
@@ -90,7 +92,7 @@ def get_yield_curve_snapshot(
     Return the full yield curve as {maturity_years: yield_pct}.
     Useful for DCF agent context injection.
     """
-    api_key = fred_api_key or os.getenv("FRED_API_KEY", "").strip()
+    api_key = fred_api_key or settings.fred_api_key.strip()
     if not api_key:
         return None
 
@@ -105,10 +107,12 @@ def get_yield_curve_snapshot(
                 if not data.empty:
                     curve[mat] = float(data.iloc[-1])
             except Exception:
+                logger.debug("FRED series %s unavailable", series_id, exc_info=True)
                 continue
 
         return curve if len(curve) >= 3 else None
-    except Exception:
+    except (ImportError, ValueError) as exc:
+        logger.debug("Yield curve snapshot failed: %s", exc)
         return None
 
 
@@ -121,16 +125,6 @@ def pv_of_debt(
 ) -> float:
     """
     Calculate the present value of a bond using standard bond math.
-
-    Args:
-        coupon_rate: Annual coupon rate (e.g. 0.05 for 5%)
-        face_value: Par/face value of the bond
-        maturity_years: Years to maturity
-        yield_to_maturity: Market yield (e.g. 0.045 for 4.5%)
-        frequency: Coupon payments per year (default 2 = semiannual)
-
-    Returns:
-        Present value of the bond
     """
     if maturity_years <= 0:
         return face_value
@@ -142,7 +136,6 @@ def pv_of_debt(
     if periodic_rate == 0:
         return periodic_coupon * n_periods + face_value
 
-    # PV of coupon annuity + PV of face value
     pv_coupons = periodic_coupon * (1 - (1 + periodic_rate) ** -n_periods) / periodic_rate
     pv_face = face_value / (1 + periodic_rate) ** n_periods
 
@@ -201,7 +194,6 @@ def format_wacc_context(
         for mat in sorted(yield_curve.keys()):
             lines.append(f"    {mat:.1f}Y: {yield_curve[mat]:.2f}%")
 
-        # Derive spread signals
         if 2.0 in yield_curve and 10.0 in yield_curve:
             spread = yield_curve[10.0] - yield_curve[2.0]
             state = "INVERTED" if spread < 0 else "NORMAL"

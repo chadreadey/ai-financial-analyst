@@ -6,9 +6,9 @@ and forward earnings expectations in the style of JPM equity research.
 """
 
 import json
-from typing import Any, Dict
 
 from agents.base import BaseAgent
+from models import AnalysisData
 
 
 class EarningsAgent(BaseAgent):
@@ -58,26 +58,25 @@ Your analytical framework:
 Write in the concise, data-driven style of a JPM equity research note. \
 Lead with conclusions, then support with data."""
 
-    def build_context(self, data: Dict[str, Any]) -> str:
+    def build_context(self, data: AnalysisData) -> str:
         parts = [
-            f"Company: {data.get('company_name', 'Unknown')} ({data.get('ticker', '?')})\n",
+            f"Company: {data.company_name} ({data.ticker})\n",
         ]
 
-        if "financial_core_summary" in data:
-            parts.append(data["financial_core_summary"])
+        if data.financial_core_summary:
+            parts.append(data.financial_core_summary)
 
-        # Earnings agent needs trend data
-        if "historical_revenue" in data:
+        if data.historical_revenue:
             parts.append("\n── Historical Revenue ──")
-            parts.append(json.dumps(data["historical_revenue"], indent=2))
+            parts.append(json.dumps(data.historical_revenue, indent=2))
 
-        if "historical_net_income" in data:
+        if data.historical_net_income:
             parts.append("\n── Historical Net Income ──")
-            parts.append(json.dumps(data["historical_net_income"], indent=2))
+            parts.append(json.dumps(data.historical_net_income, indent=2))
 
-        if "metrics" in data:
+        if data.metrics:
             parts.append("\n── Earnings Metrics ──")
-            m = data["metrics"]
+            m = data.metrics
             for key in [
                 "revenue", "gross_profit", "operating_income", "net_income",
                 "eps_basic", "eps_diluted",
@@ -91,12 +90,12 @@ Lead with conclusions, then support with data."""
                 if key in m and m[key] is not None:
                     parts.append(f"  {key}: {m[key]}")
 
-        if data.get("margin_trends"):
+        if data.margin_trends:
             parts.append("\n── Historical Margin Trends ──")
-            parts.append(json.dumps(data["margin_trends"][:5], indent=2))
+            parts.append(json.dumps(data.margin_trends[:5], indent=2))
 
-        if data.get("quarterly_summary"):
-            parts.append(f"\n{data['quarterly_summary']}")
+        if data.quarterly_summary:
+            parts.append(f"\n{data.quarterly_summary}")
 
         self.append_enrichment_sections(parts, data)
         return "\n".join(parts)

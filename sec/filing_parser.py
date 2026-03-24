@@ -7,14 +7,16 @@ Fallback path: BeautifulSoup + regex parsing of raw HTML.
 Returns dict with keys: 'mda', 'risk_factors', 'business_description'.
 """
 
-import os
+import logging
 import re
 from typing import Dict, Optional
 
 from bs4 import BeautifulSoup
 
+from config import settings
 from context_budget import trim_text
-from utils import env_flag
+
+logger = logging.getLogger(__name__)
 
 
 # ── Legacy regex patterns (fallback path) ─────────────────────
@@ -84,14 +86,10 @@ def _parse_filing_sections_legacy(html: str) -> Dict[str, str]:
     """Regex-based extraction from raw filing HTML (fallback)."""
     text = _clean_text(html)
 
-    max_mda = int(os.getenv("MAX_MDA_CHARS", "4000"))
-    max_risk = int(os.getenv("MAX_RISK_FACTORS_CHARS", "3000"))
-    max_biz = int(os.getenv("MAX_BIZ_DESC_CHARS", "2000"))
-
     budgets = {
-        "mda": max_mda,
-        "risk_factors": max_risk,
-        "business_description": max_biz,
+        "mda": settings.max_mda_chars,
+        "risk_factors": settings.max_risk_factors_chars,
+        "business_description": settings.max_biz_desc_chars,
     }
 
     result: Dict[str, str] = {}
@@ -115,7 +113,7 @@ def _extract_edgartools_section(tenk, attr_name: str) -> str:
         text = str(val).strip()
         text = re.sub(r"\s+", " ", text)
         return text
-    except Exception:
+    except (AttributeError, TypeError, ValueError):
         return ""
 
 
@@ -135,14 +133,9 @@ def _parse_filing_sections_edgartools(ticker: str) -> Optional[Dict[str, str]]:
         if tenk is None:
             return None
 
-        max_mda = int(os.getenv("MAX_MDA_CHARS", "4000"))
-        max_risk = int(os.getenv("MAX_RISK_FACTORS_CHARS", "3000"))
-        max_biz = int(os.getenv("MAX_BIZ_DESC_CHARS", "2000"))
-
         risk = _extract_edgartools_section(tenk, "risk_factors")
         biz = _extract_edgartools_section(tenk, "business")
 
-        # MD&A: try common attribute names, edgartools may expose it
         mda = ""
         for attr in ("mda", "management_discussion", "item7"):
             mda = _extract_edgartools_section(tenk, attr)
@@ -150,9 +143,9 @@ def _parse_filing_sections_edgartools(ticker: str) -> Optional[Dict[str, str]]:
                 break
 
         sections: Dict[str, str] = {
-            "mda": trim_text(mda, max_mda, marker="\n...[section trimmed]...") if mda else "",
-            "risk_factors": trim_text(risk, max_risk, marker="\n...[section trimmed]...") if risk else "",
-            "business_description": trim_text(biz, max_biz, marker="\n...[section trimmed]...") if biz else "",
+            "mda": trim_text(mda, settings.max_mda_chars, marker="\n...[section trimmed]...") if mda else "",
+            "risk_factors": trim_text(risk, settings.max_risk_factors_chars, marker="\n...[section trimmed]...") if risk else "",
+            "business_description": trim_text(biz, settings.max_biz_desc_chars, marker="\n...[section trimmed]...") if biz else "",
         }
 
         extracted_count = sum(1 for v in sections.values() if v)
@@ -160,7 +153,7 @@ def _parse_filing_sections_edgartools(ticker: str) -> Optional[Dict[str, str]]:
             return None
 
         return sections
-    except Exception:
+    except (ImportError, AttributeError, ValueError):
         return None
 
 
@@ -177,13 +170,11 @@ def parse_filing_sections(html: str, ticker: str = "") -> Dict[str, str]:
     """
     result: Dict[str, str] = {"mda": "", "risk_factors": "", "business_description": ""}
 
-    # Primary path: edgartools
-    if ticker and env_flag("ENABLE_EDGARTOOLS", True):
+    if ticker and settings.enable_edgartools:
         edgar_result = _parse_filing_sections_edgartools(ticker)
         if edgar_result is not None:
             result.update(edgar_result)
 
-    # Fallback: use legacy regex for any sections still empty
     missing = [k for k, v in result.items() if not v]
     if missing and html:
         legacy = _parse_filing_sections_legacy(html)

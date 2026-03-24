@@ -6,9 +6,9 @@ and sector trends using strategy consulting frameworks.
 """
 
 import json
-from typing import Any, Dict
 
 from agents.base import BaseAgent
+from models import AnalysisData
 
 
 class CompetitiveAgent(BaseAgent):
@@ -64,22 +64,21 @@ Write in the structured, insight-driven style of a Bain strategy deck. \
 Use the financial data to support your competitive conclusions — \
 margins, growth rates, and R&D spend reveal competitive dynamics."""
 
-    def build_context(self, data: Dict[str, Any]) -> str:
+    def build_context(self, data: AnalysisData) -> str:
         parts = [
-            f"Company: {data.get('company_name', 'Unknown')} ({data.get('ticker', '?')})\n",
+            f"Company: {data.company_name} ({data.ticker})\n",
         ]
 
-        if "financial_core_summary" in data:
-            parts.append(data["financial_core_summary"])
+        if data.financial_core_summary:
+            parts.append(data.financial_core_summary)
 
-        # Competitive analyst needs trends to assess market position
-        if "historical_revenue" in data:
+        if data.historical_revenue:
             parts.append("\n── Historical Revenue (market share / growth signal) ──")
-            parts.append(json.dumps(data["historical_revenue"], indent=2))
+            parts.append(json.dumps(data.historical_revenue, indent=2))
 
-        if "metrics" in data:
+        if data.metrics:
             parts.append("\n── Competitive-Relevant Metrics ──")
-            m = data["metrics"]
+            m = data.metrics
             for key in [
                 "revenue", "revenue_growth_yoy",
                 "revenue_cagr_3y", "revenue_cagr_5y",
@@ -90,14 +89,14 @@ margins, growth rates, and R&D spend reveal competitive dynamics."""
                 if key in m and m[key] is not None:
                     parts.append(f"  {key}: {m[key]}")
 
-        if data.get("margin_trends"):
+        if data.margin_trends:
             parts.append("\n── Historical Margin Trends ──")
-            parts.append(json.dumps(data["margin_trends"][:5], indent=2))
+            parts.append(json.dumps(data.margin_trends[:5], indent=2))
 
-        if "recent_filings" in data:
+        if data.recent_filings:
             parts.append("\n── Recent SEC Filings ──")
-            for f in data["recent_filings"][:5]:
-                parts.append(f"  {f['form']} filed {f['filingDate']}")
+            for f in data.recent_filings[:5]:
+                parts.append(f"  {f.form} filed {f.filingDate}")
 
         self.append_enrichment_sections(parts, data)
         return "\n".join(parts)

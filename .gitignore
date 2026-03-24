@@ -2,6 +2,8 @@
 .env
 .env.*
 !.env.example
+# Local Streamlit secrets (use Cloud UI or secrets.toml.example only in repo)
+.streamlit/secrets.toml
 
 # Python
 __pycache__/

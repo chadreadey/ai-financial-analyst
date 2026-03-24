@@ -10,6 +10,7 @@ import json
 from typing import Any, Dict
 
 from agents.base import BaseAgent
+from models import AnalysisData
 
 
 class RiskAgent(BaseAgent):
@@ -64,18 +65,17 @@ Format as a structured risk report. Be direct about vulnerabilities — \
 Bridgewater's culture values radical transparency. Don't sugarcoat risks, \
 but also acknowledge genuine strengths in the risk profile."""
 
-    def build_context(self, data: Dict[str, Any]) -> str:
+    def build_context(self, data: AnalysisData) -> str:
         parts = [
-            f"Company: {data.get('company_name', 'Unknown')} ({data.get('ticker', '?')})\n",
+            f"Company: {data.company_name} ({data.ticker})\n",
         ]
 
-        if "financial_core_summary" in data:
-            parts.append(data["financial_core_summary"])
+        if data.financial_core_summary:
+            parts.append(data.financial_core_summary)
 
-        # Risk agent focuses on balance sheet and leverage
-        if "metrics" in data:
+        if data.metrics:
             parts.append("\n── Risk-Relevant Metrics ──")
-            m = data["metrics"]
+            m = data.metrics
             for key in [
                 "total_assets", "total_liabilities", "stockholders_equity",
                 "cash", "long_term_debt", "debt_to_equity",
@@ -86,16 +86,16 @@ but also acknowledge genuine strengths in the risk profile."""
                 if key in m and m[key] is not None:
                     parts.append(f"  {key}: {m[key]}")
 
-        if "historical_net_income" in data:
+        if data.historical_net_income:
             parts.append("\n── Historical Net Income (trend stability) ──")
-            parts.append(json.dumps(data["historical_net_income"], indent=2))
+            parts.append(json.dumps(data.historical_net_income, indent=2))
 
-        if data.get("cash_flow_trends"):
+        if data.cash_flow_trends:
             parts.append("\n── Historical Cash Flow ──")
-            parts.append(json.dumps(data["cash_flow_trends"][:5], indent=2))
+            parts.append(json.dumps(data.cash_flow_trends[:5], indent=2))
 
-        if data.get("quarterly_summary"):
-            parts.append(f"\n{data['quarterly_summary']}")
+        if data.quarterly_summary:
+            parts.append(f"\n{data.quarterly_summary}")
 
         self.append_enrichment_sections(parts, data)
         return "\n".join(parts)

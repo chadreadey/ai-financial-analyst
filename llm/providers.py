@@ -6,14 +6,16 @@ Supports:
 - OpenAI-compatible APIs
 """
 
-import os
+import logging
 from abc import ABC, abstractmethod
 from typing import Optional
 
 from anthropic import AsyncAnthropic
 from openai import AsyncOpenAI, APIStatusError, NotFoundError
 
-DEFAULT_OPENAI_BASE_URL = "https://cbsai.business.columbia.edu/api/v1"
+from config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class LLMProvider(ABC):
@@ -40,8 +42,9 @@ class AnthropicProvider(LLMProvider):
     default_model = "claude-sonnet-4-20250514"
 
     def __init__(self, api_key: Optional[str] = None):
-        key = api_key or os.getenv("ANTHROPIC_API_KEY")
+        key = api_key or settings.anthropic_api_key or None
         self._client = AsyncAnthropic(api_key=key)
+        self._prompt_caching = settings.enable_prompt_caching
 
     async def generate(
         self,
@@ -50,10 +53,15 @@ class AnthropicProvider(LLMProvider):
         model: Optional[str] = None,
         max_tokens: int = 4096,
     ) -> str:
+        system_param = (
+            [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+            if self._prompt_caching
+            else system
+        )
         message = await self._client.messages.create(
             model=model or self.default_model,
             max_tokens=max_tokens,
-            system=system,
+            system=system_param,
             messages=[{"role": "user", "content": user}],
         )
         return message.content[0].text
@@ -70,10 +78,8 @@ class OpenAIProvider(LLMProvider):
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
     ):
-        key = api_key or os.getenv("OPENAI_API_KEY")
-        # Default to the Columbia OpenAI-compatible endpoint to preserve
-        # backward behavior from the previous codebase.
-        url = base_url or os.getenv("OPENAI_BASE_URL") or DEFAULT_OPENAI_BASE_URL
+        key = api_key or settings.openai_api_key or None
+        url = base_url or settings.openai_base_url
         self._client = AsyncOpenAI(api_key=key, base_url=url)
 
     async def generate(
@@ -93,7 +99,6 @@ class OpenAIProvider(LLMProvider):
             )
             return response.output_text or ""
         except (NotFoundError, APIStatusError, AttributeError):
-            # Fallback for OpenAI-compatible providers that only implement chat.
             chat = await self._client.chat.completions.create(
                 model=selected_model,
                 messages=[
@@ -111,13 +116,12 @@ def get_provider(provider_name: Optional[str] = None) -> LLMProvider:
 
     Priority:
     1) explicit provider_name argument
-    2) LLM_PROVIDER environment variable
+    2) settings.llm_provider
     3) default: anthropic
     """
-    name = (provider_name or os.getenv("LLM_PROVIDER", "anthropic")).strip().lower()
+    name = (provider_name or settings.llm_provider).strip().lower()
     if name == "anthropic":
         return AnthropicProvider()
     if name == "openai":
         return OpenAIProvider()
     raise ValueError(f"Unsupported LLM_PROVIDER '{name}'. Use 'anthropic' or 'openai'.")
-
