@@ -4,7 +4,10 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-import sentry_sdk
+try:
+    import sentry_sdk
+except ImportError:
+    sentry_sdk = None  # type: ignore[assignment]
 import streamlit as st  # type: ignore[import-not-found]
 from dotenv import load_dotenv  # type: ignore[import-not-found]
 
@@ -79,6 +82,8 @@ def _bootstrap_env_from_streamlit_secrets() -> None:
 
 def _init_sentry() -> None:
     """Initialize Sentry error tracking if SENTRY_DSN is configured."""
+    if sentry_sdk is None:
+        return
     dsn = os.getenv("SENTRY_DSN", "")
     if not dsn:
         return
