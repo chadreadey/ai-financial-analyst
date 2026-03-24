@@ -104,7 +104,7 @@ def _run_analysis_sync(ticker: str, user_agent: str, provider: str, model: str, 
 
     async def _pipeline() -> AnalysisResult:
         progress.write("Fetching SEC/XBRL data and enrichment...")
-        data = orchestrator.prepare_data(ticker)
+        data = await asyncio.to_thread(orchestrator.prepare_data, ticker)
         progress.write("Running analyst agents in parallel...")
         agent_reports = await orchestrator.run_phase1(data)
         progress.write("Synthesizing final investment brief...")

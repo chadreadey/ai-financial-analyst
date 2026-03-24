@@ -328,7 +328,7 @@ class XBRLParser:
             if rev == 0:
                 continue
 
-            entry: Dict[str, Any] = {"fiscal_year": fy, "period_end": end}
+            entry: Dict[str, Any] = {"fiscal_year": int(fy) if pd.notna(fy) else None, "period_end": end}
 
             for label, src_df, concept_col in [
                 ("gross_margin", gp_df, "val"),
@@ -357,7 +357,7 @@ class XBRLParser:
             ocf = float(row["val"])
 
             entry: Dict[str, Any] = {
-                "fiscal_year": fy,
+                "fiscal_year": int(fy) if pd.notna(fy) else None,
                 "period_end": end,
                 "operating_cf": ocf,
             }
@@ -389,7 +389,7 @@ class XBRLParser:
             rev = float(row["val"])
 
             entry: Dict[str, Any] = {
-                "fiscal_year": fy,
+                "fiscal_year": int(fy) if pd.notna(fy) else None,
                 "fiscal_period": fp,
                 "period_end": end,
                 "revenue": rev,
@@ -537,7 +537,7 @@ class XBRLParser:
                     rows.append(
                         {
                             "period_end": str(row["end"].date()) if pd.notna(row["end"]) else None,
-                            "fiscal_year": row.get("fiscal_year"),
+                            "fiscal_year": int(row["fiscal_year"]) if pd.notna(row.get("fiscal_year")) else None,
                             "revenue": float(row["val"]),
                         }
                     )
@@ -554,7 +554,7 @@ class XBRLParser:
             rows.append(
                 {
                     "period_end": str(row["end"].date()) if pd.notna(row["end"]) else None,
-                    "fiscal_year": row.get("fiscal_year"),
+                    "fiscal_year": int(row["fiscal_year"]) if pd.notna(row.get("fiscal_year")) else None,
                     "net_income": float(row["val"]),
                 }
             )

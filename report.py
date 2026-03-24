@@ -92,8 +92,10 @@ def clean_result_payload(result: Dict[str, Any]) -> Dict[str, Any]:
     """Return a copy with cleaned synthesis + agent report text."""
     out = dict(result)
     out["synthesis"] = clean_generated_text(result.get("synthesis", ""))
-    reports: List[Tuple[str, str]] = result.get("agent_reports", [])
-    out["agent_reports"] = [(name, clean_generated_text(text)) for name, text in reports]
+    raw_reports = result.get("agent_reports", [])
+    if raw_reports and isinstance(raw_reports[0], dict):
+        raw_reports = [(r["agent_name"], r["analysis"]) for r in raw_reports]
+    out["agent_reports"] = [(name, clean_generated_text(text)) for name, text in raw_reports]
     return out
 
 

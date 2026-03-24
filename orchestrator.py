@@ -151,7 +151,7 @@ class Orchestrator:
             except Exception as exc:
                 logger.warning("Filing text extraction failed: %s", exc)
 
-        enrichment_sections = enrichment.get("sections", {})
+        enrichment_sections = dict(enrichment.get("sections", {}))
         if filing_sections.get("mda"):
             enrichment_sections["filing_mda"] = f"=== 10-K MD&A ===\n{filing_sections['mda']}"
         if filing_sections.get("risk_factors"):
@@ -159,12 +159,13 @@ class Orchestrator:
         if filing_sections.get("business_description"):
             enrichment_sections["filing_business"] = f"=== 10-K Business Description ===\n{filing_sections['business_description']}"
 
-        segment_data = metrics.pop("_segment_data", None)
+        segment_data = metrics.pop("_segment_data", None)  # always pop, even if edgartools was skipped
         if segment_data:
             enrichment_sections["segment_data"] = f"=== Revenue Segments ===\n{segment_data}"
 
         recent_filings = [
-            FilingInfo(**f) for f in raw["recent_filings"]
+            FilingInfo(**{k: f[k] for k in FilingInfo.model_fields if k in f})
+            for f in raw["recent_filings"]
         ]
 
         return AnalysisData(
