@@ -22,6 +22,8 @@ class AnalysisData(BaseModel):
 
     ticker: str
     company_name: str
+    sector: str = ""
+    industry: str = ""
     financial_core_summary: str = ""
     financial_summary: str = ""
     metrics: dict[str, Any] = Field(default_factory=dict)

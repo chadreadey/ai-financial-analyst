@@ -16,6 +16,8 @@ class CompetitiveAgent(BaseAgent):
     prompt_file = "prompts/competitive.md"
     context_limit_env = "MAX_CONTEXT_COMPETITIVE_CHARS"
     enrichment_sections = (
+        "sector_briefing",
+        "external_sector",
         "external_company",
         "external_industry",
         "peer_comparison",

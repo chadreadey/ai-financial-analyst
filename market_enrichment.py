@@ -150,6 +150,17 @@ def _analyst_estimates_section(
     return section, ["Yahoo Finance (analyst estimates)"]
 
 
+SECTOR_TAVILY_QUERIES: Dict[str, str] = {
+    "Healthcare": "pharmaceutical biotech FDA drug pipeline patent cliff payer pricing regulatory approval",
+    "Technology": "cloud SaaS AI enterprise software cybersecurity semiconductor TAM platform",
+    "Energy": "oil gas renewable energy transition upstream midstream ESG carbon breakeven",
+    "Financial Services": "banking interest rate credit NIM capital adequacy fintech regulation",
+    "Financials": "banking interest rate credit NIM capital adequacy fintech regulation",
+    "Consumer Cyclical": "retail consumer spending DTC e-commerce brand pricing discretionary",
+    "Consumer Defensive": "staples grocery CPG private label input cost consumer demand defensive",
+}
+
+
 def _tavily_client():
     key = settings.tavily_api_key.strip()
     if not key:
@@ -179,7 +190,7 @@ def _tavily_results_to_lines(header: str, results: List[dict], max_items: int = 
 
 
 def _tavily_section(
-    ticker: str, company_name: str
+    ticker: str, company_name: str, sector: str = ""
 ) -> tuple[Dict[str, str], List[str], Dict[str, int]]:
     client = _tavily_client()
     max_results = settings.tavily_max_results
@@ -189,6 +200,7 @@ def _tavily_section(
     risks_query = f"{company_name} ({ticker}) risks concerns bear case"
 
     use_raw = settings.tavily_raw_content
+    sector_terms = SECTOR_TAVILY_QUERIES.get(sector, "")
 
     def _search_company() -> dict:
         return client.search(
@@ -220,17 +232,31 @@ def _tavily_section(
             include_raw_content=use_raw,
         )
 
-    with ThreadPoolExecutor(max_workers=3) as pool:
+    def _search_sector() -> dict:
+        return client.search(
+            query=f"{sector_terms} industry outlook trends {datetime.now().year}",
+            topic="general",
+            time_range="month",
+            search_depth="advanced",
+            max_results=max_results,
+            include_raw_content=use_raw,
+        )
+
+    pool_size = 4 if sector_terms else 3
+    with ThreadPoolExecutor(max_workers=pool_size) as pool:
         f_company = pool.submit(_search_company)
         f_industry = pool.submit(_search_industry)
         f_risks = pool.submit(_search_risks)
+        f_sector = pool.submit(_search_sector) if sector_terms else None
         company = f_company.result()
         industry = f_industry.result()
         risks = f_risks.result()
+        sector_res = f_sector.result() if f_sector else {}
 
     company_results = company.get("results", [])
     industry_results = industry.get("results", [])
     risk_results = risks.get("results", [])
+    sector_results = sector_res.get("results", []) if sector_res else []
 
     company_text = "\n".join(
         _tavily_results_to_lines("External Research - Company", company_results, max_results)
@@ -242,7 +268,7 @@ def _tavily_section(
         _tavily_results_to_lines("External Research - Risks", risk_results, max_results)
     )
 
-    sections = {
+    sections: Dict[str, str] = {
         "external_company": trim_text(
             company_text,
             settings.max_external_company_section_chars,
@@ -257,8 +283,19 @@ def _tavily_section(
         ),
     }
 
+    if sector_results:
+        sector_text = "\n".join(
+            _tavily_results_to_lines(
+                f"External Research - Sector ({sector})", sector_results, max_results
+            )
+        )
+        sections["external_sector"] = trim_text(
+            sector_text, settings.max_sector_tavily_chars
+        )
+
+    all_blocks = [company_results, industry_results, risk_results, sector_results]
     sources: List[str] = []
-    for block in [company_results, industry_results, risk_results]:
+    for block in all_blocks:
         for item in block[:max_results]:
             title = item.get("title", "Untitled")
             url = item.get("url", "")
@@ -269,9 +306,11 @@ def _tavily_section(
         "company_kept": len(company_results[:max_results]),
         "industry_kept": len(industry_results[:max_results]),
         "risks_kept": len(risk_results[:max_results]),
+        "sector_kept": len(sector_results[:max_results]),
         "company_dropped": 0,
         "industry_dropped": 0,
         "risks_dropped": 0,
+        "sector_dropped": 0,
     }
     return sections, sources, stats
 
@@ -527,12 +566,15 @@ def _macro_section(ticker: str, cache: YahooLookupCache) -> tuple[str, List[str]
 def _task_yahoo(ticker: str, cache: YahooLookupCache) -> Dict[str, Any]:
     try:
         text, src = _yahoo_section(ticker, cache)
+        info = cache.get_info(ticker)
         entries = [("market_data", text)] if text else []
         return {
             "section_entries": entries,
             "sources": list(src),
             "warnings": [],
             "filter_stats": {},
+            "sector": info.get("sector", ""),
+            "industry": info.get("industry", ""),
         }
     except Exception as exc:
         return {
@@ -540,16 +582,22 @@ def _task_yahoo(ticker: str, cache: YahooLookupCache) -> Dict[str, Any]:
             "sources": [],
             "warnings": [f"Yahoo enrichment unavailable: {exc}"],
             "filter_stats": {},
+            "sector": "",
+            "industry": "",
         }
 
 
-def _task_tavily(ticker: str, company_name: str) -> Dict[str, Any]:
+def _task_tavily(
+    ticker: str, company_name: str, cache: YahooLookupCache
+) -> Dict[str, Any]:
     try:
+        info = cache.get_info(ticker)
+        sector = info.get("sector", "")
         tavily_sections, tavily_sources, filter_stats = _tavily_section(
-            ticker, company_name
+            ticker, company_name, sector=sector
         )
         entries: List[Tuple[str, str]] = []
-        for key in ("external_company", "external_industry", "external_risks"):
+        for key in ("external_company", "external_industry", "external_risks", "external_sector"):
             if tavily_sections.get(key):
                 entries.append((key, tavily_sections[key]))
         return {
@@ -693,7 +741,7 @@ def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object
         if settings.enable_yahoo:
             futures["yahoo"] = pool.submit(_task_yahoo, ticker, cache)
         if settings.enable_tavily:
-            futures["tavily"] = pool.submit(_task_tavily, ticker, company_name)
+            futures["tavily"] = pool.submit(_task_tavily, ticker, company_name, cache)
         if settings.enable_peers:
             futures["peers"] = pool.submit(_task_peers, ticker, company_name, cache)
         if settings.enable_estimates:
@@ -705,6 +753,8 @@ def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object
         if settings.enable_rag:
             futures["rag"] = pool.submit(_task_rag, ticker)
 
+        sector = ""
+        industry = ""
         for name in _ENRICHMENT_TASK_ORDER:
             fut = futures.get(name)
             if fut is None:
@@ -717,6 +767,9 @@ def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object
             sources.extend(r["sources"])
             warnings.extend(r["warnings"])
             filter_stats.update(r.get("filter_stats", {}))
+            if name == "yahoo":
+                sector = r.get("sector", "") or sector
+                industry = r.get("industry", "") or industry
 
     if warnings:
         warn_text = "\n".join(f"- {w}" for w in warnings)
@@ -731,4 +784,6 @@ def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object
         "warnings": warnings,
         "sources": sources,
         "filter_stats": filter_stats,
+        "sector": sector,
+        "industry": industry,
     }

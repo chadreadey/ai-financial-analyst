@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     enable_rag: bool = False
     enable_wacc_helpers: bool = True
     enable_quantstats: bool = True
+    enable_sector_specialists: bool = True
     tavily_raw_content: bool = True
 
     # ── API keys ───────────────────────────────────────────────────
@@ -50,7 +51,7 @@ class Settings(BaseSettings):
     max_context_dcf_chars: int = 0
     max_context_risk_chars: int = 0
     max_context_earnings_chars: int = 0
-    max_context_competitive_chars: int = 0
+    max_context_competitive_chars: int = 15000
     max_context_pattern_chars: int = 0
     max_context_macro_chars: int = 0
 
@@ -71,6 +72,11 @@ class Settings(BaseSettings):
     enrichment_max_chars: int = 8000
     tavily_snippet_chars: int = 600
     tavily_max_results: int = 3
+    max_sector_tavily_chars: int = 2000
+
+    # ── Sector specialist ──────────────────────────────────────────
+    max_sector_briefing_tokens: int = 600
+    max_sector_briefing_chars: int = 2500
 
     # ── Enrichment concurrency (I/O-bound workers) ───────────────────
     enrichment_max_workers: int = 8

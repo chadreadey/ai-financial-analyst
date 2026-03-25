@@ -93,7 +93,7 @@ def test_prepare_data_overlaps_enrichment_with_sec_fetch(monkeypatch):
     mock_parser = MagicMock()
     mock_parser.compute_metrics.return_value = {"revenue": 1}
     mock_parser.to_summary_text.return_value = "summary"
-    mock_parser.compute_quarterly_metrics.return_value = {}
+    mock_parser.compute_quarterly_metrics.return_value = []
     mock_parser.get_quarterly_summary_text.return_value = ""
     mock_parser.get_historical_margins.return_value = []
     mock_parser.get_historical_cash_flow.return_value = []
@@ -127,3 +127,59 @@ async def test_run_phase1(sample_analysis_data, fake_provider):
     for r in reports:
         assert r.agent_name
         assert r.analysis == "Test analysis output."
+
+
+@pytest.mark.asyncio
+async def test_split_gather_healthcare(sample_analysis_data, fake_provider, monkeypatch):
+    """When sector = Healthcare, specialist runs wave 1, briefing injected, Competitive in wave 2."""
+    monkeypatch.setattr(settings, "enable_sector_specialists", True)
+    sample_analysis_data.sector = "Healthcare"
+    sample_analysis_data.industry = "Drug Manufacturers"
+
+    sec_client = MagicMock()
+    sec_client.cache.save_analysis = MagicMock()
+
+    orchestrator = Orchestrator(sec_client=sec_client, provider=fake_provider)
+
+    with patch("orchestrator.asyncio.to_thread", return_value=sample_analysis_data):
+        result = await orchestrator.run("PFE")
+
+    assert "sector_briefing" in sample_analysis_data.enrichment_sections
+    agent_names = [r.agent_name for r in result.agent_reports]
+    assert "Competitive & Sector Analyst" in agent_names
+
+
+@pytest.mark.asyncio
+async def test_no_specialist_for_unknown_sector(sample_analysis_data, fake_provider, monkeypatch):
+    """When sector is not in the map, fall back to single-gather run_phase1."""
+    monkeypatch.setattr(settings, "enable_sector_specialists", True)
+    sample_analysis_data.sector = "Utilities"
+
+    sec_client = MagicMock()
+    sec_client.cache.save_analysis = MagicMock()
+
+    orchestrator = Orchestrator(sec_client=sec_client, provider=fake_provider)
+
+    with patch("orchestrator.asyncio.to_thread", return_value=sample_analysis_data):
+        result = await orchestrator.run("NEE")
+
+    assert "sector_briefing" not in sample_analysis_data.enrichment_sections
+    assert len(result.agent_reports) >= 5
+
+
+@pytest.mark.asyncio
+async def test_specialist_disabled_by_flag(sample_analysis_data, fake_provider, monkeypatch):
+    """When the feature flag is off, no specialist runs even for Healthcare."""
+    monkeypatch.setattr(settings, "enable_sector_specialists", False)
+    sample_analysis_data.sector = "Healthcare"
+
+    sec_client = MagicMock()
+    sec_client.cache.save_analysis = MagicMock()
+
+    orchestrator = Orchestrator(sec_client=sec_client, provider=fake_provider)
+
+    with patch("orchestrator.asyncio.to_thread", return_value=sample_analysis_data):
+        result = await orchestrator.run("PFE")
+
+    assert "sector_briefing" not in sample_analysis_data.enrichment_sections
+    assert len(result.agent_reports) >= 5

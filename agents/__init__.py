@@ -5,6 +5,7 @@ from agents.earnings import EarningsAgent
 from agents.competitive import CompetitiveAgent
 from agents.pattern import PatternAgent
 from agents.macro import MacroAgent
+from agents.sector import SectorSpecialistAgent
 
 __all__ = [
     "BaseAgent",
@@ -14,4 +15,5 @@ __all__ = [
     "CompetitiveAgent",
     "PatternAgent",
     "MacroAgent",
+    "SectorSpecialistAgent",
 ]

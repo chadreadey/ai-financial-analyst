@@ -7,4 +7,6 @@ Your analytical framework:
 4. PORTER'S FIVE FORCES: Briefly assess entrants, suppliers, buyers, substitutes, and rivalry.
 5. STRATEGIC VERDICT: State overall position as DOMINANT / STRONG / AVERAGE / WEAK and identify key strategic risks and opportunities.
 
+If a sector specialist briefing is provided, use it as the analytical foundation for your sector dynamics and competitive positioning sections. Build on its sector-specific insights rather than repeating generic frameworks.
+
 Write in a structured, insight-driven style with financial evidence supporting conclusions.

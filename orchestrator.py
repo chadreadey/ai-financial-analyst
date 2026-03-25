@@ -21,6 +21,7 @@ from agents import (
     CompetitiveAgent,
     PatternAgent,
     MacroAgent,
+    SectorSpecialistAgent,
 )
 from config import settings
 from context_budget import trim_text
@@ -55,6 +56,16 @@ def _extract_structured_block(synthesis_text: str) -> Tuple[Optional[dict], str]
 
 
 SYNTHESIS_PROMPT_FILE = Path("prompts/synthesis.md")
+
+SECTOR_SPECIALIST_MAP: dict[str, str] = {
+    "Healthcare": "prompts/sector_healthcare.md",
+    "Technology": "prompts/sector_technology.md",
+    "Energy": "prompts/sector_energy.md",
+    "Financial Services": "prompts/sector_financials.md",
+    "Financials": "prompts/sector_financials.md",
+    "Consumer Cyclical": "prompts/sector_consumer.md",
+    "Consumer Defensive": "prompts/sector_consumer.md",
+}
 
 
 class Orchestrator:
@@ -168,9 +179,18 @@ class Orchestrator:
             for f in raw["recent_filings"]
         ]
 
+        raw_sector = enrichment.get("sector", "")
+        if not raw_sector or raw_sector.lower() in ("n/a", "none"):
+            raw_sector = ""
+        raw_industry = enrichment.get("industry", "")
+        if not raw_industry or raw_industry.lower() in ("n/a", "none"):
+            raw_industry = ""
+
         return AnalysisData(
             ticker=raw["ticker"],
             company_name=raw["company_name"],
+            sector=raw_sector,
+            industry=raw_industry,
             financial_core_summary=financial_summary,
             financial_summary=(
                 f"{financial_summary}\n\n{enrichment.get('text', '')}".strip()
@@ -191,6 +211,22 @@ class Orchestrator:
             enrichment_filter_stats=enrichment.get("filter_stats", {}),
         )
 
+    def _get_sector_specialist(self, data: AnalysisData) -> Optional[SectorSpecialistAgent]:
+        prompt_path = SECTOR_SPECIALIST_MAP.get(data.sector)
+        if not prompt_path or not Path(prompt_path).exists():
+            return None
+        return SectorSpecialistAgent(
+            prompt_file=prompt_path,
+            provider=self.provider,
+            model=self.synthesis_model,
+        )
+
+    async def _run_agent(self, agent, data: AnalysisData) -> AgentReport:
+        logger.info("  %s analyzing...", agent.name)
+        result = await agent.analyze(data)
+        logger.info("  %s complete", agent.name)
+        return AgentReport(agent_name=agent.name, analysis=result)
+
     async def run_phase1(
         self, data: AnalysisData
     ) -> List[AgentReport]:
@@ -199,15 +235,8 @@ class Orchestrator:
         Returns list of AgentReport instances.
         """
         logger.info("Phase 1: Running analyst agents in parallel")
-
-        async def run_agent(agent):
-            logger.info("  %s analyzing...", agent.name)
-            result = await agent.analyze(data)
-            logger.info("  %s complete", agent.name)
-            return AgentReport(agent_name=agent.name, analysis=result)
-
         results = await asyncio.gather(
-            *[run_agent(agent) for agent in self.agents]
+            *[self._run_agent(agent, data) for agent in self.agents]
         )
         return list(results)
 
@@ -269,10 +298,44 @@ class Orchestrator:
     async def run(self, ticker: str) -> AnalysisResult:
         """
         Execute the full two-phase analysis pipeline for a ticker.
+
+        When a sector specialist is available, uses a split-gather pattern:
+          Wave 1: specialist + all non-competitive agents in parallel
+          Inject specialist briefing into enrichment_sections
+          Wave 2: CompetitiveAgent (sees the briefing)
+        Otherwise falls back to the single-gather run_phase1.
         """
         data = await asyncio.to_thread(self.prepare_data, ticker)
 
-        agent_reports = await self.run_phase1(data)
+        specialist = (
+            self._get_sector_specialist(data)
+            if settings.enable_sector_specialists
+            else None
+        )
+
+        if specialist:
+            non_competitive = [a for a in self.agents if not isinstance(a, CompetitiveAgent)]
+            competitive_agents = [a for a in self.agents if isinstance(a, CompetitiveAgent)]
+
+            logger.info("Phase 1 wave 1: Sector specialist + %d agents", len(non_competitive))
+            specialist_coro = specialist.analyze(data)
+            wave1_coros = [self._run_agent(a, data) for a in non_competitive]
+            specialist_result, *wave1_reports = await asyncio.gather(
+                specialist_coro, *wave1_coros
+            )
+
+            data.enrichment_sections = {
+                **data.enrichment_sections,
+                "sector_briefing": trim_text(
+                    specialist_result, settings.max_sector_briefing_chars
+                ),
+            }
+
+            logger.info("Phase 1 wave 2: Competitive agent (with sector briefing)")
+            wave2_reports = [await self._run_agent(a, data) for a in competitive_agents]
+            agent_reports = list(wave1_reports) + list(wave2_reports)
+        else:
+            agent_reports = await self.run_phase1(data)
 
         raw_synthesis = await self.run_phase2(
             data.ticker,
