@@ -18,6 +18,8 @@ from __future__ import annotations
 import threading
 from typing import Any, Dict
 
+from utils import env_flag
+
 # Serializes all outbound yfinance HTTP calls across threads to avoid
 # triggering Yahoo's anti-abuse detection from datacenter IPs.
 _YF_GLOBAL_LOCK = threading.Lock()
@@ -34,6 +36,8 @@ class YahooLookupCache:
 
     def get_info(self, symbol: str) -> Dict[str, Any]:
         """Return a copy of Yahoo ``info`` for *symbol* (uppercased)."""
+        if not env_flag("ENABLE_YAHOO_FALLBACK", default=True):
+            return {}
         sym = symbol.upper()
         with self._lock:
             cached = self._info.get(sym)

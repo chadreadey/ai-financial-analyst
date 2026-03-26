@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from config import settings
 from context_budget import trim_text
-from utils import format_money
+from utils import env_flag, format_money
 from yahoo_cache import YahooLookupCache
 
 logger = logging.getLogger(__name__)
@@ -47,13 +47,28 @@ TICKER_BLOCKLIST = {
 
 
 def _validate_ticker(
-    sym: str, cache: Optional[YahooLookupCache] = None
+    sym: str, cache: Optional[YahooLookupCache] = None, fmp_cache=None
 ) -> Optional[Dict[str, Any]]:
     """Check that a string is a real tradeable ticker and return its info."""
     import yfinance as yf
 
     if sym in TICKER_BLOCKLIST or len(sym) < 2:
         return None
+
+    if fmp_cache and env_flag("ENABLE_FMP"):
+        try:
+            q = fmp_cache.get_quote(sym)
+            if q.get("marketCap") and q.get("marketCap") > 0:
+                return {
+                    "marketCap": q.get("marketCap"),
+                    "quoteType": "EQUITY",
+                    "shortName": q.get("name", sym),
+                    "sector": q.get("sector", ""),
+                    "industry": "",
+                }
+        except Exception:
+            logger.debug("FMP validation failed for %s, trying Yahoo", sym, exc_info=True)
+
     try:
         if cache is not None:
             info = cache.get_info(sym)
@@ -102,6 +117,7 @@ def discover_peers(
     company_name: str,
     max_peers: int = 5,
     cache: Optional[YahooLookupCache] = None,
+    fmp_cache=None,
 ) -> List[str]:
     """
     Dynamically discover peer tickers for each request.
@@ -109,23 +125,29 @@ def discover_peers(
     import yfinance as yf
 
     ticker = ticker.upper()
-    if cache is not None:
-        info = cache.get_info(ticker)
-    else:
-        info = yf.Ticker(ticker).info or {}
-    sector = info.get("sector", "")
-    industry = info.get("industry", "")
-    subject_cap = info.get("marketCap", 0) or 0
+    sector = ""
+    industry = ""
+    subject_cap = 0
+
+    if fmp_cache and env_flag("ENABLE_FMP"):
+        try:
+            q = fmp_cache.get_quote(ticker)
+            sector = q.get("sector", "")
+            industry = ""
+            subject_cap = int(q.get("marketCap") or 0)
+        except Exception:
+            pass
+
+    if not sector:
+        if cache is not None:
+            info = cache.get_info(ticker)
+        else:
+            info = yf.Ticker(ticker).info or {}
+        sector = info.get("sector", "")
+        industry = info.get("industry", "")
+        subject_cap = info.get("marketCap", 0) or 0
 
     raw_candidates: List[str] = []
-
-    recommended = info.get("recommendedSymbols") or []
-    if isinstance(recommended, list):
-        for item in recommended:
-            sym = item.get("symbol", item) if isinstance(item, dict) else str(item)
-            sym = sym.upper().strip()
-            if sym and sym != ticker and sym not in raw_candidates:
-                raw_candidates.append(sym)
 
     if settings.enable_tavily:
         queries = []
@@ -181,7 +203,7 @@ def discover_peers(
     max_val_workers = max(1, settings.peer_validation_max_workers)
     with ThreadPoolExecutor(max_workers=max_val_workers) as pool:
         future_to_sym = {
-            pool.submit(_validate_ticker, sym, cache): sym for sym in unique_ordered
+            pool.submit(_validate_ticker, sym, cache, fmp_cache): sym for sym in unique_ordered
         }
         for fut in as_completed(future_to_sym):
             sym = future_to_sym[fut]
@@ -230,10 +252,34 @@ def discover_peers(
 
 
 def _fetch_peer_metrics(
-    peer_ticker: str, cache: Optional[YahooLookupCache] = None
+    peer_ticker: str, cache: Optional[YahooLookupCache] = None, fmp_cache=None
 ) -> Optional[Dict[str, Any]]:
     """Fetch key metrics for a single peer ticker."""
     import yfinance as yf
+
+    if fmp_cache and env_flag("ENABLE_FMP"):
+        try:
+            q = fmp_cache.get_quote(peer_ticker)
+            km = fmp_cache.get_key_metrics(peer_ticker)
+            if not q.get("marketCap"):
+                raise ValueError("no marketCap")
+            return {
+                "ticker": peer_ticker,
+                "marketCap": int(q.get("marketCap") or 0),
+                "trailingPE": q.get("pe") if q.get("pe") and q["pe"] > 0 else None,
+                "forwardPE": None,
+                "priceToSalesTrailing12Months": km.get("priceToSalesRatioTTM") if km else None,
+                "enterpriseToEbitda": km.get("evToEbitdaTTM") if km else None,
+                "grossMargins": km.get("grossProfitMarginTTM") if km else None,
+                "operatingMargins": km.get("operatingProfitMarginTTM") if km else None,
+                "totalRevenue": None,
+                "revenueGrowth": None,
+                "shortName": q.get("name", peer_ticker),
+                "industry": "",
+                "sector": q.get("sector", ""),
+            }
+        except Exception:
+            logger.debug("FMP peer metrics failed for %s, trying Yahoo", peer_ticker, exc_info=True)
 
     try:
         if cache is not None:
@@ -259,6 +305,7 @@ def build_peer_comparison(
     company_name: str,
     peers: Optional[List[str]] = None,
     cache: Optional[YahooLookupCache] = None,
+    fmp_cache=None,
 ) -> tuple[str, List[str]]:
     """
     Build a formatted peer comparison section.
@@ -268,27 +315,57 @@ def build_peer_comparison(
 
     ticker = ticker.upper()
     if peers is None:
-        peers = discover_peers(ticker, company_name, cache=cache)
+        peers = discover_peers(ticker, company_name, cache=cache, fmp_cache=fmp_cache)
 
     if not peers:
         return "", []
 
-    if cache is not None:
-        subject_info = cache.get_info(ticker)
-    else:
-        subject_info = yf.Ticker(ticker).info or {}
-    subject: Dict[str, Any] = {"ticker": ticker, "shortName": company_name}
-    for key, _ in PEER_METRICS:
-        subject[key] = subject_info.get(key)
-    subject_industry = subject_info.get("industry", "Unknown")
-    subject_sector = subject_info.get("sector", "Unknown")
+    subject: Optional[Dict[str, Any]] = None
+    subject_industry = "Unknown"
+    subject_sector = "Unknown"
+    if fmp_cache and env_flag("ENABLE_FMP"):
+        try:
+            q = fmp_cache.get_quote(ticker)
+            km = fmp_cache.get_key_metrics(ticker)
+            subject = {"ticker": ticker, "shortName": company_name}
+            for key, _ in PEER_METRICS:
+                if key == "marketCap":
+                    subject[key] = int(q.get("marketCap") or 0)
+                elif key == "trailingPE":
+                    pe = q.get("pe")
+                    subject[key] = pe if pe and pe > 0 else None
+                elif key == "priceToSalesTrailing12Months":
+                    subject[key] = km.get("priceToSalesRatioTTM") if km else None
+                elif key == "enterpriseToEbitda":
+                    subject[key] = km.get("evToEbitdaTTM") if km else None
+                elif key == "grossMargins":
+                    subject[key] = km.get("grossProfitMarginTTM") if km else None
+                elif key == "operatingMargins":
+                    subject[key] = km.get("operatingProfitMarginTTM") if km else None
+                else:
+                    subject[key] = None
+            subject_industry = q.get("sector", "Unknown")
+            subject_sector = q.get("sector", "Unknown")
+        except Exception:
+            subject = None
+
+    if subject is None:
+        if cache is not None:
+            subject_info = cache.get_info(ticker)
+        else:
+            subject_info = yf.Ticker(ticker).info or {}
+        subject = {"ticker": ticker, "shortName": company_name}
+        for key, _ in PEER_METRICS:
+            subject[key] = subject_info.get(key)
+        subject_industry = subject_info.get("industry", "Unknown")
+        subject_sector = subject_info.get("sector", "Unknown")
 
     max_workers = max(1, settings.peer_validation_max_workers)
     peer_data: List[Dict[str, Any]] = []
     metrics_by_ticker: Dict[str, Optional[Dict[str, Any]]] = {}
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         fut_to_peer = {
-            pool.submit(_fetch_peer_metrics, p, cache): p for p in peers
+            pool.submit(_fetch_peer_metrics, p, cache, fmp_cache): p for p in peers
         }
         for fut in as_completed(fut_to_peer):
             p = fut_to_peer[fut]
@@ -358,4 +435,5 @@ def build_peer_comparison(
 
     section = "\n".join(lines)
     section = trim_text(section, settings.max_peer_section_chars)
-    return section, ["Yahoo Finance (peer data)"]
+    source_label = "FMP (peer data)" if fmp_cache and env_flag("ENABLE_FMP") else "Yahoo Finance (peer data)"
+    return section, [source_label]

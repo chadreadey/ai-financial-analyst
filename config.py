@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     # ── Feature flags ──────────────────────────────────────────────
     enable_macro_agent: bool = True
     enable_yahoo: bool = True
+    enable_tiingo: bool = True
+    enable_fmp: bool = True
+    enable_yahoo_fallback: bool = True
     enable_tavily: bool = True
     enable_peers: bool = True
     enable_estimates: bool = True
@@ -42,6 +45,8 @@ class Settings(BaseSettings):
 
     # ── API keys ───────────────────────────────────────────────────
     tavily_api_key: str = ""
+    tiingo_api_key: str = ""
+    fmp_api_key: str = ""
     fred_api_key: str = ""
     openai_embed_key: str = ""
 
@@ -63,13 +68,14 @@ class Settings(BaseSettings):
     # ── Enrichment section caps ────────────────────────────────────
     max_market_section_chars: int = 1200
     max_estimates_section_chars: int = 1200
+    max_fmp_estimates_section_chars: int = 1800
     max_external_company_section_chars: int = 2500
     max_external_industry_section_chars: int = 2500
     max_external_risks_section_chars: int = 2500
     max_price_history_chars: int = 1500
     max_macro_section_chars: int = 1500
     max_peer_section_chars: int = 2500
-    enrichment_max_chars: int = 8000
+    enrichment_max_chars: int = 10000
     tavily_snippet_chars: int = 600
     tavily_max_results: int = 3
     max_sector_tavily_chars: int = 2000
@@ -97,6 +103,14 @@ class Settings(BaseSettings):
 
     # ── Logging ────────────────────────────────────────────────────
     log_level: str = "INFO"
+
+    # ── Warehouse ───────────────────────────────────────────────────
+    enable_warehouse: bool = False
+    warehouse_db_path: str = ".warehouse.db"
+    warehouse_filing_limit: int = 20
+    warehouse_market_ttl_hours: int = 4
+    warehouse_macro_ttl_hours: int = 24
+    warehouse_check_interval_hours: int = 6
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

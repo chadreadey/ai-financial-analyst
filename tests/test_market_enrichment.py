@@ -26,7 +26,7 @@ def test_build_enrichment_context_merge_order_yahoo_before_tavily(
 ):
     """Stable ordering: market_data section precedes Tavily sections in merged text."""
 
-    def fake_yahoo(ticker, cache):
+    def fake_market_data(ticker, cache, tiingo_cache=None, fmp_cache=None):
         return {
             "section_entries": [("market_data", "===MARKER_YAHOO===")],
             "sources": ["Y"],
@@ -36,7 +36,7 @@ def test_build_enrichment_context_merge_order_yahoo_before_tavily(
             "industry": "",
         }
 
-    def fake_tavily(ticker, company_name, cache):
+    def fake_tavily(ticker, company_name, cache, pre_sector=""):
         return {
             "section_entries": [("external_company", "===MARKER_TAVILY===")],
             "sources": [],
@@ -44,7 +44,7 @@ def test_build_enrichment_context_merge_order_yahoo_before_tavily(
             "filter_stats": {"company_kept": 1},
         }
 
-    with patch("market_enrichment._task_yahoo", side_effect=fake_yahoo), patch(
+    with patch("market_enrichment._task_market_data", side_effect=fake_market_data), patch(
         "market_enrichment._task_tavily", side_effect=fake_tavily
     ):
         out = build_enrichment_context("ZZZ", "Z Corp")
@@ -59,7 +59,7 @@ def test_build_enrichment_context_merge_order_yahoo_before_tavily(
 def test_sector_surfaces_from_yahoo(enrichment_only_yahoo_tavily, monkeypatch):
     """sector/industry from Yahoo task propagate to the return dict."""
 
-    def fake_yahoo(ticker, cache):
+    def fake_market_data(ticker, cache, tiingo_cache=None, fmp_cache=None):
         return {
             "section_entries": [("market_data", "data")],
             "sources": [],
@@ -69,7 +69,7 @@ def test_sector_surfaces_from_yahoo(enrichment_only_yahoo_tavily, monkeypatch):
             "industry": "Drug Manufacturers",
         }
 
-    def fake_tavily(ticker, company_name, cache):
+    def fake_tavily(ticker, company_name, cache, pre_sector=""):
         return {
             "section_entries": [],
             "sources": [],
@@ -77,7 +77,7 @@ def test_sector_surfaces_from_yahoo(enrichment_only_yahoo_tavily, monkeypatch):
             "filter_stats": {},
         }
 
-    with patch("market_enrichment._task_yahoo", side_effect=fake_yahoo), patch(
+    with patch("market_enrichment._task_market_data", side_effect=fake_market_data), patch(
         "market_enrichment._task_tavily", side_effect=fake_tavily
     ):
         out = build_enrichment_context("PFE", "Pfizer Inc.")
@@ -91,7 +91,7 @@ def test_external_sector_present_for_mapped_sector(
 ):
     """When Yahoo returns a mapped sector, Tavily task includes external_sector."""
 
-    def fake_yahoo(ticker, cache):
+    def fake_market_data(ticker, cache, tiingo_cache=None, fmp_cache=None):
         return {
             "section_entries": [],
             "sources": [],
@@ -101,7 +101,7 @@ def test_external_sector_present_for_mapped_sector(
             "industry": "Software",
         }
 
-    def fake_tavily(ticker, company_name, cache):
+    def fake_tavily(ticker, company_name, cache, pre_sector=""):
         return {
             "section_entries": [
                 ("external_company", "company"),
@@ -112,7 +112,7 @@ def test_external_sector_present_for_mapped_sector(
             "filter_stats": {"sector_kept": 3},
         }
 
-    with patch("market_enrichment._task_yahoo", side_effect=fake_yahoo), patch(
+    with patch("market_enrichment._task_market_data", side_effect=fake_market_data), patch(
         "market_enrichment._task_tavily", side_effect=fake_tavily
     ):
         out = build_enrichment_context("MSFT", "Microsoft Corp")
@@ -126,7 +126,7 @@ def test_external_sector_absent_for_unmapped_sector(
 ):
     """When Yahoo returns an unmapped sector, no external_sector key appears."""
 
-    def fake_yahoo(ticker, cache):
+    def fake_market_data(ticker, cache, tiingo_cache=None, fmp_cache=None):
         return {
             "section_entries": [],
             "sources": [],
@@ -136,7 +136,7 @@ def test_external_sector_absent_for_unmapped_sector(
             "industry": "Electric Utilities",
         }
 
-    def fake_tavily(ticker, company_name, cache):
+    def fake_tavily(ticker, company_name, cache, pre_sector=""):
         return {
             "section_entries": [("external_company", "company")],
             "sources": [],
@@ -144,7 +144,7 @@ def test_external_sector_absent_for_unmapped_sector(
             "filter_stats": {},
         }
 
-    with patch("market_enrichment._task_yahoo", side_effect=fake_yahoo), patch(
+    with patch("market_enrichment._task_market_data", side_effect=fake_market_data), patch(
         "market_enrichment._task_tavily", side_effect=fake_tavily
     ):
         out = build_enrichment_context("NEE", "NextEra Energy")

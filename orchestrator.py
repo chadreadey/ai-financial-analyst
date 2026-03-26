@@ -9,6 +9,7 @@ Phase 2: Feed all agent outputs to a synthesis agent that
 import asyncio
 import json
 import logging
+import os
 import re
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -104,6 +105,54 @@ class Orchestrator:
         Fetch and parse all SEC data for a ticker.
         Returns the unified AnalysisData that agents consume.
         """
+        if os.getenv("ENABLE_WAREHOUSE", "").lower() == "true":
+            try:
+                from warehouse.db import WarehouseDB
+                from warehouse.bootstrap import bootstrap_ticker
+                from warehouse.change_detector import needs_update, incremental_update
+                from warehouse.reader import build_analysis_data_from_warehouse
+
+                db = WarehouseDB()
+                company = db.get_company(ticker.upper())
+                if company is None:
+                    logger.info("Warehouse: bootstrapping %s...", ticker.upper())
+                    bootstrap_ticker(ticker.upper(), db, self.sec_client)
+                elif needs_update(ticker.upper(), db, self.sec_client):
+                    logger.info("Warehouse: updating %s...", ticker.upper())
+                    incremental_update(ticker.upper(), db, self.sec_client)
+
+                data = build_analysis_data_from_warehouse(ticker.upper(), db)
+                if data is not None:
+                    logger.info("Warehouse: loaded %s from warehouse", ticker.upper())
+                    info = self.sec_client.resolve_ticker(ticker)
+                    with ThreadPoolExecutor(max_workers=1) as overlap_pool:
+                        enrich_future = overlap_pool.submit(
+                            build_enrichment_context, ticker.upper(), info["name"]
+                        )
+                    enrichment = enrich_future.result()
+
+                    live_sections = dict(enrichment.get("sections", {}))
+                    data.enrichment_sections = {**data.enrichment_sections, **live_sections}
+                    data.financial_summary = (
+                        f"{data.financial_core_summary}\n\n{enrichment.get('text', '')}".strip()
+                        if enrichment.get("text")
+                        else data.financial_core_summary
+                    )
+                    data.enrichment_warnings = enrichment.get("warnings", [])
+                    data.enrichment_sources = enrichment.get("sources", [])
+                    data.enrichment_filter_stats = enrichment.get("filter_stats", {})
+
+                    raw_sector = enrichment.get("sector", "")
+                    if raw_sector and raw_sector.lower() not in ("n/a", "none"):
+                        data.sector = raw_sector
+                    raw_industry = enrichment.get("industry", "")
+                    if raw_industry and raw_industry.lower() not in ("n/a", "none"):
+                        data.industry = raw_industry
+
+                    return data
+            except Exception as exc:
+                logger.warning("Warehouse read failed, falling back to live: %s", exc)
+
         logger.info("Fetching SEC data for %s...", ticker.upper())
         info = self.sec_client.resolve_ticker(ticker)
         ticker_upper = ticker.upper()

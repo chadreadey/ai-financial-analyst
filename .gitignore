@@ -12,4 +12,11 @@ __pycache__/
 
 # Runtime artifacts
 .sec_cache.db
+.warehouse.db
 reports/
+
+# Build artifacts
+*.egg-info/
+
+# IDE / tooling
+.claude/

@@ -53,5 +53,7 @@ py-modules = [
     "models",
     "main",
     "app",
+    "tiingo_client",
+    "fmp_client",
 ]
-packages = ["agents", "llm", "sec", "quant"]
+packages = ["agents", "llm", "sec", "quant", "warehouse"]

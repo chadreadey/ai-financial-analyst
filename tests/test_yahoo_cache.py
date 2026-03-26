@@ -29,3 +29,12 @@ def test_get_info_uppercases_symbol():
         cache.get_info("msft")
         cache.get_info("MSFT")
         assert yt.call_count == 1
+
+
+def test_get_info_returns_empty_when_fallback_disabled(monkeypatch):
+    """get_info() returns {} immediately when ENABLE_YAHOO_FALLBACK=false."""
+    monkeypatch.setenv("ENABLE_YAHOO_FALLBACK", "false")
+    from yahoo_cache import YahooLookupCache
+    cache = YahooLookupCache()
+    result = cache.get_info("AAPL")
+    assert result == {}

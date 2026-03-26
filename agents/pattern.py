@@ -8,17 +8,89 @@ and data-driven pattern identification.
 
 import json
 import logging
+import os
 from typing import Optional
 
 from agents.base import BaseAgent
 from config import settings
 from models import AnalysisData
+from utils import env_flag
 
 logger = logging.getLogger(__name__)
 
 
+def _format_risk_lines(returns, close) -> str:
+    """Format risk metrics from a returns Series and close Series."""
+    import numpy as np
+
+    ann_factor = 252
+    mean_ret = float(returns.mean())
+    std_ret = float(returns.std())
+
+    sharpe = (mean_ret * ann_factor) / (std_ret * np.sqrt(ann_factor)) if std_ret > 0 else 0.0
+
+    downside = returns[returns < 0]
+    downside_std = float(downside.std()) if len(downside) > 1 else std_ret
+    sortino = (mean_ret * ann_factor) / (downside_std * np.sqrt(ann_factor)) if downside_std > 0 else 0.0
+
+    cumulative = (1 + returns).cumprod()
+    running_max = cumulative.cummax()
+    drawdowns = (cumulative - running_max) / running_max
+    max_dd = float(drawdowns.min())
+
+    ann_ret = float((cumulative.iloc[-1]) ** (ann_factor / len(returns)) - 1)
+    calmar = ann_ret / abs(max_dd) if max_dd != 0 else 0.0
+
+    var_95 = float(np.percentile(returns, 5))
+    skew = float(returns.skew())
+    kurt = float(returns.kurtosis())
+
+    monthly_returns = close.resample("ME").last().pct_change().dropna()
+    best_month = float(monthly_returns.max()) if len(monthly_returns) > 0 else None
+    worst_month = float(monthly_returns.min()) if len(monthly_returns) > 0 else None
+
+    lines = [
+        "=== Quantitative Risk Metrics ===",
+        f"  Sharpe Ratio (ann.): {sharpe:.2f}",
+        f"  Sortino Ratio (ann.): {sortino:.2f}",
+        f"  Max Drawdown: {max_dd*100:.1f}%",
+        f"  Calmar Ratio: {calmar:.2f}",
+        f"  Value at Risk (95%): {var_95*100:.2f}% daily",
+        f"  Return Skewness: {skew:.2f}",
+        f"  Return Kurtosis: {kurt:.2f}",
+        f"  Annualized Return: {ann_ret*100:.1f}%",
+        f"  Annualized Volatility: {std_ret * np.sqrt(ann_factor)*100:.1f}%",
+    ]
+    if best_month is not None:
+        lines.append(f"  Best Month: {best_month*100:+.1f}%")
+    if worst_month is not None:
+        lines.append(f"  Worst Month: {worst_month*100:+.1f}%")
+
+    return "\n".join(lines)
+
+
 def _compute_risk_metrics(ticker: str) -> Optional[str]:
     """Compute risk-adjusted return metrics from 2-year daily price history."""
+    if env_flag("ENABLE_TIINGO") and os.getenv("TIINGO_API_KEY", "").strip():
+        try:
+            from tiingo_client import TiingoClient
+            import pandas as pd
+            from datetime import datetime, timedelta
+
+            client = TiingoClient(os.getenv("TIINGO_API_KEY", ""))
+            start = (datetime.now() - timedelta(days=730)).strftime("%Y-%m-%d")
+            data = client.get_eod_history(ticker, start)
+            if data and len(data) >= 60:
+                df = pd.DataFrame(data)
+                df["date"] = pd.to_datetime(df["date"]).dt.tz_convert(None)
+                df = df.sort_values("date").set_index("date")
+                close = df["adjClose"]
+                returns = close.pct_change().dropna()
+                if len(returns) >= 60:
+                    return _format_risk_lines(returns, close)
+        except Exception:
+            logger.debug("Tiingo risk metrics failed, falling to Yahoo", exc_info=True)
+
     try:
         import yfinance as yf
         import numpy as np
@@ -32,51 +104,7 @@ def _compute_risk_metrics(ticker: str) -> Optional[str]:
         if len(returns) < 60:
             return None
 
-        ann_factor = 252
-        mean_ret = float(returns.mean())
-        std_ret = float(returns.std())
-
-        sharpe = (mean_ret * ann_factor) / (std_ret * np.sqrt(ann_factor)) if std_ret > 0 else 0.0
-
-        downside = returns[returns < 0]
-        downside_std = float(downside.std()) if len(downside) > 1 else std_ret
-        sortino = (mean_ret * ann_factor) / (downside_std * np.sqrt(ann_factor)) if downside_std > 0 else 0.0
-
-        cumulative = (1 + returns).cumprod()
-        running_max = cumulative.cummax()
-        drawdowns = (cumulative - running_max) / running_max
-        max_dd = float(drawdowns.min())
-
-        ann_ret = float((cumulative.iloc[-1]) ** (ann_factor / len(returns)) - 1)
-        calmar = ann_ret / abs(max_dd) if max_dd != 0 else 0.0
-
-        var_95 = float(np.percentile(returns, 5))
-
-        skew = float(returns.skew())
-        kurt = float(returns.kurtosis())
-
-        monthly_returns = close.resample("ME").last().pct_change().dropna()
-        best_month = float(monthly_returns.max()) if len(monthly_returns) > 0 else None
-        worst_month = float(monthly_returns.min()) if len(monthly_returns) > 0 else None
-
-        lines = [
-            "=== Quantitative Risk Metrics ===",
-            f"  Sharpe Ratio (ann.): {sharpe:.2f}",
-            f"  Sortino Ratio (ann.): {sortino:.2f}",
-            f"  Max Drawdown: {max_dd*100:.1f}%",
-            f"  Calmar Ratio: {calmar:.2f}",
-            f"  Value at Risk (95%): {var_95*100:.2f}% daily",
-            f"  Return Skewness: {skew:.2f}",
-            f"  Return Kurtosis: {kurt:.2f}",
-            f"  Annualized Return: {ann_ret*100:.1f}%",
-            f"  Annualized Volatility: {std_ret * np.sqrt(ann_factor)*100:.1f}%",
-        ]
-        if best_month is not None:
-            lines.append(f"  Best Month: {best_month*100:+.1f}%")
-        if worst_month is not None:
-            lines.append(f"  Worst Month: {worst_month*100:+.1f}%")
-
-        return "\n".join(lines)
+        return _format_risk_lines(returns, close)
     except Exception:
         return None
 

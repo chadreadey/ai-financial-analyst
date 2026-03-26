@@ -34,6 +34,8 @@ def _set_runtime_env(
     provider: str,
     enable_yahoo: bool,
     enable_tavily: bool,
+    enable_tiingo: bool,
+    enable_fmp: bool,
     max_agent_context_chars: int,
     max_agent_output_tokens: int,
     synthesis_report_max_chars: int,
@@ -47,6 +49,9 @@ def _set_runtime_env(
             os.environ["OPENAI_API_KEY"] = cbs_key
     os.environ["ENABLE_YAHOO"] = "true" if enable_yahoo else "false"
     os.environ["ENABLE_TAVILY"] = "true" if enable_tavily else "false"
+    os.environ["ENABLE_TIINGO"] = "true" if enable_tiingo else "false"
+    os.environ["ENABLE_FMP"] = "true" if enable_fmp else "false"
+    os.environ["ENABLE_YAHOO_FALLBACK"] = "true" if enable_yahoo else "false"
     os.environ["MAX_AGENT_CONTEXT_CHARS"] = str(max_agent_context_chars)
     os.environ["MAX_AGENT_OUTPUT_TOKENS"] = str(max_agent_output_tokens)
     os.environ["SYNTHESIS_REPORT_MAX_CHARS"] = str(synthesis_report_max_chars)
@@ -66,6 +71,8 @@ def _bootstrap_env_from_streamlit_secrets() -> None:
             "OPENAI_BASE_URL",
             "TAVILY_API_KEY",
             "FRED_API_KEY",
+            "TIINGO_API_KEY",
+            "FMP_API_KEY",
             "EDGAR_IDENTITY",
             "SENTRY_DSN",
         ]
@@ -114,6 +121,18 @@ def _with_ephemeral_env(env_overrides: dict[str, str], fn):
 
 
 def _run_analysis_sync(ticker: str, user_agent: str, provider: str, model: str, progress) -> AnalysisResult:
+    if os.getenv("ENABLE_WAREHOUSE", "").lower() == "true":
+        try:
+            from warehouse.db import WarehouseDB
+            from warehouse.bootstrap import bootstrap_ticker
+            db = WarehouseDB()
+            if db.get_company(ticker.upper()) is None:
+                progress.write(f"First time analyzing {ticker.upper()} — bootstrapping warehouse (~10s)...")
+                bootstrap_ticker(ticker.upper(), db, SECClient(user_agent=user_agent))
+                progress.write("Bootstrap complete. Running analysis...")
+        except Exception as exc:
+            logger.warning("Warehouse bootstrap failed: %s", exc)
+
     cache = SECCache()
     sec_client = SECClient(user_agent=user_agent, cache=cache)
     orchestrator = Orchestrator(
@@ -317,7 +336,13 @@ def main() -> None:
         )
 
         st.subheader("Enrichment")
-        enable_yahoo = st.checkbox("Enable Yahoo market data", value=settings.enable_yahoo)
+        enable_tiingo = st.checkbox("Enable Tiingo market data", value=settings.enable_tiingo)
+        enable_fmp = st.checkbox("Enable FMP valuations & estimates", value=settings.enable_fmp)
+        enable_yahoo = st.checkbox(
+            "Enable Yahoo Finance fallback",
+            value=settings.enable_yahoo,
+            help="Unreliable on cloud IPs. Enable as fallback when Tiingo/FMP are unavailable.",
+        )
         enable_tavily = st.checkbox("Enable Tavily research", value=settings.enable_tavily)
 
         with st.expander("Budget Guardrails", expanded=False):
@@ -354,6 +379,40 @@ def main() -> None:
         )
 
     ticker = st.text_input("Ticker", value="AAPL").strip().upper()
+
+    if os.getenv("ENABLE_WAREHOUSE", "").lower() == "true":
+        try:
+            from warehouse.db import WarehouseDB
+            from warehouse.change_detector import incremental_update
+            wh_db = WarehouseDB()
+            tracked = wh_db.list_tracked_tickers()
+            with st.sidebar:
+                st.divider()
+                with st.expander("Warehouse Status", expanded=False):
+                    st.metric("Tracked Tickers", len(tracked))
+                    if ticker.upper() in [t.upper() for t in tracked]:
+                        company = wh_db.get_company(ticker.upper())
+                        if company:
+                            from datetime import datetime as _dt
+                            if company.get("bootstrapped_at"):
+                                bs_time = _dt.fromtimestamp(company["bootstrapped_at"]).strftime("%Y-%m-%d %H:%M")
+                                st.text(f"Bootstrapped: {bs_time}")
+                            if company.get("last_checked_at"):
+                                lc_time = _dt.fromtimestamp(company["last_checked_at"]).strftime("%Y-%m-%d %H:%M")
+                                st.text(f"Last checked: {lc_time}")
+                    if st.button("Force Refresh", key="wh_refresh"):
+                        try:
+                            from sec.client import SECClient as SECCli
+                            result = incremental_update(ticker.upper(), wh_db, SECCli(user_agent=user_agent))
+                            if result.had_changes:
+                                st.success(f"Updated {ticker.upper()}: {result.new_filing_count} new filings")
+                            else:
+                                st.info(f"{ticker.upper()} is up to date")
+                        except Exception as exc:
+                            st.error(f"Refresh failed: {exc}")
+        except Exception:
+            pass
+
     col_run, col_hint = st.columns([1, 4])
     with col_run:
         run = st.button("Run Analysis", type="primary", use_container_width=True)
@@ -369,6 +428,8 @@ def main() -> None:
             provider=provider,
             enable_yahoo=enable_yahoo,
             enable_tavily=enable_tavily,
+            enable_tiingo=enable_tiingo,
+            enable_fmp=enable_fmp,
             max_agent_context_chars=int(max_agent_context_chars),
             max_agent_output_tokens=int(max_agent_output_tokens),
             synthesis_report_max_chars=int(synthesis_report_max_chars),

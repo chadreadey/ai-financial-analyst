@@ -9,6 +9,7 @@ This module is intentionally fail-safe:
 from __future__ import annotations
 
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from importlib import import_module
@@ -16,14 +17,13 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from config import settings
 from context_budget import trim_text
-from utils import format_money
+from utils import env_flag, format_money
 from yahoo_cache import YahooLookupCache
 
 logger = logging.getLogger(__name__)
 
-# Merge order for parallel enrichment tasks (stable prompts / tests).
 _ENRICHMENT_TASK_ORDER = (
-    "yahoo",
+    "market_data",
     "tavily",
     "peers",
     "estimates",
@@ -82,6 +82,115 @@ def _yahoo_section(ticker: str, cache: YahooLookupCache) -> tuple[str, List[str]
     section_text = "\n".join(lines)
     section_text = trim_text(section_text, settings.max_market_section_chars)
     return section_text, ["Yahoo Finance"]
+
+
+def _tiingo_quote_section(ticker: str, tiingo_cache) -> tuple[str, list[str]]:
+    """Tiingo EOD quote — price, 52W range, volume."""
+    quote = tiingo_cache.get_quote(ticker)
+    meta = tiingo_cache.get_meta(ticker)
+    if not quote:
+        return "", []
+
+    close = quote.get("close")
+    date_str = str(quote.get("date", ""))[:10]
+    lines = [f"=== Market Data (Tiingo EOD, as of {date_str} close) ==="]
+    if close is not None:
+        lines.append(f"Current Price: ${float(close):.2f}")
+    prev = quote.get("prevClose")
+    if prev is not None and close is not None:
+        chg = float(close) - float(prev)
+        pct = chg / float(prev) * 100 if float(prev) != 0 else 0
+        lines.append(f"Day Change: {chg:+.2f} ({pct:+.1f}%)")
+    low52 = quote.get("low52Week")
+    high52 = quote.get("high52Week")
+    if low52 is not None and high52 is not None:
+        lines.append(f"52-Week Range: ${float(low52):.2f} - ${float(high52):.2f}")
+    vol = quote.get("volume")
+    if vol is not None:
+        lines.append(f"Volume: {int(vol):,}")
+
+    section = "\n".join(lines)
+    section = trim_text(section, settings.max_market_section_chars)
+    return section, ["Tiingo (market data)"]
+
+
+def _fmp_valuation_section(ticker: str, fmp_cache) -> tuple[str, list[str]]:
+    """FMP valuation multiples — P/E, EV/EBITDA, P/S, beta, market cap."""
+    quote = fmp_cache.get_quote(ticker)
+    km = fmp_cache.get_key_metrics(ticker)
+    if not quote and not km:
+        return "", []
+
+    lines = ["=== Valuation (FMP) ==="]
+    mc = quote.get("marketCap")
+    if mc:
+        lines.append(f"Market Cap: {format_money(mc)}")
+    pe = quote.get("pe")
+    if pe is not None and pe > 0:
+        lines.append(f"P/E (TTM): {float(pe):.2f}")
+    else:
+        lines.append("P/E (TTM): N/A")
+    beta = quote.get("beta")
+    if beta is not None:
+        lines.append(f"Beta: {float(beta):.2f}")
+    ev_ebitda = km.get("evToEbitdaTTM") if km else None
+    if ev_ebitda is not None:
+        lines.append(f"EV/EBITDA: {float(ev_ebitda):.2f}")
+    ps = km.get("priceToSalesRatioTTM") if km else None
+    if ps is not None:
+        lines.append(f"P/S (TTM): {float(ps):.2f}")
+
+    section = "\n".join(lines)
+    section = trim_text(section, settings.max_market_section_chars)
+    return section, ["FMP (Financial Modeling Prep)"]
+
+
+def _fmp_estimates_section(ticker: str, fmp_cache) -> tuple[str, list[str]]:
+    """FMP analyst estimates, price targets, earnings surprises."""
+    lines = ["=== Analyst Estimates & Consensus (FMP) ==="]
+
+    pt = fmp_cache.get_price_target(ticker)
+    if pt:
+        for field in ("targetHigh", "targetLow", "targetConsensus", "targetMedian"):
+            val = pt.get(field)
+            if val is not None:
+                label = field.replace("target", "Price Target ")
+                lines.append(f"  {label}: ${float(val):.2f}")
+        count = pt.get("numberOfAnalysts")
+        if count is not None:
+            lines.append(f"  Analysts Count: {count}")
+
+    estimates = fmp_cache.get_analyst_estimates(ticker)
+    if estimates:
+        lines.append("  -- Forward Estimates --")
+        for est in estimates[:4]:
+            date = est.get("date", "?")
+            rev = est.get("estimatedRevenueAvg")
+            eps = est.get("estimatedEpsAvg")
+            parts = [f"  {date}:"]
+            if rev is not None:
+                parts.append(f"Rev {format_money(rev)}")
+            if eps is not None:
+                parts.append(f"EPS ${float(eps):.2f}")
+            lines.append(" | ".join(parts))
+
+    surprises = fmp_cache.get_earnings_surprises(ticker)
+    if surprises:
+        lines.append("  -- Recent Earnings Surprises --")
+        for s in surprises[:4]:
+            date = s.get("date", "?")
+            actual = s.get("actualEarningResult")
+            est_eps = s.get("estimatedEarning")
+            if actual is not None and est_eps is not None:
+                beat = "BEAT" if float(actual) > float(est_eps) else "MISS"
+                lines.append(f"  {date}: ${float(actual):.2f} vs ${float(est_eps):.2f} ({beat})")
+
+    if len(lines) <= 1:
+        return "", []
+
+    section = "\n".join(lines)
+    section = trim_text(section, settings.max_fmp_estimates_section_chars)
+    return section, ["FMP (analyst estimates)"]
 
 
 def _analyst_estimates_section(
@@ -393,6 +502,92 @@ def _price_history_section(ticker: str, cache: YahooLookupCache) -> tuple[str, L
     return section, ["Yahoo Finance (price history)"]
 
 
+def _tiingo_price_history_section(ticker: str, tiingo_cache) -> tuple[str, list[str]]:
+    """2-year daily price history from Tiingo with pre-computed stats."""
+    import numpy as np
+    import pandas as pd
+
+    two_years_ago = (datetime.now() - timedelta(days=730)).strftime("%Y-%m-%d")
+    data = tiingo_cache.get_eod_history(ticker, two_years_ago)
+    if not data or len(data) < 20:
+        return "", []
+
+    df = pd.DataFrame(data)
+    df["date"] = pd.to_datetime(df["date"]).dt.tz_convert(None)
+    df = df.sort_values("date")
+    close = df["adjClose"]
+    latest = float(close.iloc[-1])
+
+    lines = ["=== Price History & Technical Data (Tiingo) ==="]
+    lines.append(f"Current Price: ${latest:.2f}")
+
+    for label, days in [("1M", 21), ("3M", 63), ("6M", 126), ("1Y", 252), ("2Y", 504)]:
+        if len(close) > days:
+            ret = latest / float(close.iloc[-days]) - 1
+            lines.append(f"  {label} Return: {ret*100:+.1f}%")
+
+    high_52 = float(close.tail(252).max()) if len(close) >= 252 else float(close.max())
+    low_52 = float(close.tail(252).min()) if len(close) >= 252 else float(close.min())
+    pct_range = (latest - low_52) / (high_52 - low_52) * 100 if high_52 != low_52 else 50
+    lines.append(f"  52-Week High: ${high_52:.2f}")
+    lines.append(f"  52-Week Low: ${low_52:.2f}")
+    lines.append(f"  Position in 52W Range: {pct_range:.0f}th percentile")
+
+    if len(close) >= 50:
+        sma50 = float(close.tail(50).mean())
+        lines.append(f"  50-Day SMA: ${sma50:.2f} ({'above' if latest > sma50 else 'below'})")
+    if len(close) >= 200:
+        sma200 = float(close.tail(200).mean())
+        lines.append(f"  200-Day SMA: ${sma200:.2f} ({'above' if latest > sma200 else 'below'})")
+        if len(close) >= 50:
+            cross = "bullish (golden cross)" if sma50 > sma200 else "bearish (death cross)"
+            lines.append(f"  50/200 SMA State: {cross}")
+
+    if len(close) >= 252:
+        returns = close.pct_change().dropna()
+        ann_vol = float(np.std(returns) * np.sqrt(252))
+        lines.append(f"  Annualized Volatility: {ann_vol*100:.1f}%")
+
+    if "volume" in df.columns and len(df) >= 21:
+        vol_col = df["volume"]
+        avg_vol = float(vol_col.tail(252).mean()) if len(df) >= 252 else float(vol_col.mean())
+        recent_vol = float(vol_col.tail(21).mean())
+        lines.append(f"  Avg Daily Volume: {avg_vol:,.0f}")
+        lines.append(f"  Recent 21-Day Avg Volume: {recent_vol:,.0f}")
+
+    section = "\n".join(lines)
+    section = trim_text(section, settings.max_price_history_chars)
+    return section, ["Tiingo (price history)"]
+
+
+def _tiingo_index_section(tiingo_cache, sector: str = "") -> tuple[list[str], list[str]]:
+    """YTD returns for SPY and sector ETFs via Tiingo."""
+    jan1 = datetime(datetime.now().year, 1, 1).strftime("%Y-%m-%d")
+    lines: list[str] = []
+    sources: list[str] = []
+
+    spy_data = tiingo_cache.get_eod_history("SPY", jan1)
+    if spy_data and len(spy_data) >= 2:
+        first = float(spy_data[0].get("adjClose", 0))
+        last = float(spy_data[-1].get("adjClose", 0))
+        if first > 0:
+            ytd = (last / first - 1) * 100
+            lines.append(f"  S&P 500 (SPY proxy): ${last:,.2f} | YTD: {ytd:+.1f}%")
+            sources.append("Tiingo (indices)")
+
+    etf_sym = SECTOR_ETF_MAP.get(sector)
+    if etf_sym:
+        etf_data = tiingo_cache.get_eod_history(etf_sym, jan1)
+        if etf_data and len(etf_data) >= 2:
+            first = float(etf_data[0].get("adjClose", 0))
+            last = float(etf_data[-1].get("adjClose", 0))
+            if first > 0:
+                ytd = (last / first - 1) * 100
+                lines.append(f"  Sector ETF ({etf_sym} - {sector}) YTD: {ytd:+.1f}%")
+
+    return lines, sources
+
+
 def _fred_fetch_one(
     fred: Any, series_id: str, label: str, unit: str, one_year_ago: str
 ) -> Tuple[str, str, str, Optional[Any]]:
@@ -426,6 +621,7 @@ def _fred_macro_data() -> tuple[List[str], List[str]]:
         "BAMLH0A0HYM2": ("High Yield Credit Spread", "%"),
         "BAMLC0A0CM": ("IG Credit Spread", "%"),
         "UMCSENT": ("Consumer Sentiment (UMich)", ""),
+        "VIXCLS": ("CBOE VIX", ""),
     }
 
     one_year_ago = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
@@ -476,8 +672,10 @@ def _fred_macro_data() -> tuple[List[str], List[str]]:
     return lines, sources
 
 
-def _macro_section(ticker: str, cache: YahooLookupCache) -> tuple[str, List[str]]:
-    """Current macro environment: FRED primary, Yahoo for indices/sector ETF."""
+def _macro_section(
+    ticker: str, cache: YahooLookupCache, tiingo_cache=None, sector: str = ""
+) -> tuple[str, List[str]]:
+    """Current macro environment: FRED primary, Tiingo/Yahoo for indices/sector ETF."""
     import yfinance as yf
 
     lines = ["=== Macro Environment ==="]
@@ -510,33 +708,38 @@ def _macro_section(ticker: str, cache: YahooLookupCache) -> tuple[str, List[str]
                 logger.debug("Yahoo yield ticker %s unavailable", sym, exc_info=True)
 
     lines.append("-- Market Indices --")
-    index_tickers = {"^GSPC": "S&P 500", "^VIX": "VIX"}
-    for sym, label in index_tickers.items():
-        try:
-            info = cache.get_info(sym)
-            price = info.get("regularMarketPrice") or info.get("previousClose")
-            if price is not None:
-                lines.append(f"  {label}: {float(price):,.2f}")
-            t = yf.Ticker(sym)
-            hist = t.history(period="ytd")
-            if not hist.empty and len(hist) > 1:
-                ytd_ret = float(hist["Close"].iloc[-1]) / float(hist["Close"].iloc[0]) - 1
-                lines.append(f"  {label} YTD: {ytd_ret*100:+.1f}%")
-        except Exception:
-            logger.debug("Yahoo index ticker %s unavailable", sym, exc_info=True)
+    if tiingo_cache is not None and env_flag("ENABLE_TIINGO"):
+        idx_lines, idx_sources = _tiingo_index_section(tiingo_cache, sector)
+        lines.extend(idx_lines)
+        sources.extend(idx_sources)
+    else:
+        index_tickers = {"^GSPC": "S&P 500", "^VIX": "VIX"}
+        for sym, label in index_tickers.items():
+            try:
+                info = cache.get_info(sym)
+                price = info.get("regularMarketPrice") or info.get("previousClose")
+                if price is not None:
+                    lines.append(f"  {label}: {float(price):,.2f}")
+                t = yf.Ticker(sym)
+                hist = t.history(period="ytd")
+                if not hist.empty and len(hist) > 1:
+                    ytd_ret = float(hist["Close"].iloc[-1]) / float(hist["Close"].iloc[0]) - 1
+                    lines.append(f"  {label} YTD: {ytd_ret*100:+.1f}%")
+            except Exception:
+                logger.debug("Yahoo index ticker %s unavailable", sym, exc_info=True)
 
-    try:
-        stock_info = cache.get_info(ticker)
-        sector = stock_info.get("sector", "")
-        etf_sym = SECTOR_ETF_MAP.get(sector)
-        if etf_sym:
-            etf = yf.Ticker(etf_sym)
-            hist = etf.history(period="ytd")
-            if not hist.empty and len(hist) > 1:
-                ytd = float(hist["Close"].iloc[-1]) / float(hist["Close"].iloc[0]) - 1
-                lines.append(f"  Sector ETF ({etf_sym} - {sector}) YTD: {ytd*100:+.1f}%")
-    except Exception:
-        logger.debug("Sector ETF data unavailable for %s", ticker, exc_info=True)
+        try:
+            stock_info = cache.get_info(ticker)
+            sec = stock_info.get("sector", "")
+            etf_sym = SECTOR_ETF_MAP.get(sec)
+            if etf_sym:
+                etf = yf.Ticker(etf_sym)
+                hist = etf.history(period="ytd")
+                if not hist.empty and len(hist) > 1:
+                    ytd = float(hist["Close"].iloc[-1]) / float(hist["Close"].iloc[0]) - 1
+                    lines.append(f"  Sector ETF ({etf_sym} - {sec}) YTD: {ytd*100:+.1f}%")
+        except Exception:
+            logger.debug("Sector ETF data unavailable for %s", ticker, exc_info=True)
 
     if settings.enable_tavily:
         try:
@@ -563,36 +766,87 @@ def _macro_section(ticker: str, cache: YahooLookupCache) -> tuple[str, List[str]
     return section, sources
 
 
-def _task_yahoo(ticker: str, cache: YahooLookupCache) -> Dict[str, Any]:
-    try:
-        text, src = _yahoo_section(ticker, cache)
-        info = cache.get_info(ticker)
-        entries = [("market_data", text)] if text else []
-        return {
-            "section_entries": entries,
-            "sources": list(src),
-            "warnings": [],
-            "filter_stats": {},
-            "sector": info.get("sector", ""),
-            "industry": info.get("industry", ""),
-        }
-    except Exception as exc:
-        return {
-            "section_entries": [],
-            "sources": [],
-            "warnings": [f"Yahoo enrichment unavailable: {exc}"],
-            "filter_stats": {},
-            "sector": "",
-            "industry": "",
-        }
+def _task_market_data(
+    ticker: str, cache: YahooLookupCache, tiingo_cache=None, fmp_cache=None
+) -> Dict[str, Any]:
+    sector = ""
+    industry = ""
+    entries: list[tuple[str, str]] = []
+    sources: list[str] = []
+    warnings: list[str] = []
+
+    tiingo_ok = False
+    if tiingo_cache and env_flag("ENABLE_TIINGO"):
+        try:
+            text, src = _tiingo_quote_section(ticker, tiingo_cache)
+            if text:
+                entries.append(("market_data", text))
+                sources.extend(src)
+                tiingo_ok = True
+                logger.info("market_data served by tiingo for %s", ticker)
+                meta = tiingo_cache.get_meta(ticker)
+                sector = meta.get("sector", "") or ""
+                industry = meta.get("industry", "") or ""
+        except Exception as exc:
+            logger.warning("tiingo quote failed for %s, falling back to FMP: %s", ticker, exc)
+
+    if fmp_cache and env_flag("ENABLE_FMP"):
+        try:
+            fmp_text, fmp_src = _fmp_valuation_section(ticker, fmp_cache)
+            if fmp_text:
+                entries.append(("valuation", fmp_text))
+                sources.extend(fmp_src)
+                if not tiingo_ok:
+                    logger.info("market_data served by fmp for %s", ticker)
+                fmp_quote = fmp_cache.get_quote(ticker)
+                if not sector:
+                    sector = fmp_quote.get("sector", "") or ""
+        except Exception as exc:
+            if not tiingo_ok:
+                logger.warning("fmp quote failed for %s, falling back to Yahoo: %s", ticker, exc)
+
+    if not entries and env_flag("ENABLE_YAHOO_FALLBACK", default=True):
+        try:
+            text, src = _yahoo_section(ticker, cache)
+            if text:
+                entries.append(("market_data", text))
+                sources.extend(src)
+                logger.info("market_data served by yahoo for %s", ticker)
+        except Exception as exc:
+            warnings.append(f"Yahoo enrichment unavailable: {exc}")
+
+    if not entries:
+        logger.info("market_data served by empty for %s", ticker)
+
+    if not sector:
+        try:
+            info = cache.get_info(ticker)
+            sector = info.get("sector", "")
+            industry = info.get("industry", "")
+        except Exception:
+            pass
+
+    return {
+        "section_entries": entries,
+        "sources": sources,
+        "warnings": warnings,
+        "filter_stats": {},
+        "sector": sector,
+        "industry": industry,
+    }
 
 
 def _task_tavily(
-    ticker: str, company_name: str, cache: YahooLookupCache
+    ticker: str, company_name: str, cache: YahooLookupCache, pre_sector: str = ""
 ) -> Dict[str, Any]:
     try:
-        info = cache.get_info(ticker)
-        sector = info.get("sector", "")
+        sector = pre_sector
+        if not sector:
+            try:
+                info = cache.get_info(ticker)
+                sector = info.get("sector", "")
+            except Exception:
+                sector = ""
         tavily_sections, tavily_sources, filter_stats = _tavily_section(
             ticker, company_name, sector=sector
         )
@@ -615,12 +869,14 @@ def _task_tavily(
         }
 
 
-def _task_peers(ticker: str, company_name: str, cache: YahooLookupCache) -> Dict[str, Any]:
+def _task_peers(
+    ticker: str, company_name: str, cache: YahooLookupCache, fmp_cache=None
+) -> Dict[str, Any]:
     try:
         from peer_enrichment import build_peer_comparison
 
         peer_text, peer_sources = build_peer_comparison(
-            ticker, company_name, cache=cache
+            ticker, company_name, cache=cache, fmp_cache=fmp_cache
         )
         entries = [("peer_comparison", peer_text)] if peer_text else []
         return {
@@ -638,47 +894,115 @@ def _task_peers(ticker: str, company_name: str, cache: YahooLookupCache) -> Dict
         }
 
 
-def _task_estimates(ticker: str, cache: YahooLookupCache) -> Dict[str, Any]:
+def _task_estimates(
+    ticker: str, cache: YahooLookupCache, fmp_cache=None
+) -> Dict[str, Any]:
+    if fmp_cache and env_flag("ENABLE_FMP"):
+        try:
+            fmp_text, fmp_src = _fmp_estimates_section(ticker, fmp_cache)
+            if fmp_text:
+                logger.info("estimates served by fmp for %s", ticker)
+                return {
+                    "section_entries": [("analyst_estimates", fmp_text)],
+                    "sources": fmp_src,
+                    "warnings": [],
+                    "filter_stats": {},
+                }
+        except Exception as exc:
+            logger.warning("FMP estimates failed for %s, falling back to Yahoo: %s", ticker, exc)
+
+    if env_flag("ENABLE_YAHOO_FALLBACK", default=True):
+        try:
+            est_text, est_sources = _analyst_estimates_section(ticker, cache)
+            entries = [("analyst_estimates", est_text)] if est_text else []
+            return {
+                "section_entries": entries,
+                "sources": list(est_sources),
+                "warnings": [],
+                "filter_stats": {},
+            }
+        except Exception as exc:
+            return {
+                "section_entries": [],
+                "sources": [],
+                "warnings": [f"Analyst estimates unavailable: {exc}"],
+                "filter_stats": {},
+            }
+
+    return {
+        "section_entries": [],
+        "sources": [],
+        "warnings": [],
+        "filter_stats": {},
+    }
+
+
+def _task_price(
+    ticker: str, cache: YahooLookupCache, tiingo_cache=None
+) -> Dict[str, Any]:
+    if tiingo_cache and env_flag("ENABLE_TIINGO"):
+        try:
+            text, src = _tiingo_price_history_section(ticker, tiingo_cache)
+            if text:
+                logger.info("price_history served by tiingo for %s", ticker)
+                return {
+                    "section_entries": [("price_history", text)],
+                    "sources": src,
+                    "warnings": [],
+                    "filter_stats": {},
+                }
+        except Exception as exc:
+            logger.warning("Tiingo price history failed for %s: %s", ticker, exc)
+
+    if env_flag("ENABLE_YAHOO_FALLBACK", default=True):
+        try:
+            ph_text, ph_sources = _price_history_section(ticker, cache)
+            entries = [("price_history", ph_text)] if ph_text else []
+            return {
+                "section_entries": entries,
+                "sources": list(ph_sources),
+                "warnings": [],
+                "filter_stats": {},
+            }
+        except Exception as exc:
+            return {
+                "section_entries": [],
+                "sources": [],
+                "warnings": [f"Price history unavailable: {exc}"],
+                "filter_stats": {},
+            }
+
+    return {
+        "section_entries": [],
+        "sources": [],
+        "warnings": [],
+        "filter_stats": {},
+    }
+
+
+def _task_macro(
+    ticker: str, cache: YahooLookupCache, tiingo_cache=None, sector: str = ""
+) -> Dict[str, Any]:
+    if os.getenv("ENABLE_WAREHOUSE", "").lower() == "true":
+        try:
+            from warehouse.db import WarehouseDB
+            from warehouse.reader import get_macro_for_context
+            db = WarehouseDB()
+            cached_macro = get_macro_for_context(db)
+            if cached_macro:
+                return {
+                    "section_entries": [("macro_data", cached_macro)],
+                    "sources": ["Warehouse (macro)"],
+                    "warnings": [],
+                    "filter_stats": {},
+                }
+        except Exception:
+            logger.debug("Warehouse macro fallback to live", exc_info=True)
+
     try:
-        est_text, est_sources = _analyst_estimates_section(ticker, cache)
-        entries = [("analyst_estimates", est_text)] if est_text else []
-        return {
-            "section_entries": entries,
-            "sources": list(est_sources),
-            "warnings": [],
-            "filter_stats": {},
-        }
-    except Exception as exc:
-        return {
-            "section_entries": [],
-            "sources": [],
-            "warnings": [f"Analyst estimates unavailable: {exc}"],
-            "filter_stats": {},
-        }
-
-
-def _task_price(ticker: str, cache: YahooLookupCache) -> Dict[str, Any]:
-    try:
-        ph_text, ph_sources = _price_history_section(ticker, cache)
-        entries = [("price_history", ph_text)] if ph_text else []
-        return {
-            "section_entries": entries,
-            "sources": list(ph_sources),
-            "warnings": [],
-            "filter_stats": {},
-        }
-    except Exception as exc:
-        return {
-            "section_entries": [],
-            "sources": [],
-            "warnings": [f"Price history unavailable: {exc}"],
-            "filter_stats": {},
-        }
-
-
-def _task_macro(ticker: str, cache: YahooLookupCache) -> Dict[str, Any]:
-    try:
-        macro_text, macro_sources = _macro_section(ticker, cache)
+        macro_text, macro_sources = _macro_section(
+            ticker, cache, tiingo_cache=tiingo_cache, sector=sector
+        )
         entries = [("macro_data", macro_text)] if macro_text else []
         return {
             "section_entries": entries,
@@ -728,6 +1052,40 @@ def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object
       }
     """
     cache = YahooLookupCache()
+
+    tiingo_cache = None
+    tiingo_key = os.getenv("TIINGO_API_KEY", "").strip()
+    if tiingo_key and env_flag("ENABLE_TIINGO"):
+        try:
+            from tiingo_client import TiingoClient, TiingoCache
+            tiingo_cache = TiingoCache(TiingoClient(tiingo_key))
+        except Exception:
+            logger.debug("Tiingo client init failed", exc_info=True)
+
+    fmp_cache = None
+    fmp_key = os.getenv("FMP_API_KEY", "").strip()
+    if fmp_key and env_flag("ENABLE_FMP"):
+        try:
+            from fmp_client import FMPClient, FMPCache
+            fmp_cache = FMPCache(FMPClient(fmp_key))
+        except Exception:
+            logger.debug("FMP client init failed", exc_info=True)
+
+    pre_sector = ""
+    pre_industry = ""
+    if fmp_cache:
+        try:
+            q = fmp_cache.get_quote(ticker)
+            pre_sector = q.get("sector", "") or ""
+        except Exception:
+            pass
+    if not pre_sector and tiingo_cache:
+        try:
+            m = tiingo_cache.get_meta(ticker)
+            pre_sector = m.get("sector", "") or ""
+        except Exception:
+            pass
+
     warnings: List[str] = []
     sources: List[str] = []
     sections: List[str] = []
@@ -738,18 +1096,29 @@ def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object
     futures: Dict[str, Any] = {}
 
     with ThreadPoolExecutor(max_workers=worker_cap) as pool:
-        if settings.enable_yahoo:
-            futures["yahoo"] = pool.submit(_task_yahoo, ticker, cache)
+        futures["market_data"] = pool.submit(
+            _task_market_data, ticker, cache, tiingo_cache, fmp_cache
+        )
         if settings.enable_tavily:
-            futures["tavily"] = pool.submit(_task_tavily, ticker, company_name, cache)
+            futures["tavily"] = pool.submit(
+                _task_tavily, ticker, company_name, cache, pre_sector
+            )
         if settings.enable_peers:
-            futures["peers"] = pool.submit(_task_peers, ticker, company_name, cache)
+            futures["peers"] = pool.submit(
+                _task_peers, ticker, company_name, cache, fmp_cache
+            )
         if settings.enable_estimates:
-            futures["estimates"] = pool.submit(_task_estimates, ticker, cache)
+            futures["estimates"] = pool.submit(
+                _task_estimates, ticker, cache, fmp_cache
+            )
         if settings.enable_price_history:
-            futures["price"] = pool.submit(_task_price, ticker, cache)
+            futures["price"] = pool.submit(
+                _task_price, ticker, cache, tiingo_cache
+            )
         if settings.enable_macro:
-            futures["macro"] = pool.submit(_task_macro, ticker, cache)
+            futures["macro"] = pool.submit(
+                _task_macro, ticker, cache, tiingo_cache, pre_sector
+            )
         if settings.enable_rag:
             futures["rag"] = pool.submit(_task_rag, ticker)
 
@@ -767,9 +1136,12 @@ def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object
             sources.extend(r["sources"])
             warnings.extend(r["warnings"])
             filter_stats.update(r.get("filter_stats", {}))
-            if name == "yahoo":
+            if name == "market_data":
                 sector = r.get("sector", "") or sector
                 industry = r.get("industry", "") or industry
+
+    if fmp_cache:
+        logger.info("fmp_calls_this_run=%d", fmp_cache.call_count)
 
     if warnings:
         warn_text = "\n".join(f"- {w}" for w in warnings)
