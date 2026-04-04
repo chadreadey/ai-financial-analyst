@@ -25,6 +25,7 @@ class RiskAgent(BaseAgent):
         "filing_risk_factors",
         "filing_mda",
         "rag_research",
+        "timesfm_price",
     )
 
     system_prompt = """You are a senior risk analyst at Bridgewater Associates, \

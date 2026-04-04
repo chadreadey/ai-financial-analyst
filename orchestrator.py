@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import re
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -37,19 +38,48 @@ from sec.xbrl_parser import XBRLParser
 logger = logging.getLogger(__name__)
 
 
+def _as_float(value: Any) -> Optional[float]:
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value.replace("%", "").strip())
+        except ValueError:
+            return None
+    return None
+
+
 def _extract_structured_block(synthesis_text: str) -> Tuple[Optional[dict], str]:
     """
     Extract the structured JSON block from the end of synthesis output.
     Returns (parsed_dict_or_None, prose_text_with_json_removed).
     """
-    pattern = r"```json\s*\n(\{.*?\})\s*\n```"
-    match = re.search(pattern, synthesis_text, re.DOTALL)
+    patterns = [
+        r"```json\s*\n(\{.*?\})\s*\n```",
+        r"```\s*\n(\{.*?\})\s*\n```",
+    ]
+    match = None
+    for pattern in patterns:
+        match = re.search(pattern, synthesis_text, re.DOTALL)
+        if match:
+            break
     if not match:
         return None, synthesis_text
 
+    raw_json = match.group(1).strip()
     try:
-        data = json.loads(match.group(1))
+        data = json.loads(raw_json)
     except (json.JSONDecodeError, ValueError):
+        # Parser tolerance: common LLM issue is trailing commas.
+        sanitized = re.sub(r",\s*([}\]])", r"\1", raw_json)
+        try:
+            data = json.loads(sanitized)
+        except (json.JSONDecodeError, ValueError):
+            return None, synthesis_text
+
+    if not isinstance(data, dict):
         return None, synthesis_text
 
     prose = synthesis_text[:match.start()].rstrip()
@@ -67,6 +97,60 @@ SECTOR_SPECIALIST_MAP: dict[str, str] = {
     "Consumer Cyclical": "prompts/sector_consumer.md",
     "Consumer Defensive": "prompts/sector_consumer.md",
 }
+
+
+def _flywheel_ingest(ticker: str) -> None:
+    """
+    Background flywheel: bootstrap the warehouse and seed Pinecone for a ticker.
+
+    Runs in a daemon thread after every analysis so that previously-unseen
+    tickers are available for RAG on the next query. Safe to re-run —
+    all warehouse upserts and Pinecone upsert_records are idempotent.
+
+    Creates its own SECClient and DB connection — never shares state with
+    the main thread.
+    """
+    try:
+        from pinecone import Pinecone
+
+        from sec.client import SECClient as _SECClient
+        from warehouse.bootstrap import bootstrap_ticker
+        from warehouse.change_detector import needs_update, incremental_update
+        from warehouse.db import WarehouseDB
+        from warehouse.embedder import embed_and_upsert_all
+
+        api_key = settings.pinecone_api_key.strip()
+        if not api_key:
+            logger.debug("Flywheel: no Pinecone API key, skipping")
+            return
+
+        db = WarehouseDB()
+        company = db.get_company(ticker)
+        sec = _SECClient()
+
+        if company is None:
+            logger.info("Flywheel: new ticker %s — bootstrapping warehouse...", ticker)
+            bootstrap_ticker(ticker, db, sec)
+        elif needs_update(ticker, db, sec):
+            logger.info("Flywheel: stale ticker %s — incremental update...", ticker)
+            incremental_update(ticker, db, sec)
+        else:
+            logger.debug("Flywheel: %s is current, skipping", ticker)
+            return
+
+        pc = Pinecone(api_key=api_key)
+        index = pc.Index(settings.pinecone_index_name)
+        summary = embed_and_upsert_all(
+            db_path=settings.warehouse_db_path,
+            index=index,
+            namespace=settings.pinecone_namespace or "__default__",
+            tickers=[ticker],
+        )
+        seeded = sum(summary.values())
+        logger.info("Flywheel: %s — %d records seeded to Pinecone", ticker, seeded)
+
+    except Exception:
+        logger.warning("Flywheel ingestion failed for %s", ticker, exc_info=True)
 
 
 class Orchestrator:
@@ -222,6 +306,21 @@ class Orchestrator:
         segment_data = metrics.pop("_segment_data", None)  # always pop, even if edgartools was skipped
         if segment_data:
             enrichment_sections["segment_data"] = f"=== Revenue Segments ===\n{segment_data}"
+
+        if settings.enable_timesfm:
+            try:
+                from quant.timesfm.cache import get_signals
+                from quant.timesfm.enrichment import format_price_signals, format_eps_signals
+                tfm_signals = get_signals(ticker_upper)
+                if tfm_signals:
+                    price_sig = tfm_signals.get("price_forecast")
+                    eps_sig = tfm_signals.get("eps_forecast")
+                    if price_sig:
+                        enrichment_sections["timesfm_price"] = format_price_signals(ticker_upper, price_sig)
+                    if eps_sig:
+                        enrichment_sections["timesfm_eps"] = format_eps_signals(ticker_upper, eps_sig)
+            except Exception as exc:
+                logger.warning("TimesFM enrichment injection failed: %s", exc)
 
         recent_filings = [
             FilingInfo(**{k: f[k] for k in FilingInfo.model_fields if k in f})
@@ -397,17 +496,51 @@ class Orchestrator:
         if structured:
             try:
                 health = structured.get("health_scores", {})
+                stop_loss_value = None
+                stop_loss_unit = ""
+                raw_stop_loss = structured.get("stop_loss")
+                if isinstance(raw_stop_loss, dict):
+                    stop_loss_value = _as_float(raw_stop_loss.get("value"))
+                    stop_loss_unit = str(raw_stop_loss.get("unit") or "")
+                elif isinstance(raw_stop_loss, (int, float)):
+                    stop_loss_value = _as_float(raw_stop_loss)
+                    stop_loss_unit = "price"
+
                 self.sec_client.cache.save_analysis(
                     ticker=data.ticker,
+                    company_name=data.company_name,
                     verdict=structured.get("verdict", ""),
                     conviction=structured.get("conviction", ""),
                     time_horizon=structured.get("time_horizon", ""),
                     composite_score=health.get("overall"),
                     health_scores=health,
+                    price_target=_as_float(structured.get("price_target")),
+                    stop_loss_value=stop_loss_value,
+                    stop_loss_unit=stop_loss_unit,
+                    entry_price_at_run=_as_float(structured.get("entry_price")),
+                    result_json={
+                        "ticker": data.ticker,
+                        "company_name": data.company_name,
+                        "agent_reports": [r.model_dump() for r in agent_reports],
+                        "synthesis": synthesis,
+                        "structured_verdict": structured,
+                        "metrics": data.metrics,
+                        "enrichment_warnings": data.enrichment_warnings,
+                        "enrichment_sources": data.enrichment_sources,
+                        "enrichment_filter_stats": data.enrichment_filter_stats,
+                    },
                 )
                 logger.info("Analysis saved to history")
             except Exception as exc:
                 logger.warning("Failed to save analysis history: %s", exc)
+
+        if settings.enable_rag:
+            threading.Thread(
+                target=_flywheel_ingest,
+                args=(data.ticker,),
+                daemon=True,
+                name=f"flywheel-{data.ticker}",
+            ).start()
 
         return AnalysisResult(
             ticker=data.ticker,

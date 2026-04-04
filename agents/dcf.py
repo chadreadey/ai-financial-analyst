@@ -30,6 +30,7 @@ class DCFAgent(BaseAgent):
         "filing_mda",
         "segment_data",
         "rag_research",
+        "timesfm_eps",
     )
 
     system_prompt = """You are a senior equity research analyst at Morgan Stanley, \

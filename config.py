@@ -93,13 +93,32 @@ class Settings(BaseSettings):
     max_mda_chars: int = 4000
     max_risk_factors_chars: int = 3000
     max_biz_desc_chars: int = 2000
+    max_market_risk_chars: int = 2000
+    max_legal_proceedings_chars: int = 1500
+    max_properties_chars: int = 1000
+    max_tenq_mda_chars: int = 3000
+    max_tenq_risk_update_chars: int = 1500
+    max_tenq_market_risk_chars: int = 1500
 
     # ── RAG ────────────────────────────────────────────────────────
-    qdrant_host: str = "localhost"
-    qdrant_port: int = 6333
-    qdrant_collection: str = "financial_research"
+    pinecone_api_key: str = ""
+    pinecone_index_name: str = "financial-analyst"
+    pinecone_namespace: str = ""
+    pinecone_embed_model: str = "text-embedding-3-small"
+    pinecone_embed_dimensions: int = 1536
+    pinecone_upsert_batch_size: int = 100
     rag_top_k: int = 5
-    rag_max_chars: int = 2000
+    rag_max_chars: int = 1500
+
+    # ── RAG time-series namespaces ──────────────────────────────────
+    pinecone_financial_ts_namespace: str = "financial_ts"
+    pinecone_macro_ts_namespace: str = "macro_ts"
+    rag_financial_history_top_k: int = 6
+    rag_macro_history_top_k: int = 3
+    rag_financial_history_max_chars: int = 2000
+    rag_macro_history_max_chars: int = 1200
+    enable_financial_history_rag: bool = False
+    enable_macro_history_rag: bool = False
 
     # ── Logging ────────────────────────────────────────────────────
     log_level: str = "INFO"
@@ -108,9 +127,26 @@ class Settings(BaseSettings):
     enable_warehouse: bool = False
     warehouse_db_path: str = ".warehouse.db"
     warehouse_filing_limit: int = 20
+    warehouse_sections_limit: int = 3
+    warehouse_tenq_limit: int = 4
     warehouse_market_ttl_hours: int = 4
     warehouse_macro_ttl_hours: int = 24
     warehouse_check_interval_hours: int = 6
+
+    # ── Supabase history sync ────────────────────────────────────────
+    enable_supabase_history: bool = False
+    supabase_url: str = ""
+    supabase_service_key: str = ""
+    supabase_history_table: str = "analyses"
+
+    # ── TimesFM ──────────────────────────────────────────────────────
+    enable_timesfm: bool = False
+    redis_url: str = ""
+    timesfm_checkpoint_dir: str = ""
+    timesfm_batch_tickers: str = ""
+    timesfm_horizon_days: int = 10
+    timesfm_price_lookback_days: int = 512
+    timesfm_ttl_seconds: int = 86400
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

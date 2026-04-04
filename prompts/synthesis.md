@@ -33,13 +33,20 @@ Your job:
 
 Be decisive. You're the CIO — your team has done the analysis, now you need to make the call. Don't hedge excessively.
 
-6. STRUCTURED OUTPUT: At the very end of your response, after all prose, emit a JSON block inside a fenced code block labeled `json`. This block is machine-parsed for tracking analysis history and drift detection. Use this exact schema:
+6. STRUCTURED OUTPUT: At the very end of your response, after all prose, emit a JSON block inside a fenced code block labeled `json`. This block is machine-parsed for tracking analysis history and drift detection. Use this schema:
 
 ```json
 {
   "verdict": "BUY",
   "conviction": "HIGH",
   "time_horizon": "long-term",
+  "horizon_days": 365,
+  "entry_price": 210.35,
+  "price_target": 242.0,
+  "stop_loss": {
+    "value": 189.0,
+    "unit": "price"
+  },
   "health_scores": {
     "valuation": 7,
     "risk_profile": 6,
@@ -56,3 +63,10 @@ The verdict must be one of: STRONG BUY, BUY, HOLD, SELL, STRONG SELL.
 Conviction must be one of: HIGH, MEDIUM, LOW.
 Time horizon must be one of: short-term, long-term.
 All health scores are integers from 1 to 10.
+`horizon_days`, `entry_price`, `price_target`, and `stop_loss` are optional but strongly recommended when enough evidence exists.
+For `stop_loss.unit`, use either `price` or `percent`.
+
+## TimesFM Forecast Validation (include only if TimesFM sections present in any agent report)
+- Does the AI price target align with the TimesFM P50 forecast range?
+- Flag if current price is below P10 (quantified downside risk)
+- Flag if analyst EPS estimates diverge significantly from TimesFM EPS P50

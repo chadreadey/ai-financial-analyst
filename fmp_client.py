@@ -82,6 +82,36 @@ class FMPClient:
             logger.debug("fmp earnings-surprises/%s failed: %s", symbol, exc, exc_info=True)
             return []
 
+    def get_income_statement_quarterly(self, symbol: str, limit: int = 5) -> list[dict]:
+        try:
+            return self._get(
+                "/stable/income-statement",
+                {"symbol": symbol, "period": "quarter", "limit": limit},
+            )
+        except Exception as exc:
+            logger.debug("fmp income-statement (Q)/%s failed: %s", symbol, exc, exc_info=True)
+            return []
+
+    def get_balance_sheet_quarterly(self, symbol: str, limit: int = 5) -> list[dict]:
+        try:
+            return self._get(
+                "/stable/balance-sheet-statement",
+                {"symbol": symbol, "period": "quarter", "limit": limit},
+            )
+        except Exception as exc:
+            logger.debug("fmp balance-sheet (Q)/%s failed: %s", symbol, exc, exc_info=True)
+            return []
+
+    def get_cash_flow_quarterly(self, symbol: str, limit: int = 5) -> list[dict]:
+        try:
+            return self._get(
+                "/stable/cash-flow-statement",
+                {"symbol": symbol, "period": "quarter", "limit": limit},
+            )
+        except Exception as exc:
+            logger.debug("fmp cash-flow (Q)/%s failed: %s", symbol, exc, exc_info=True)
+            return []
+
 
 class FMPCache:
     """Per-run cache for FMP responses. Two-lock pattern like YahooLookupCache."""
@@ -94,6 +124,9 @@ class FMPCache:
         self._estimates_cache: Dict[str, list] = {}
         self._target_cache: Dict[str, dict] = {}
         self._surprises_cache: Dict[str, list] = {}
+        self._income_q_cache: Dict[str, list] = {}
+        self._balance_q_cache: Dict[str, list] = {}
+        self._cashflow_q_cache: Dict[str, list] = {}
 
     @property
     def call_count(self) -> int:
@@ -164,4 +197,46 @@ class FMPCache:
 
         with self._lock:
             self._surprises_cache[key] = result
+            return list(result)
+
+    def get_income_statement_quarterly(self, symbol: str, limit: int = 100) -> list[dict]:
+        sym = symbol.upper()
+        key = f"{sym}:{limit}"
+        with self._lock:
+            cached = self._income_q_cache.get(key)
+            if cached is not None:
+                return list(cached)
+
+        result = self._client.get_income_statement_quarterly(sym, limit)
+
+        with self._lock:
+            self._income_q_cache[key] = result
+            return list(result)
+
+    def get_balance_sheet_quarterly(self, symbol: str, limit: int = 100) -> list[dict]:
+        sym = symbol.upper()
+        key = f"{sym}:{limit}"
+        with self._lock:
+            cached = self._balance_q_cache.get(key)
+            if cached is not None:
+                return list(cached)
+
+        result = self._client.get_balance_sheet_quarterly(sym, limit)
+
+        with self._lock:
+            self._balance_q_cache[key] = result
+            return list(result)
+
+    def get_cash_flow_quarterly(self, symbol: str, limit: int = 100) -> list[dict]:
+        sym = symbol.upper()
+        key = f"{sym}:{limit}"
+        with self._lock:
+            cached = self._cashflow_q_cache.get(key)
+            if cached is not None:
+                return list(cached)
+
+        result = self._client.get_cash_flow_quarterly(sym, limit)
+
+        with self._lock:
+            self._cashflow_q_cache[key] = result
             return list(result)

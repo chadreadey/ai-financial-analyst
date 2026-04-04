@@ -118,6 +118,7 @@ class PatternAgent(BaseAgent):
         "price_history",
         "analyst_estimates",
         "rag_research",
+        "timesfm_price",
     )
 
     system_prompt = """You are a quantitative analyst at Renaissance Technologies, \
