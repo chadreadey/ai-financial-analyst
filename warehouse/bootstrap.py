@@ -14,7 +14,7 @@ import pandas as pd
 
 from config import settings
 from sec.client import SECClient
-from sec.filing_parser import parse_filing_sections
+from sec.filing_parser import parse_filing_sections, parse_tenq_sections
 from sec.xbrl_parser import (
     BALANCE_SHEET_CONCEPTS,
     CASH_FLOW_CONCEPTS,
@@ -77,14 +77,16 @@ def bootstrap_ticker(
     )
     filing_count = len(filings)
 
-    for f in filings:
-        db.upsert_filing(
-            ticker=ticker,
-            accession=f["accessionNumber"],
-            form=f["form"],
-            filing_date=f["filingDate"],
-            primary_doc=f.get("primaryDocument", ""),
-        )
+    db.upsert_filings_bulk([
+        {
+            "ticker": ticker,
+            "accession": f["accessionNumber"],
+            "form": f["form"],
+            "filing_date": f["filingDate"],
+            "primary_doc": f.get("primaryDocument", ""),
+        }
+        for f in filings
+    ])
 
     company_facts = sec_client.get_company_facts(ticker)
     parser = XBRLParser(company_facts)
@@ -92,9 +94,8 @@ def bootstrap_ticker(
 
     sections_extracted = 0
     if settings.enable_filing_text:
-        sections_extracted = _ingest_latest_10k_sections(
-            ticker, filings, sec_client, db,
-        )
+        sections_extracted = _ingest_10k_sections(ticker, sec_client, db)
+        sections_extracted += _ingest_10q_sections(ticker, sec_client, db)
 
     last_accession = filings[0]["accessionNumber"] if filings else None
     db.upsert_company(
@@ -121,8 +122,8 @@ def bootstrap_ticker(
 def _ingest_xbrl_facts(
     ticker: str, parser: XBRLParser, db: WarehouseDB,
 ) -> int:
-    """Extract all tracked XBRL concepts and write to warehouse. Returns row count."""
-    count = 0
+    """Extract all tracked XBRL concepts and bulk-write to warehouse. Returns row count."""
+    rows = []
     for concept in ALL_CONCEPTS:
         df = parser._extract_concept(concept)
         if df.empty:
@@ -134,49 +135,121 @@ def _ingest_xbrl_facts(
                 if isinstance(row["end"], pd.Timestamp)
                 else str(row["end"])
             )
-            db.upsert_xbrl_fact(
-                ticker=ticker,
-                concept=concept,
-                unit=unit,
-                period_end=period_end,
-                value=float(row["val"]),
-                form=row.get("form", ""),
-                fiscal_year=_safe_int(row.get("fiscal_year")),
-                fiscal_period=row.get("fiscal_period"),
-            )
-            count += 1
-    return count
+            rows.append({
+                "ticker": ticker,
+                "concept": concept,
+                "unit": unit,
+                "period_end": period_end,
+                "value": float(row["val"]),
+                "form": row.get("form", ""),
+                "fiscal_year": _safe_int(row.get("fiscal_year")),
+                "fiscal_period": row.get("fiscal_period"),
+            })
+    db.upsert_xbrl_facts_bulk(rows)
+    return len(rows)
 
 
-def _ingest_latest_10k_sections(
+def _ingest_10k_sections(
     ticker: str,
-    filings: list[dict],
     sec_client: SECClient,
     db: WarehouseDB,
 ) -> int:
-    """Fetch + parse the most recent 10-K's narrative sections. Returns section count."""
-    tenk = next((f for f in filings if f["form"] == "10-K"), None)
-    if tenk is None:
+    """
+    Fetch and parse narrative sections from the N most recent 10-Ks.
+
+    Uses a dedicated 10-K-only fetch so the section count isn't limited by
+    the mixed-form filing list (10-K/10-Q/8-K). For the latest filing,
+    edgartools is tried first; older filings use HTML parsing only.
+
+    Returns total section count written.
+    """
+    limit = settings.warehouse_sections_limit
+    tenks = sec_client.get_recent_filings(ticker, form_types=["10-K"], limit=limit)
+    if not tenks:
         return 0
 
-    accession = tenk["accessionNumber"]
-    primary_doc = tenk.get("primaryDocument", "")
-    if not primary_doc:
+    total = 0
+    for i, filing in enumerate(tenks):
+        accession = filing["accessionNumber"]
+        primary_doc = filing.get("primaryDocument", "")
+        if not primary_doc:
+            continue
+
+        try:
+            html = sec_client.get_filing_text(ticker, accession, primary_doc)
+        except Exception:
+            logger.warning(
+                "failed to fetch 10-K text for %s (%s)", ticker, accession, exc_info=True
+            )
+            continue
+
+        # Only use edgartools for the latest filing — it always returns the
+        # most recent 10-K regardless of which accession we're processing.
+        ticker_for_edgar = ticker if i == 0 else ""
+        sections = parse_filing_sections(html, ticker=ticker_for_edgar)
+
+        written = 0
+        for key, text in sections.items():
+            if text:
+                db.upsert_filing_section(ticker, accession, key, text)
+                written += 1
+
+        logger.info(
+            "%s  %s (%s)  %d sections extracted",
+            ticker, accession, filing.get("filingDate", ""), written,
+        )
+        total += written
+
+    return total
+
+
+def _ingest_10q_sections(
+    ticker: str,
+    sec_client: SECClient,
+    db: WarehouseDB,
+) -> int:
+    """
+    Fetch and parse narrative sections from recent 10-Q filings.
+
+    Uses edgartools for the latest 10-Q only; older filings use HTML parsing.
+    Returns total section count written.
+    """
+    limit = settings.warehouse_tenq_limit
+    tenqs = sec_client.get_recent_filings(ticker, form_types=["10-Q"], limit=limit)
+    if not tenqs:
         return 0
 
-    try:
-        html = sec_client.get_filing_text(ticker, accession, primary_doc)
-    except Exception:
-        logger.warning("failed to fetch 10-K text for %s (%s)", ticker, accession, exc_info=True)
-        return 0
+    total = 0
+    for i, filing in enumerate(tenqs):
+        accession = filing["accessionNumber"]
+        primary_doc = filing.get("primaryDocument", "")
+        if not primary_doc:
+            continue
 
-    sections = parse_filing_sections(html, ticker=ticker)
-    written = 0
-    for key, text in sections.items():
-        if text:
-            db.upsert_filing_section(ticker, accession, key, text)
-            written += 1
-    return written
+        try:
+            html = sec_client.get_filing_text(ticker, accession, primary_doc)
+        except Exception:
+            logger.warning(
+                "failed to fetch 10-Q text for %s (%s)", ticker, accession, exc_info=True
+            )
+            continue
+
+        ticker_for_edgar = ticker if i == 0 else ""
+        sections = parse_tenq_sections(html, ticker=ticker_for_edgar)
+
+        written = 0
+        for key, text in sections.items():
+            if text:
+                db.upsert_filing_section(ticker, accession, key, text)
+                written += 1
+
+        logger.info(
+            "%s  10-Q %s (%s)  %d sections extracted",
+            ticker, accession, filing.get("filingDate", ""), written,
+        )
+        total += written
+
+    return total
 
 
 def _safe_int(val) -> Optional[int]:

@@ -15,6 +15,73 @@ from utils import format_money
 logger = logging.getLogger(__name__)
 
 
+# ── IFRS support ──────────────────────────────────────────────────────────────
+# Foreign private issuers (TSM, ASML, NVO, BABA, etc.) file 20-F / 6-K and
+# report under the ifrs-full XBRL namespace.  The map below translates each
+# US-GAAP concept name to its IFRS equivalent(s) so the existing metric
+# pipeline can consume both without duplication.
+
+IFRS_ANNUAL_FORMS = {"20-F", "40-F"}   # 40-F is used by Canadian filers
+IFRS_QUARTERLY_FORMS = {"6-K"}
+
+# US-GAAP concept → list of IFRS concept names to try (in priority order)
+IFRS_CONCEPT_MAP: Dict[str, List[str]] = {
+    "Revenues": ["Revenue"],
+    "RevenueFromContractWithCustomerExcludingAssessedTax": ["Revenue"],
+    "SalesRevenueNet": ["Revenue"],
+    "GrossProfit": ["GrossProfit"],
+    "OperatingIncomeLoss": ["ProfitLossBeforeTax"],   # closest IFRS proxy
+    "NetIncomeLoss": [
+        "ProfitLossAttributableToOwnersOfParent",
+        "ProfitLoss",
+    ],
+    "EarningsPerShareBasic": ["BasicEarningsLossPerShare"],
+    "EarningsPerShareDiluted": [
+        "DilutedEarningsLossPerShare",
+        "BasicEarningsLossPerShare",
+    ],
+    "Assets": ["Assets"],
+    "AssetsCurrent": ["CurrentAssets"],
+    "Liabilities": ["Liabilities"],
+    "LiabilitiesCurrent": ["CurrentLiabilities"],
+    "StockholdersEquity": [
+        "EquityAttributableToOwnersOfParent",
+        "Equity",
+    ],
+    "CashAndCashEquivalentsAtCarryingValue": ["CashAndCashEquivalents"],
+    "LongTermDebt": [
+        "NoncurrentPortionOfNoncurrentBorrowings",
+        "BorrowingsNoncurrent",
+    ],
+    "ShortTermBorrowings": ["CurrentPortionOfNoncurrentBorrowings"],
+    "NetCashProvidedByUsedInOperatingActivities": [
+        "CashFlowsFromUsedInOperatingActivities",
+    ],
+    "NetCashProvidedByUsedInInvestingActivities": [
+        "CashFlowsFromUsedInInvestingActivities",
+    ],
+    "NetCashProvidedByUsedInFinancingActivities": [
+        "CashFlowsFromUsedInFinancingActivities",
+    ],
+    "PaymentsToAcquirePropertyPlantAndEquipment": [
+        "PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities",
+        "AcquisitionsOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities",
+    ],
+    "DepreciationDepletionAndAmortization": [
+        "DepreciationAndAmortisationExpense",
+        "DepreciationAmortisationAndImpairmentLossReversalOfImpairmentLossRecognisedInProfitOrLoss",
+    ],
+    "CommonStockSharesOutstanding": ["NumberOfSharesOutstanding"],
+}
+
+# Common currencies reported by major foreign filers (for display context)
+_CURRENCY_SYMBOLS: Dict[str, str] = {
+    "TWD": "NT$", "EUR": "€", "GBP": "£", "JPY": "¥", "CNY": "¥",
+    "KRW": "₩", "INR": "₹", "CAD": "C$", "AUD": "A$", "CHF": "CHF ",
+    "DKK": "DKK ", "SEK": "SEK ", "HKD": "HK$", "SGD": "S$",
+}
+
+
 # Common US-GAAP concepts we extract
 INCOME_STATEMENT_CONCEPTS = [
     "Revenues",
@@ -71,7 +138,95 @@ class XBRLParser:
         self.raw = company_facts
         self.facts = company_facts.get("facts", {})
         self.us_gaap = self.facts.get("us-gaap", {})
+        self.ifrs = self.facts.get("ifrs-full", {})
         self.entity_name = company_facts.get("entityName", "Unknown")
+
+        # Detect whether this is an IFRS filer (no US-GAAP, has ifrs-full).
+        self.is_ifrs: bool = not self.us_gaap and bool(self.ifrs)
+
+        # Detect the functional reporting currency for IFRS filers.
+        self.reporting_currency: str = self._detect_reporting_currency()
+
+    def _detect_reporting_currency(self) -> str:
+        """Infer the functional reporting currency.
+
+        Works for both IFRS filers (e.g. TSM → TWD, NVO → DKK) and
+        US-GAAP filers that report in a non-USD currency (e.g. ASML → EUR).
+        """
+        source = self.ifrs if self.is_ifrs else self.us_gaap
+        unit_counts: Dict[str, int] = {}
+        for concept_data in list(source.values())[:40]:
+            for unit in concept_data.get("units", {}):
+                # Skip non-monetary units and per-share denominators.
+                if unit in ("pure", "shares") or "/" in unit:
+                    continue
+                unit_counts[unit] = unit_counts.get(unit, 0) + 1
+        if not unit_counts:
+            return "USD"
+        return max(unit_counts, key=unit_counts.get)
+
+    def _extract_ifrs_concept(
+        self,
+        gaap_concept: str,
+        form_filter: Optional[List[str]] = None,
+    ) -> pd.DataFrame:
+        """
+        Translate a US-GAAP concept name to its IFRS equivalent(s) and
+        extract data from the ifrs-full namespace.
+
+        ``form_filter`` is interpreted relative to IFRS filing forms:
+        ``["10-K"]`` → also tries ``20-F``/``40-F``;
+        ``["10-Q"]`` → also tries ``6-K``.
+        """
+        ifrs_names = IFRS_CONCEPT_MAP.get(gaap_concept, [])
+        if not ifrs_names:
+            return pd.DataFrame()
+
+        # Map US form types to IFRS equivalents.
+        effective_forms: set[str] = set()
+        if form_filter:
+            for f in form_filter:
+                if f == "10-K":
+                    effective_forms |= IFRS_ANNUAL_FORMS
+                elif f == "10-Q":
+                    effective_forms |= IFRS_QUARTERLY_FORMS
+                else:
+                    effective_forms.add(f)
+        else:
+            effective_forms = IFRS_ANNUAL_FORMS | IFRS_QUARTERLY_FORMS
+
+        currency = self.reporting_currency
+        for ifrs_name in ifrs_names:
+            concept_data = self.ifrs.get(ifrs_name, {})
+            if not concept_data:
+                continue
+            units = concept_data.get("units", {})
+            # Prefer local currency; fall back to USD if the company reports in USD.
+            records = units.get(currency, []) or units.get("USD", [])
+            if not records:
+                # For per-share data, try currency/shares
+                records = units.get(f"{currency}/shares", []) or units.get("USD/shares", [])
+            if not records:
+                continue
+
+            df = pd.DataFrame(records)
+            if "form" in df.columns and effective_forms:
+                df = df[df["form"].isin(effective_forms)]
+            if df.empty:
+                continue
+
+            # IFRS annual filings don't have a "start" column reliably;
+            # duration filtering is less reliable, so skip it for IFRS.
+            df = df.sort_values("end", ascending=False)
+            if "fy" in df.columns:
+                df = df.rename(columns={"fy": "fiscal_year", "fp": "fiscal_period"})
+            if "end" in df.columns:
+                df["end"] = pd.to_datetime(df["end"])
+
+            cols = [c for c in ["end", "val", "form", "filed", "fiscal_year", "fiscal_period"] if c in df.columns]
+            return df[cols].reset_index(drop=True)
+
+        return pd.DataFrame()
 
     def _extract_concept(
         self,
@@ -88,24 +243,44 @@ class XBRLParser:
 
         concept_data = self.us_gaap.get(concept, {})
         if not concept_data:
+            # Fall back to IFRS for foreign private issuers (20-F filers).
+            if self.is_ifrs:
+                return self._extract_ifrs_concept(concept, form_filter)
             return pd.DataFrame()
 
         units = concept_data.get("units", {})
         records = units.get(unit_filter, [])
+        if not records and self.reporting_currency != unit_filter:
+            # Some companies file US-GAAP but report in a non-USD functional
+            # currency (e.g. ASML reports in EUR).  Fall back to their native
+            # currency so we don't silently drop all their financial data.
+            records = units.get(self.reporting_currency, [])
         if not records:
             # Try "shares" for per-share or share count concepts
             records = units.get("shares", [])
         if not records:
-            # Try USD/shares for EPS
-            records = units.get("USD/shares", [])
+            # Try per-share denominated in the reporting currency or USD
+            records = (
+                units.get(f"{self.reporting_currency}/shares", [])
+                or units.get("USD/shares", [])
+            )
         if not records:
             return pd.DataFrame()
 
         df = pd.DataFrame(records)
 
+        # For non-USD US-GAAP filers (e.g. ASML/EUR, BABA/CNY) that file
+        # 20-F instead of 10-K, expand the form filter to include 20-F/40-F.
+        effective_filter = list(form_filter)
+        if self.reporting_currency != "USD" and not self.is_ifrs:
+            if "10-K" in effective_filter:
+                effective_filter += [f for f in ("20-F", "40-F") if f not in effective_filter]
+            if "10-Q" in effective_filter:
+                effective_filter += [f for f in ("6-K",) if f not in effective_filter]
+
         # Filter to annual/quarterly filings
         if "form" in df.columns:
-            df = df[df["form"].isin(form_filter)]
+            df = df[df["form"].isin(effective_filter)]
 
         # Keep only point-in-time or full-period entries
         # (filter out quarterly fragments for income/cash flow items)
@@ -113,12 +288,13 @@ class XBRLParser:
             df["duration_days"] = (
                 pd.to_datetime(df["end"]) - pd.to_datetime(df["start"])
             ).dt.days
-            # For 10-K, keep ~365 day periods; for 10-Q keep ~90 day periods
+            annual_forms = {"10-K"} | IFRS_ANNUAL_FORMS
+            quarterly_forms = {"10-Q"} | IFRS_QUARTERLY_FORMS
             df_annual = df[
-                (df["form"] == "10-K") & (df["duration_days"] > 300)
+                df["form"].isin(annual_forms) & (df["duration_days"] > 300)
             ]
             df_quarterly = df[
-                (df["form"] == "10-Q") & (df["duration_days"] < 120)
+                df["form"].isin(quarterly_forms) & (df["duration_days"] < 120)
             ]
             df = pd.concat([df_annual, df_quarterly])
 
@@ -179,17 +355,29 @@ class XBRLParser:
         return df.head(years)
 
     def _resolve_revenue_df(self, form_filter: Optional[List[str]] = None) -> pd.DataFrame:
+        """Return the revenue concept DataFrame with the most recent data.
+
+        Many companies switched from ``Revenues`` to
+        ``RevenueFromContractWithCustomerExcludingAssessedTax`` when they
+        adopted ASC 606 (~2018-2019).  Taking the first non-empty concept
+        would return stale pre-switch data for those companies (e.g. MSFT
+        shows 2010 revenue, META shows 2017 revenue).  Instead, we pick
+        whichever concept has the most recent ``end`` date.
+        """
         if form_filter is None:
             form_filter = ["10-K"]
+        best_df: pd.DataFrame = pd.DataFrame()
         for concept in [
             "Revenues",
             "RevenueFromContractWithCustomerExcludingAssessedTax",
             "SalesRevenueNet",
         ]:
             df = self._extract_concept(concept, form_filter=form_filter)
-            if not df.empty:
-                return df
-        return pd.DataFrame()
+            if df.empty:
+                continue
+            if best_df.empty or df.iloc[0]["end"] > best_df.iloc[0]["end"]:
+                best_df = df
+        return best_df
 
     def compute_metrics(self) -> Dict[str, Any]:
         """
@@ -198,12 +386,10 @@ class XBRLParser:
         """
         metrics: Dict[str, Any] = {}
 
-        # Revenue
-        revenue = (
-            self._latest_annual_value("Revenues")
-            or self._latest_annual_value("RevenueFromContractWithCustomerExcludingAssessedTax")
-            or self._latest_annual_value("SalesRevenueNet")
-        )
+        # Revenue — use _resolve_revenue_df so we always pick the concept
+        # with the most recent data (companies switch concepts on ASC 606 adoption).
+        _rev_df = self._resolve_revenue_df(form_filter=["10-K"])
+        revenue = float(_rev_df.iloc[0]["val"]) if not _rev_df.empty else None
         metrics["revenue"] = revenue
 
         # Net income
@@ -452,7 +638,11 @@ class XBRLParser:
         """
         if metrics is None:
             metrics = self.compute_metrics()
-        lines = [f"=== Financial Summary: {self.entity_name} ===\n"]
+        currency_note = ""
+        if self.reporting_currency != "USD":
+            sym = _CURRENCY_SYMBOLS.get(self.reporting_currency, self.reporting_currency + " ")
+            currency_note = f" (values in {self.reporting_currency}, {sym})"
+        lines = [f"=== Financial Summary: {self.entity_name}{currency_note} ===\n"]
 
         def fmt(val: Any, is_dollars: bool = True, is_pct: bool = False) -> str:
             if val is None:

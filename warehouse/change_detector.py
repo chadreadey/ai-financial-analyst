@@ -12,7 +12,7 @@ from typing import Optional
 
 from config import settings
 from sec.client import SECClient
-from warehouse.bootstrap import _ingest_latest_10k_sections, _ingest_xbrl_facts
+from warehouse.bootstrap import _ingest_10k_sections, _ingest_10q_sections, _ingest_xbrl_facts
 from warehouse.db import WarehouseDB
 
 logger = logging.getLogger(__name__)
@@ -140,7 +140,11 @@ def incremental_update(
     if settings.enable_filing_text:
         new_10k = [f for f in new_filings if f["form"] == "10-K"]
         if new_10k:
-            _ingest_latest_10k_sections(ticker, new_10k, sec_client, db)
+            _ingest_10k_sections(ticker, sec_client, db)
+
+        new_10q = [f for f in new_filings if f["form"] == "10-Q"]
+        if new_10q:
+            _ingest_10q_sections(ticker, sec_client, db)
 
     latest_accession = filings[0]["accessionNumber"] if filings else None
     if latest_accession:

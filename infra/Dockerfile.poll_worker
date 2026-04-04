@@ -1,0 +1,23 @@
+FROM python:3.11-slim
+
+# ── system deps ───────────────────────────────────────────────────────────────
+# libpq-dev is needed to compile psycopg2-binary on slim
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# ── install infra-specific deps first (better layer caching) ─────────────────
+COPY infra/requirements.txt /app/infra/requirements.txt
+RUN pip install --no-cache-dir -r infra/requirements.txt
+
+# ── install main project deps ─────────────────────────────────────────────────
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# ── copy source ───────────────────────────────────────────────────────────────
+COPY . /app
+
+# ── run ───────────────────────────────────────────────────────────────────────
+CMD ["python", "-m", "infra.worker.poll_worker"]

@@ -1,12 +1,11 @@
 """
-RAG (Retrieval Augmented Generation) enrichment stub.
+RAG (Retrieval Augmented Generation) enrichment via Pinecone.
 
-This module provides the code interface for querying a Qdrant vector DB
-populated with financial research content (analyst newsletters, SEC full-text
-search, news articles). The actual data pipeline (n8n + embedding + ingestion)
-is a separate infrastructure concern.
+Queries a Pinecone index populated by warehouse/embedder.py with SEC filing
+sections (10-K MD&A, Risk Factors, Business Description).  Each vector ID is
+deterministic: {TICKER}_{accession_no_hyphens}_{section_key}.
 
-When ENABLE_RAG is false (default) or Qdrant is unreachable, all functions
+When ENABLE_RAG is false (default) or Pinecone is unreachable, all functions
 return empty results gracefully.
 """
 
@@ -18,19 +17,40 @@ from context_budget import trim_text
 
 logger = logging.getLogger(__name__)
 
+_pinecone_index = None
+_pinecone_lock = None
 
-def _get_qdrant_client():
-    """Return a Qdrant client instance or None if unavailable."""
-    try:
-        from qdrant_client import QdrantClient
 
-        return QdrantClient(
-            host=settings.qdrant_host,
-            port=settings.qdrant_port,
-            timeout=5,
-        )
-    except (ImportError, ConnectionError, OSError):
-        return None
+def _get_lock():
+    global _pinecone_lock
+    if _pinecone_lock is None:
+        import threading
+        _pinecone_lock = threading.Lock()
+    return _pinecone_lock
+
+
+def _get_pinecone_index():
+    """Return a cached Pinecone Index instance or None if unavailable."""
+    global _pinecone_index
+    if _pinecone_index is not None:
+        return _pinecone_index
+
+    with _get_lock():
+        if _pinecone_index is not None:
+            return _pinecone_index
+        try:
+            from pinecone import Pinecone
+
+            api_key = settings.pinecone_api_key.strip()
+            if not api_key:
+                return None
+
+            pc = Pinecone(api_key=api_key)
+            _pinecone_index = pc.Index(settings.pinecone_index_name)
+            return _pinecone_index
+        except Exception:
+            logger.debug("Pinecone init failed", exc_info=True)
+            return None
 
 
 def query_rag(
@@ -39,10 +59,10 @@ def query_rag(
     top_k: int = 0,
 ) -> List[Dict]:
     """
-    Query the vector DB for relevant research chunks.
+    Query Pinecone for relevant SEC filing chunks for a given ticker.
 
-    Returns a list of dicts with keys: text, score, source, date.
-    Returns empty list if RAG is disabled or Qdrant is unreachable.
+    Returns a list of dicts with keys: text, score, source, date, section_key.
+    Returns empty list if RAG is disabled or Pinecone is unreachable.
     """
     if not settings.enable_rag:
         return []
@@ -50,44 +70,34 @@ def query_rag(
     if top_k <= 0:
         top_k = settings.rag_top_k
 
-    collection = settings.qdrant_collection
-    embed_key = (settings.openai_embed_key or settings.openai_api_key).strip()
-
-    if not embed_key:
-        return []
-
-    client = _get_qdrant_client()
-    if client is None:
+    index = _get_pinecone_index()
+    if index is None:
         return []
 
     try:
-        import openai
-        embed_client = openai.OpenAI(api_key=embed_key)
-        response = embed_client.embeddings.create(
-            model="text-embedding-3-small",
-            input=query or f"{ticker} financial analysis outlook",
+        q = query or (
+            f"{ticker} financial analysis revenue earnings outlook risks business"
         )
-        query_vector = response.data[0].embedding
-
-        results = client.search(
-            collection_name=collection,
-            query_vector=query_vector,
-            limit=top_k,
-            query_filter={
-                "must": [
-                    {"key": "ticker", "match": {"value": ticker.upper()}}
-                ]
+        namespace = settings.pinecone_namespace or "__default__"
+        results = index.search(
+            namespace=namespace,
+            query={
+                "inputs": {"text": q},
+                "top_k": top_k,
+                "filter": {"ticker": {"$eq": ticker.upper()}},
             },
+            fields=["text", "ticker", "accession", "section_key", "form_type", "filing_date"],
         )
 
         chunks = []
-        for hit in results:
-            payload = hit.payload or {}
+        for hit in results.result.hits:
+            fields = hit.fields or {}
             chunks.append({
-                "text": payload.get("text", ""),
-                "score": float(hit.score),
-                "source": payload.get("source", "unknown"),
-                "date": payload.get("date", ""),
+                "text": fields.get("text", ""),
+                "score": float(hit._score),
+                "source": f"{fields.get('form_type', '10-K')} {fields.get('section_key', '')}",
+                "date": fields.get("filing_date", ""),
+                "section_key": fields.get("section_key", ""),
             })
         return chunks
 
@@ -102,13 +112,13 @@ def format_rag_section(chunks: List[Dict]) -> str:
         return ""
 
     max_chars = settings.rag_max_chars
-    lines = ["=== Research Intelligence (RAG) ==="]
+    lines = ["=== SEC Filing Intelligence (RAG) ==="]
 
     for i, chunk in enumerate(chunks, 1):
         text = chunk.get("text", "").strip()
         if not text:
             continue
-        source = chunk.get("source", "unknown")
+        source = chunk.get("source", "SEC Filing")
         date = chunk.get("date", "")
         score = chunk.get("score", 0)
         header = f"{i}. [{source}]"
@@ -116,7 +126,7 @@ def format_rag_section(chunks: List[Dict]) -> str:
             header += f" ({date})"
         header += f" relevance: {score:.2f}"
         lines.append(header)
-        lines.append(f"   {text}")
+        lines.append(f"   {text[:400]}")
 
     section = "\n".join(lines)
     return trim_text(section, max_chars)
@@ -132,3 +142,174 @@ def fetch_rag_section(ticker: str) -> str:
 
     chunks = query_rag(ticker)
     return format_rag_section(chunks)
+
+
+# ── time-series RAG ────────────────────────────────────────────────────────
+
+def query_financial_history(
+    ticker: str,
+    query: str = "",
+    top_k: int = 0,
+) -> List[Dict]:
+    """
+    Query the `financial_ts` namespace for historical quarterly financial snapshots
+    for a specific ticker.
+
+    Always filters by ticker — never returns another company's records.
+    Returns empty list if ENABLE_FINANCIAL_HISTORY_RAG is false or Pinecone is unreachable.
+    """
+    if not settings.enable_financial_history_rag:
+        return []
+
+    if top_k <= 0:
+        top_k = settings.rag_financial_history_top_k
+
+    index = _get_pinecone_index()
+    if index is None:
+        return []
+
+    try:
+        q = query or (
+            f"{ticker} quarterly revenue earnings margins cash flow growth"
+        )
+        namespace = settings.pinecone_financial_ts_namespace
+        results = index.search(
+            namespace=namespace,
+            query={
+                "inputs": {"text": q},
+                "top_k": top_k,
+                "filter": {"ticker": {"$eq": ticker.upper()}},
+            },
+            fields=["text", "ticker", "period", "quarter_label",
+                    "revenue", "net_income", "operating_margin", "free_cash_flow"],
+        )
+
+        chunks = []
+        for hit in results.result.hits:
+            fields = hit.fields or {}
+            chunks.append({
+                "text": fields.get("text", ""),
+                "score": float(hit._score),
+                "source": f"Financial History {fields.get('quarter_label', '')}",
+                "date": fields.get("period", ""),
+                "quarter_label": fields.get("quarter_label", ""),
+            })
+        return chunks
+
+    except Exception:
+        logger.debug("Financial history RAG query failed for %s", ticker, exc_info=True)
+        return []
+
+
+def query_macro_history(
+    query: str = "",
+    top_k: int = 0,
+) -> List[Dict]:
+    """
+    Query the `macro_ts` namespace for quarterly macro snapshots.
+
+    No ticker filter — macro snapshots are global.
+    Returns empty list if ENABLE_MACRO_HISTORY_RAG is false or Pinecone is unreachable.
+    """
+    if not settings.enable_macro_history_rag:
+        return []
+
+    if top_k <= 0:
+        top_k = settings.rag_macro_history_top_k
+
+    index = _get_pinecone_index()
+    if index is None:
+        return []
+
+    try:
+        q = query or (
+            "interest rates inflation GDP growth unemployment credit spreads macro regime"
+        )
+        namespace = settings.pinecone_macro_ts_namespace
+        results = index.search(
+            namespace=namespace,
+            query={
+                "inputs": {"text": q},
+                "top_k": top_k,
+            },
+            fields=["text", "period", "quarter_label", "fed_funds",
+                    "cpi_yoy", "real_gdp_growth", "hy_spread"],
+        )
+
+        chunks = []
+        for hit in results.result.hits:
+            fields = hit.fields or {}
+            chunks.append({
+                "text": fields.get("text", ""),
+                "score": float(hit._score),
+                "source": f"Macro Snapshot {fields.get('quarter_label', '')}",
+                "date": fields.get("period", ""),
+                "quarter_label": fields.get("quarter_label", ""),
+            })
+        return chunks
+
+    except Exception:
+        logger.debug("Macro history RAG query failed", exc_info=True)
+        return []
+
+
+def format_timeseries_rag_section(
+    financial_chunks: List[Dict],
+    macro_chunks: List[Dict],
+) -> str:
+    """
+    Format financial history and macro history chunks into a combined enrichment block.
+    Returns empty string if both lists are empty.
+    """
+    if not financial_chunks and not macro_chunks:
+        return ""
+
+    parts = []
+
+    if financial_chunks:
+        lines = ["=== Historical Financial Data (RAG) ==="]
+        char_budget = settings.rag_financial_history_max_chars
+        used = 0
+        for chunk in financial_chunks:
+            text = chunk.get("text", "").strip()
+            if not text:
+                continue
+            label = chunk.get("quarter_label", chunk.get("source", ""))
+            entry = f"[{label}]\n{text}"
+            if used + len(entry) > char_budget:
+                break
+            lines.append(entry)
+            used += len(entry)
+        parts.append("\n".join(lines))
+
+    if macro_chunks:
+        lines = ["=== Historical Macro Environment (RAG) ==="]
+        char_budget = settings.rag_macro_history_max_chars
+        used = 0
+        for chunk in macro_chunks:
+            text = chunk.get("text", "").strip()
+            if not text:
+                continue
+            label = chunk.get("quarter_label", chunk.get("source", ""))
+            entry = f"[{label}]\n{text}"
+            if used + len(entry) > char_budget:
+                break
+            lines.append(entry)
+            used += len(entry)
+        parts.append("\n".join(lines))
+
+    return "\n\n".join(parts)
+
+
+def fetch_timeseries_rag_section(ticker: str) -> str:
+    """
+    Convenience wrapper: query both financial and macro history RAG and
+    return a combined formatted string.
+    Returns empty string if both features are disabled or no results found.
+    """
+    if not settings.enable_financial_history_rag and not settings.enable_macro_history_rag:
+        return ""
+
+    financial_chunks = query_financial_history(ticker)
+    macro_chunks = query_macro_history()
+    return format_timeseries_rag_section(financial_chunks, macro_chunks)

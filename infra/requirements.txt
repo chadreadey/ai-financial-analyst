@@ -1,0 +1,3 @@
+upstash-redis
+psycopg2-binary
+python-dotenv

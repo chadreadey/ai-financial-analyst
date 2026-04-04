@@ -1,0 +1,90 @@
+-- =============================================================================
+-- Upstash Redis queue key reference for the filing update pipeline
+--
+-- Upstash Redis is HTTP-based and schema-less, so this file documents the
+-- key naming conventions, data types, and TTL policies used by queue_client.py
+-- and the poll/update workers.
+--
+-- All keys are managed via the upstash-redis Python SDK (HTTP REST API).
+-- No Redis server or persistent connection is required — safe for Fly.io
+-- and other serverless / ephemeral environments.
+-- =============================================================================
+
+-- ── Job queue ─────────────────────────────────────────────────────────────────
+-- Type    : Redis List
+-- Enqueue : LPUSH  queue:filing_updates  <json_payload>
+-- Consume : BRPOP  queue:filing_updates  <timeout_seconds>
+-- Depth   : LLEN   queue:filing_updates
+--
+-- Payload schema (JSON):
+-- {
+--   "ticker":       "AAPL",
+--   "accession":    "0000320193-25-000079",
+--   "form":         "10-K",
+--   "filing_date":  "2025-11-01",
+--   "enqueued_at":  1748000000.0          -- unix timestamp (float)
+-- }
+--
+-- Key: queue:filing_updates
+
+
+-- ── Deduplication set ─────────────────────────────────────────────────────────
+-- Type    : Redis Set
+-- Add     : SADD   processing:accessions  <accession_string>
+-- Remove  : SREM   processing:accessions  <accession_string>
+-- Check   : SISMEMBER processing:accessions <accession_string>
+--
+-- Members are accession strings currently being processed by an update worker.
+-- Each member is given a per-key TTL by re-setting via EXPIRE after SADD
+-- (Upstash does not support per-member TTLs in sets; the set-level TTL is
+-- reset on each new addition via mark_processing()).
+--
+-- TTL policy: 1 hour (3600 s). If a worker crashes, stale members expire
+-- automatically and the accession becomes re-processable.
+--
+-- Key: processing:accessions
+
+
+-- ── Dead letter queue ─────────────────────────────────────────────────────────
+-- Type    : Redis List
+-- Write   : LPUSH  queue:filing_updates:dead  <json_payload>
+-- Read    : LRANGE queue:filing_updates:dead  0 -1   (manual inspection)
+--
+-- Payload schema (JSON) — original job payload plus error metadata:
+-- {
+--   "ticker":       "AAPL",
+--   "accession":    "0000320193-25-000079",
+--   "form":         "10-K",
+--   "filing_date":  "2025-11-01",
+--   "enqueued_at":  1748000000.0,
+--   "error":        "ConnectionError: ...",
+--   "failed_at":    1748000300.0
+-- }
+--
+-- Key: queue:filing_updates:dead
+
+
+-- ── Per-ticker metadata cache ──────────────────────────────────────────────────
+-- Type    : Redis String (GET / SET)
+-- Purpose : Avoids one DB round-trip per ticker during the poll sweep loop.
+--           Written by the poll worker after each successful check; read at
+--           the top of the sweep to skip unchanged tickers quickly.
+--
+-- ticker:{TICKER}:cik
+--   Value   : padded CIK string (10 digits, e.g. "0000320193")
+--   TTL     : none (static, changes only if CIK mapping changes — rare)
+--
+-- ticker:{TICKER}:last_accession
+--   Value   : most recent accession string seen by the poll worker
+--             (e.g. "0000320193-25-000079")
+--   TTL     : none (overwritten on each detected change)
+--
+-- ticker:{TICKER}:last_checked
+--   Value   : unix timestamp (string) of the last poll for this ticker
+--             (e.g. "1748000000")
+--   TTL     : none (overwritten each sweep)
+--
+-- Keys     :
+--   ticker:{TICKER}:cik
+--   ticker:{TICKER}:last_accession
+--   ticker:{TICKER}:last_checked

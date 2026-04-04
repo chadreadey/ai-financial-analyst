@@ -1,0 +1,40 @@
+# Fly.io app config for the SEC EDGAR poll worker.
+# Deploy: fly deploy --config infra/fly.poll_worker.toml
+
+app = "ai-fin-analyst-poll-worker"
+primary_region = "iad"
+
+[build]
+  dockerfile = "infra/Dockerfile.poll_worker"
+
+[processes]
+  worker = "python -m infra.worker.poll_worker"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[env]
+  # Non-secret configuration. Set actual secrets via `fly secrets set`.
+  POLL_INTERVAL = "300"
+  SEC_USER_AGENT = "AIFinancialAnalyst admin@example.com"
+  # WAREHOUSE_DB_PATH is only used when DATABASE_URL is not set (local dev).
+  # In production DATABASE_URL points to Supabase.
+
+# ── secrets (set via `fly secrets set KEY=value`) ─────────────────────────────
+# DATABASE_URL              — Supabase PostgreSQL connection string
+# UPSTASH_REDIS_REST_URL    — Upstash REST endpoint
+# UPSTASH_REDIS_REST_TOKEN  — Upstash REST token
+
+[deploy]
+  strategy = "immediate"
+
+[[mounts]]
+  # Uncomment if you need a persistent volume for the SQLite fallback DB.
+  # source = "warehouse_data"
+  # destination = "/app/data"
+
+[checks]
+  # No HTTP health check for a pure background worker.
+  # Fly monitors the process exit code instead.

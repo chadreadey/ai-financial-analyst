@@ -16,7 +16,6 @@ import time
 from sec.client import SECClient
 from warehouse.db import WarehouseDB
 from warehouse.bootstrap import bootstrap_ticker
-from warehouse.change_detector import incremental_update
 
 logger = logging.getLogger(__name__)
 
@@ -41,19 +40,23 @@ def cmd_bootstrap(args: argparse.Namespace) -> None:
 
 
 def cmd_refresh(args: argparse.Namespace) -> None:
+    from warehouse.scheduler import run_refresh_cycle
+
     db = WarehouseDB()
     sec = SECClient()
-    tickers = [t.upper() for t in args.tickers] if args.tickers else db.list_tracked_tickers()
-    if not tickers:
-        print("No tracked tickers to refresh.")
-        return
-    for ticker in tickers:
-        print(f"Refreshing {ticker} ...")
-        try:
-            result = incremental_update(ticker, db, sec)
+    tickers = [t.upper() for t in args.tickers] if args.tickers else None
+    results = run_refresh_cycle(
+        tickers=tickers,
+        db=db,
+        sec_client=sec,
+        dry_run=args.dry_run,
+        seed_pinecone=not args.no_seed,
+    )
+    for ticker, result in results.items():
+        if args.dry_run:
+            print(f"  {ticker}: needs_update={result.had_changes}")
+        else:
             print(f"  {ticker}: {result}")
-        except Exception as exc:
-            print(f"  {ticker}: ERROR – {exc}", file=sys.stderr)
 
 
 def cmd_status(args: argparse.Namespace) -> None:
@@ -119,6 +122,16 @@ def main(argv: list[str] | None = None) -> None:
 
     p_refresh = sub.add_parser("refresh", help="Incremental update for tickers (all if none given)")
     p_refresh.add_argument("tickers", nargs="*", metavar="TICKER")
+    p_refresh.add_argument(
+        "--no-seed",
+        action="store_true",
+        help="Skip Pinecone re-seed after warehouse update (DB update only)",
+    )
+    p_refresh.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Check staleness only, no writes",
+    )
     p_refresh.set_defaults(func=cmd_refresh)
 
     p_status = sub.add_parser("status", help="Show tracked tickers and stats")

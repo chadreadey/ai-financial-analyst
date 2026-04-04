@@ -1,0 +1,40 @@
+# Fly.io app config for the filing update worker.
+# Deploy: fly deploy --config infra/fly.update_worker.toml
+
+app = "ai-fin-analyst-update-worker"
+primary_region = "iad"
+
+[build]
+  dockerfile = "infra/Dockerfile.update_worker"
+
+[processes]
+  worker = "python -m infra.worker.update_worker"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1
+
+[env]
+  # Non-secret configuration. Set actual secrets via `fly secrets set`.
+  SEC_USER_AGENT = "AIFinancialAnalyst admin@example.com"
+  PINECONE_INDEX_NAME = "financial-analyst"
+  PINECONE_NAMESPACE = ""
+  # WAREHOUSE_DB_PATH is only used when DATABASE_URL is not set (local dev).
+
+# ── secrets (set via `fly secrets set KEY=value`) ─────────────────────────────
+# DATABASE_URL              — Supabase PostgreSQL connection string
+# UPSTASH_REDIS_REST_URL    — Upstash REST endpoint
+# UPSTASH_REDIS_REST_TOKEN  — Upstash REST token
+# PINECONE_API_KEY          — Pinecone API key
+
+[deploy]
+  strategy = "immediate"
+
+[[mounts]]
+  # Uncomment if you need a persistent volume for the SQLite fallback DB.
+  # source = "warehouse_data"
+  # destination = "/app/data"
+
+[checks]
+  # No HTTP health check for a pure background worker.

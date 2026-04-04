@@ -14,11 +14,37 @@ from warehouse.db import WarehouseDB
 logger = logging.getLogger(__name__)
 
 
+def _seed_ticker(ticker: str, db: WarehouseDB) -> None:
+    """Re-seed Pinecone for a single ticker after a warehouse update."""
+    try:
+        from pinecone import Pinecone
+        from warehouse.embedder import embed_and_upsert_all
+        from config import settings
+
+        api_key = settings.pinecone_api_key.strip()
+        if not api_key:
+            return
+
+        pc = Pinecone(api_key=api_key)
+        index = pc.Index(settings.pinecone_index_name)
+        summary = embed_and_upsert_all(
+            db_path=db._db_path,
+            index=index,
+            namespace=settings.pinecone_namespace or "__default__",
+            tickers=[ticker],
+        )
+        seeded = sum(summary.values())
+        logger.info("Pinecone re-seed %s: %d records", ticker, seeded)
+    except Exception:
+        logger.warning("Pinecone re-seed failed for %s", ticker, exc_info=True)
+
+
 def run_refresh_cycle(
     tickers: list[str] | None,
     db: WarehouseDB,
     sec_client: SECClient,
     dry_run: bool = False,
+    seed_pinecone: bool = True,
 ) -> dict[str, UpdateResult]:
     """
     Run incremental_update for each ticker in sequence.
@@ -28,6 +54,7 @@ def run_refresh_cycle(
         db:         WarehouseDB instance.
         sec_client: SECClient instance (reused across tickers for rate-limit state).
         dry_run:    If True, only check staleness and log—never write.
+        seed_pinecone: If True, re-seed Pinecone after updates that had changes.
 
     Returns:
         Mapping of ticker -> UpdateResult.
@@ -58,6 +85,8 @@ def run_refresh_cycle(
         try:
             result = incremental_update(ticker, db, sec_client)
             results[ticker] = result
+            if result.had_changes and seed_pinecone and not dry_run:
+                _seed_ticker(ticker, db)
         except Exception:
             logger.error(
                 "refresh cycle: error updating %s", ticker, exc_info=True,
