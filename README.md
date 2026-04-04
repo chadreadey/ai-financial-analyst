@@ -1,301 +1,456 @@
 # AI Financial Analyst
 
-An agentic financial analysis system that pulls real SEC filings, market data, and external research, then runs them through six specialist AI analysts — each modeled after a top-tier firm's methodology — and synthesizes their findings into a unified investment brief.
+A production-grade multi-agent equity research platform. Enter a ticker and get a full investment brief produced by six specialist AI analysts running in parallel — each modeled after a top-tier firm's methodology — synthesized into a single verdict with health scores, price target, and conviction rating.
 
-## How It Works
+**Live deployment:**
+- Frontend: Vercel
+- Backend API: Railway
+
+---
+
+## What It Does
 
 1. You input a stock ticker
-2. The system fetches SEC data (10-K, 10-Q, XBRL financials) via EDGAR, extracts 10-K narrative sections (MD&A, Risk Factors, Business Description), and enriches with Yahoo market data (price history, analyst estimates, macro indicators), dynamic peer comparisons, and Tavily external research
+2. The system fetches SEC EDGAR filings (10-K, 10-Q, XBRL financials), enriches with Tiingo price data, FMP estimates, FRED macro indicators, Tavily web research, and Pinecone RAG context
 3. Six analyst agents run in parallel, each examining the data through a different lens
-4. A synthesis agent cross-references all six reports and produces a final investment brief with health scores
+4. A synthesis agent cross-references all six reports, resolves contradictions, and produces a final investment brief with a structured JSON verdict
 
 ```
-User Input (ticker)
+Input: AAPL
        │
        ▼
- SEC Data Layer ─── XBRL financials + 10-K filing text extraction
+ Prepare Data (parallel)
+ ├── SEC EDGAR ──── XBRL financials + 10-K/10-Q text sections
+ ├── Tiingo ──────── price history, live quote, 52W range
+ ├── FMP ─────────── analyst estimates, earnings surprises, key metrics
+ ├── FRED ────────── 10Y/2Y treasury, fed funds, CPI, credit spreads
+ ├── Tavily ──────── company/industry/risk web research
+ ├── Peers ───────── dynamic peer discovery + comparison tables
+ └── Pinecone RAG ── historical 10-K vectors for comparable context
        │
-       ├── Multi-Year Metrics ─── 3Y/5Y CAGRs, margin trends, quarterly data
-       │
-       ├── Enrichment Layer
-       │   ├── Yahoo Finance ─── price history, analyst estimates, market data
-       │   ├── Peer Comparison ─── dynamic industry-matched peers with medians
-       │   ├── Macro Data ─── treasury yields, VIX, sector ETF, S&P 500
-       │   └── Tavily ─── external research (company, industry, risks)
-       │
-       ├── DCF Analyst (Morgan Stanley)
-       ├── Risk Analyst (Bridgewater)
-       ├── Earnings Analyst (JPMorgan)
-       ├── Competitive Analyst (Bain)
-       ├── Pattern Analyst (Renaissance Tech)
-       └── Macro Strategist (Goldman Sachs)
-       │
-       ▼
- Synthesis Agent ─── cross-reference, resolve contradictions
+       ▼ asyncio.gather()
+ ┌──────────────────────────────────────────────────────┐
+ │  DCF Analyst        │  Risk Analyst    │  Earnings   │
+ │  (Morgan Stanley)   │  (Bridgewater)   │  (JPMorgan) │
+ ├──────────────────────────────────────────────────────┤
+ │  Competitive Analyst  │  Pattern Analyst  │  Macro   │
+ │  (Bain & Co.)         │  (Renaissance)    │  (GS)    │
+ └──────────────────────────────────────────────────────┘
        │
        ▼
- Investment Brief ─── verdict, health scores, risks, catalysts
+ Synthesis Agent (CIO) ── resolves contradictions, issues verdict
+       │
+       ▼
+ {verdict, conviction, price_target, health_scores, risks, catalysts}
 ```
+
+---
 
 ## Architecture
 
-Configuration and types are centralized so the app stays predictable across CLI, Streamlit, and tests:
+### Stack
 
-| Layer | Role |
-|-------|------|
-| **`config.py`** | Single **`Settings`** object (Pydantic `BaseSettings`) — all environment variables, feature flags, and context budgets load once from `.env` / the process environment. |
-| **`models.py`** | Pydantic models for **`AnalysisData`**, **`AnalysisResult`**, **`AgentReport`**, **`FilingInfo`** — typed payloads between the orchestrator, agents, and reports. |
-| **`orchestrator.py`** | **`prepare_data`** builds SEC + enrichment; **`run`** loads data with **`asyncio.to_thread`** so blocking I/O does not stall the event loop, runs agents with **`asyncio.gather`**, then synthesis. |
-| **`yahoo_cache.py`** | Per-run, thread-safe cache for Yahoo **`.info`** lookups to avoid duplicate calls across enrichment sections. |
-| **Logging** | Standard **`logging`** (level from **`LOG_LEVEL`**, default `INFO`) — no ad-hoc prints in the pipeline. |
+| Layer | Technology |
+|-------|------------|
+| Frontend | Vite 6, React 19, TypeScript, Tailwind CSS v3 |
+| Charting | TradingView Lightweight Charts v5, Recharts |
+| Component lib | Radix UI primitives, Lucide icons |
+| Backend API | FastAPI + Uvicorn (Python 3.11+) |
+| Analysis engine | asyncio orchestrator, 6 parallel agents |
+| LLM | Anthropic Claude (`claude-sonnet-4-20250514` default), OpenAI-compatible fallback |
+| Market data | Tiingo (price history + quotes), FMP (estimates + metrics), FRED (macro) |
+| SEC data | SEC EDGAR API + edgartools + XBRL parser |
+| RAG | Pinecone (llama-text-embed-v2, index: `financial-analyst`) |
+| Time-series forecasting | Google TimesFM 2.5 (optional, pre-computed nightly) |
+| Cache | SQLite (SEC + warehouse), Redis (TimesFM forecast cache) |
+| Hosting | Railway (backend), Vercel (frontend) |
+| Error monitoring | Sentry (FastAPI integration) |
 
-**Performance (enrichment):** After ticker resolution, market enrichment runs **in parallel** with SEC filings + XBRL fact fetch (overlap). Inside **`build_enrichment_context`**, enabled sections (Yahoo, Tavily, peers, estimates, price history, macro, optional RAG) run on a bounded thread pool; Tavily triple-search, FRED series, and peer validation/metrics are parallelized where safe. Tune concurrency with **`ENRICHMENT_MAX_WORKERS`**, **`FRED_MAX_WORKERS`**, and **`PEER_VALIDATION_MAX_WORKERS`** (see `.env.example`). SEC HTTP stays on a **single thread** so EDGAR rate limits are respected.
-
-## Analyst Agents
-
-| Agent | Style | Focus |
-|---|---|---|
-| DCF Analyst | Morgan Stanley | Intrinsic valuation, FCF projections, WACC, price target |
-| Risk Analyst | Bridgewater | Balance sheet risk, macro sensitivity, tail scenarios |
-| Earnings Analyst | JPMorgan | EPS trajectory, margin analysis, earnings quality |
-| Competitive Analyst | Bain & Company | Moat analysis, Porter's Five Forces, sector dynamics |
-| Pattern Analyst | Renaissance Tech | Quantitative trends, mean reversion, statistical anomalies |
-| Macro Strategist | Goldman Sachs | Macro regime, monetary policy impact, sector positioning |
-
-The synthesis agent acts as a CIO — it reads all reports, flags where analysts agree or contradict each other, and delivers a final rating (Strong Buy → Strong Sell) with a 1-10 health score across each dimension including macro environment.
-
-## Data Pipeline
-
-The system enriches raw SEC filings with multiple data sources before feeding agents:
-
-| Data Source | What It Provides |
-|---|---|
-| SEC EDGAR (XBRL) | 8 years of annual financials, 8 quarters of quarterly data, multi-year CAGRs, margin trends, FCF series |
-| SEC 10-K Filing Text | MD&A narrative, Risk Factors, Business Description (extracted via BeautifulSoup) |
-| Yahoo Finance | Current price, multiples, 2-year price history, 50/200 SMA, volatility, volume trends |
-| Yahoo Analyst Data | Consensus price targets, EPS/revenue estimates, earnings revisions, growth estimates |
-| Dynamic Peer Discovery | Industry-matched peers with market cap proximity scoring, sector medians for key multiples |
-| Macro Indicators | Treasury yields (10Y/5Y/13W), VIX, S&P 500, sector ETF performance |
-| Tavily Search | Company developments, industry landscape, risk/bear case research |
-
-Each agent receives only the enrichment sections relevant to its analysis via targeted routing.
-
-## Project Structure
+### Repository Layout
 
 ```
 ai-financial-analyst/
-├── app.py                 # Streamlit UI
-├── main.py                # CLI entry point
-├── orchestrator.py        # prepare_data + Phase 1 parallel fan-out + Phase 2 synthesis
-├── config.py              # Pydantic Settings (env-driven configuration)
-├── models.py              # AnalysisData, AnalysisResult, AgentReport, FilingInfo
-├── market_enrichment.py   # Yahoo, Tavily, price history, macro, estimates (parallel sections)
-├── peer_enrichment.py     # Dynamic peer discovery + comparison tables
-├── yahoo_cache.py         # Per-run Yahoo .info cache (shared across enrichment)
-├── report.py              # Output formatting (text + PDF)
-├── utils.py               # Shared helpers (format_money, etc.)
-├── context_budget.py      # Deterministic context trimming
-├── prompt_loader.py       # Markdown prompt loader + token rendering
-├── pyproject.toml         # Project metadata, dependencies, pytest config
-├── requirements.txt       # Editable install: -e .[dev]
-├── tests/                 # pytest suite (models, orchestrator, providers, xbrl, enrichment, …)
-├── .streamlit/
-│   ├── config.toml
-│   └── secrets.toml.example
-├── prompts/
-│   ├── dcf.md
-│   ├── risk.md
-│   ├── earnings.md
-│   ├── competitive.md
-│   ├── pattern.md
-│   ├── macro.md
-│   └── synthesis.md
+├── backend/                   # FastAPI app
+│   ├── main.py                # App factory, CORS, Sentry, router mounting
+│   ├── jobs.py                # In-process async job queue + SSE streaming
+│   ├── schemas.py             # Pydantic request/response models
+│   ├── backtest_engine.py     # Walk-forward backtesting engine
+│   ├── history_outcomes.py    # Retroactive outcome scoring
+│   └── routers/
+│       ├── analysis.py        # POST /run, GET /stream/:id, GET /result/:id
+│       ├── market_data.py     # Price history + sparklines (Tiingo)
+│       ├── recommendations.py # Per-ticker recommendation history
+│       ├── watchlist.py       # Watchlist CRUD + summary
+│       ├── portfolio.py       # Holdings with cost basis tracking
+│       ├── news.py            # FMP news feed
+│       ├── industry.py        # Sector performance aggregation
+│       ├── backtest.py        # Backtest job management
+│       ├── paper_trading.py   # Virtual portfolio + equity curve
+│       ├── reports.py         # Report file listing + download
+│       └── config.py          # Feature flag defaults for frontend
+├── frontend/                  # Vite + React SPA
+│   ├── src/
+│   │   ├── App.tsx            # Routes: /analysis /portfolio /stock/:ticker /news /industry /backtest /paper-trading
+│   │   ├── api/
+│   │   │   ├── client.ts      # Typed wrappers for all 25 API endpoints
+│   │   │   └── types.ts       # Shared TypeScript types
+│   │   ├── components/
+│   │   │   ├── analysis/      # TickerInput, ProgressStream, ResultView, AgentTabs, DiagnosticsPanel
+│   │   │   ├── charts/        # PriceChart (LWC v5), SparklineChart (Recharts), EquityCurveChart
+│   │   │   ├── deepdive/      # PriceHistoryTab, HistoricalPerformanceCards, PerformanceMetricsPanel
+│   │   │   ├── watchlist/     # WatchlistCard, StatusDots
+│   │   │   ├── backtest/      # BacktestConfigPanel, BacktestMetricsPanel, TradeLogTable
+│   │   │   ├── paper-trading/ # OpenPositionsTable, ClosedTradesTable, PaperMetricsPanel
+│   │   │   ├── layout/        # TopNav, Sidebar
+│   │   │   └── common/        # Badge, Card, MarkdownRenderer
+│   │   ├── hooks/             # useAnalysis, usePriceHistory, useRecommendationHistory, useWatchlist, useBacktest, usePaperTrading
+│   │   └── pages/             # AnalysisPage, WatchlistPage, StockDeepDivePage, NewsPage, IndustryPage, BacktestPage, PaperTradingPage
+│   └── vercel.json            # SPA rewrites for React Router
+├── agents/                    # Six analyst agents
+│   ├── base.py                # BaseAgent: build_context(), append_enrichment_sections()
+│   ├── dcf.py                 # DCF Analyst (Morgan Stanley style)
+│   ├── risk.py                # Risk Analyst (Bridgewater style)
+│   ├── earnings.py            # Earnings Analyst (JPMorgan style)
+│   ├── competitive.py         # Competitive Analyst (Bain style)
+│   ├── pattern.py             # Pattern Analyst (Renaissance style) + quantstats metrics
+│   ├── macro.py               # Macro Strategist (Goldman Sachs style)
+│   └── sector.py              # Sector specialist briefings
+├── sec/                       # SEC data layer
+│   ├── client.py              # EDGAR API client + rate limiting
+│   ├── xbrl_parser.py         # XBRL → structured financials + CAGRs + metrics
+│   ├── filing_parser.py       # 10-K/10-Q HTML → MD&A, Risk Factors, Business Desc
+│   ├── cache.py               # SQLite caching (WAL mode, thread-safe, two-lock pattern)
+│   └── supabase_history.py    # Optional: sync analysis history to Supabase
+├── warehouse/                 # Persistent filing warehouse
+│   ├── db.py                  # SQLite schema + all read/write operations
+│   ├── bootstrap.py           # Cold-start ingestion for any ticker
+│   ├── change_detector.py     # Incremental update on new SEC filings
+│   ├── scheduler.py           # Batch refresh loop
+│   ├── reader.py              # Translate warehouse rows → AnalysisData
+│   ├── embedder.py            # Pinecone upsert (llama-text-embed-v2)
+│   ├── financial_vectors.py   # Financial time-series RAG vectors
+│   ├── macro_vectors.py       # Macro indicator RAG vectors
+│   ├── xbrl_vectors.py        # XBRL structured data vectors
+│   ├── seed.py                # Pinecone index seeding CLI
+│   └── cli.py                 # `python -m warehouse.cli bootstrap|refresh|status`
+├── quant/                     # Quantitative modules
+│   ├── discount_rate.py       # FRED-based risk-free rate + WACC helpers (QuantLib)
+│   └── timesfm/               # Google TimesFM 2.5 nightly batch + Redis cache
+│       ├── model.py           # Lazy singleton, threading.Lock, optional import
+│       ├── cache.py           # Redis read/write, graceful degradation (never raises)
+│       ├── signals.py         # Extract P10/P50/P90 bands + trend direction
+│       ├── enrichment.py      # Format signals as agent-readable text sections
+│       └── batch.py           # Nightly batch: Tiingo history → TimesFM → Redis
 ├── llm/
-│   ├── __init__.py
-│   └── providers.py       # LLM provider abstraction (Anthropic/OpenAI)
-├── agents/
-│   ├── base.py            # Shared agent interface
-│   ├── dcf.py             # DCF Analyst
-│   ├── risk.py            # Risk Analyst
-│   ├── earnings.py        # Earnings Analyst
-│   ├── competitive.py     # Competitive & Sector Analyst
-│   ├── pattern.py         # Pattern Analyst
-│   └── macro.py           # Macro Strategist
-└── sec/
-    ├── client.py          # SEC EDGAR API client + rate limiting
-    ├── xbrl_parser.py     # XBRL → structured financials + computed metrics
-    ├── filing_parser.py   # 10-K HTML → MD&A, Risk Factors, Business Desc
-    └── cache.py           # SQLite caching layer
+│   └── providers.py           # LLM provider abstraction (Anthropic / OpenAI-compatible)
+├── prompts/                   # Agent system prompts (Markdown, editable without code changes)
+│   ├── dcf.md / risk.md / earnings.md / competitive.md / pattern.md / macro.md
+│   └── synthesis.md           # Synthesis agent + TimesFM validation instructions
+├── scripts/
+│   ├── run_timesfm_batch.py   # APScheduler cron (11 PM nightly) + --run-now flag
+│   ├── bulk_bootstrap.py      # One-time Pinecone bootstrap for large ticker lists
+│   └── seed_timeseries.py     # Seed RAG time-series namespaces
+├── tests/                     # pytest suite
+├── infra/                     # Archived infrastructure (Supabase schema, queue workers)
+├── orchestrator.py            # Core pipeline: prepare_data() + asyncio.gather() + synthesis
+├── market_enrichment.py       # Parallel enrichment: Tiingo, FMP, FRED, Tavily, peers, RAG
+├── peer_enrichment.py         # Dynamic peer discovery + comparison tables
+├── config.py                  # Pydantic BaseSettings — all env vars and feature flags
+├── models.py                  # AnalysisData, AnalysisResult, AgentReport (Pydantic)
+├── context_budget.py          # Deterministic context trimming (trim_text, per-agent caps)
+├── main.py                    # CLI entry point
+├── report.py                  # Text + PDF report generation
+├── tiingo_client.py           # Tiingo REST client (thread-safe cache)
+├── fmp_client.py              # FMP REST client (two-lock cache pattern)
+├── Dockerfile                 # Railway deployment (reads $PORT)
+├── railway.json               # Railway build config (Dockerfile builder, health check)
+└── vercel.json                # Vercel build config (frontend build + SPA rewrites)
 ```
 
-## Setup
+---
 
-### Requirements
+## Local Development
 
-- Python **3.11+** (see `requires-python` in `pyproject.toml`)
-- An [Anthropic API key](https://console.anthropic.com/) or OpenAI-compatible API key
+### Prerequisites
 
-### Install
+- Python 3.11+
+- Node.js 18+
+- (Optional) Redis — only needed if `ENABLE_TIMESFM=true`
+
+### Backend Setup
 
 ```bash
 git clone https://github.com/chadreadey/ai-financial-analyst.git
 cd ai-financial-analyst
+
+# Install Python dependencies
 pip install -r requirements.txt
-# installs the package in editable mode with dev deps (pytest, pytest-asyncio)
-```
+pip install -e .
 
-Alternatively: `pip install -e ".[dev]"` from the repo root.
-
-### Configure provider and API keys
-
-```bash
+# Configure environment
 cp .env.example .env
+# Edit .env and fill in your API keys (see Environment Variables below)
+
+# Start the API server
+uvicorn backend.main:app --reload --port 8000
 ```
 
-Then edit `.env`:
+API runs at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
 
-```env
-LLM_PROVIDER=anthropic
-ANTHROPIC_API_KEY=your-anthropic-key
-OPENAI_API_KEY=your-openai-key
-# Optional override. Default is:
-# OPENAI_BASE_URL=https://cbsai.business.columbia.edu/api/v1
-TAVILY_API_KEY=your-tavily-key
-
-# --- Feature toggles (all default to true) ---
-ENABLE_YAHOO=true
-ENABLE_TAVILY=true
-ENABLE_PRICE_HISTORY=true
-ENABLE_MACRO=true
-ENABLE_ESTIMATES=true
-ENABLE_PEERS=true
-ENABLE_FILING_TEXT=true
-ENABLE_MACRO_AGENT=true
-
-# --- Context budgets ---
-TAVILY_MAX_RESULTS=3
-TAVILY_SNIPPET_CHARS=600
-ENRICHMENT_MAX_CHARS=8000
-MAX_MARKET_SECTION_CHARS=1200
-MAX_EXTERNAL_COMPANY_SECTION_CHARS=2500
-MAX_EXTERNAL_INDUSTRY_SECTION_CHARS=2500
-MAX_EXTERNAL_RISKS_SECTION_CHARS=2500
-MAX_PRICE_HISTORY_CHARS=1500
-MAX_MACRO_SECTION_CHARS=1500
-MAX_ESTIMATES_SECTION_CHARS=1200
-MAX_PEER_SECTION_CHARS=2500
-MAX_MDA_CHARS=4000
-MAX_RISK_FACTORS_CHARS=3000
-MAX_BIZ_DESC_CHARS=2000
-MAX_AGENT_CONTEXT_CHARS=12000
-MAX_AGENT_OUTPUT_TOKENS=1200
-SYNTHESIS_REPORT_MAX_CHARS=4500
-SYNTHESIS_INPUT_MAX_CHARS=22000
-MAX_SYNTHESIS_OUTPUT_TOKENS=1500
-# Per-agent overrides (optional):
-# MAX_CONTEXT_DCF_CHARS=12000
-# MAX_CONTEXT_RISK_CHARS=12000
-# MAX_CONTEXT_EARNINGS_CHARS=12000
-# MAX_CONTEXT_COMPETITIVE_CHARS=12000
-# MAX_CONTEXT_PATTERN_CHARS=12000
-# MAX_CONTEXT_MACRO_CHARS=12000
-```
-
-No SEC configuration needed. The SEC EDGAR API is free and requires no key.
-
-**Secrets:** Keep real keys in `.env` (gitignored) or Streamlit Cloud **Secrets**. Do not commit `.env` or `.streamlit/secrets.toml`. Use `.env.example` and `.streamlit/secrets.toml.example` as templates only.
-
-### Prompt customization
-
-All agent/synthesis prompts live in `prompts/` as Markdown files. You can edit these directly without changing Python code. Supported placeholder tokens:
-
-- `[COMPANY NAME]`
-- `[STOCK NAME]`
-- `[TICKER]`
-
-## Usage
-
-### Run Streamlit UI
+### Frontend Setup
 
 ```bash
-python -m streamlit run app.py
+cd frontend
+cp .env.example .env.local
+# .env.local already has VITE_API_URL=http://localhost:8000
+
+npm install
+npm run dev
 ```
 
-The UI exposes provider selection, enrichment toggles, budget guardrails, PDF download, and a cached report viewer so you can toggle between historical runs.
-OpenAI mode uses `OPENAI_CBS_API_KEY` as the default deployed key (fallback to `OPENAI_API_KEY` if needed).
-Anthropic mode is BYOK in the UI: users must paste their own Anthropic key per run.
+App runs at `http://localhost:5173`.
 
-### Run tests
+### CLI (direct analysis without the web UI)
 
 ```bash
-pytest
-# or
-python -m pytest tests/
-```
-
-### Deploy on Streamlit Community Cloud
-
-1. Push this repository to GitHub.
-2. In Streamlit Community Cloud, create a new app and set entrypoint to `app.py` (optionally point a **staging branch** at the same repo for previews).
-3. Add secrets in app settings (use `.streamlit/secrets.toml.example` as template — paste values in the Cloud UI, not into a committed file):
-   - `OPENAI_CBS_API_KEY` (default OpenAI key fallback)
-   - `OPENAI_BASE_URL` (if using CBS endpoint)
-   - `OPENAI_API_KEY` (optional fallback)
-   - `TAVILY_API_KEY` (optional)
-4. Deploy and test with both provider modes.
-
-### Analyze a stock
-
-```bash
+# Run analysis for a ticker
 python main.py AAPL
-```
 
-### Disable enrichment (SEC/XBRL only mode)
+# Inspect context sizes without calling any LLM
+python main.py AAPL --inspect-context
 
-```bash
+# Save report to file
+python main.py AAPL --save
+
+# Disable all enrichment (SEC/XBRL only)
 ENABLE_YAHOO=false ENABLE_TAVILY=false python main.py AAPL
 ```
 
-### Inspect context sizes without calling any LLM
+---
 
-```bash
-python main.py AAPL --inspect-context --preview-chars 1200
+## Deployment
+
+### Backend → Railway
+
+1. Create a new Railway project and connect the GitHub repo
+2. Railway auto-detects `railway.json` and builds via `Dockerfile`
+3. Add all environment variables (see table below) in the Railway dashboard
+4. Add a **Volume** mounted at `/data` — SQLite files persist here across deploys
+5. Copy your Railway service URL (e.g. `https://your-app.up.railway.app`)
+
+### Frontend → Vercel
+
+1. Create a new Vercel project and import the GitHub repo
+2. Vercel auto-detects `vercel.json` at the repo root — no extra config needed
+3. Add environment variable: `VITE_API_URL=https://your-app.up.railway.app`
+4. Deploy
+
+### Wire CORS
+
+After both are deployed, go back to Railway and add:
+```
+CORS_ORIGINS=https://your-app.vercel.app
 ```
 
-The inspection output includes enrichment section sizes and per-agent context caps/sent size, so you can tune token cost before running any model calls.
+---
 
-Tavily results are used directly (no domain filtering). Inspection output shows how many sources were included per bucket.
+## Environment Variables
 
-### Save the report to a file
+### Required
+
+| Variable | Description |
+|----------|-------------|
+| `ANTHROPIC_API_KEY` | Anthropic API key (required if `LLM_PROVIDER=anthropic`) |
+| `OPENAI_API_KEY` | OpenAI-compatible API key (required if `LLM_PROVIDER=openai`) |
+
+### Data Sources
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TIINGO_API_KEY` | — | Tiingo market data (price history, quotes) |
+| `FMP_API_KEY` | — | Financial Modeling Prep (estimates, earnings, metrics) |
+| `FRED_API_KEY` | — | FRED macro data (optional — raises rate limits) |
+| `TAVILY_API_KEY` | — | Tavily web search enrichment |
+| `PINECONE_API_KEY` | — | Pinecone RAG (required if `ENABLE_RAG=true`) |
+
+### Feature Flags
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ENABLE_TIINGO` | `true` | Tiingo price history and quotes |
+| `ENABLE_FMP` | `true` | FMP estimates, earnings surprises, key metrics |
+| `ENABLE_FRED` | `true` | FRED macro indicators |
+| `ENABLE_TAVILY` | `true` | Tavily web research sections |
+| `ENABLE_YAHOO` | `true` | Yahoo Finance fallback |
+| `ENABLE_PEERS` | `true` | Dynamic peer discovery and comparison |
+| `ENABLE_ESTIMATES` | `true` | Analyst estimate sections |
+| `ENABLE_PRICE_HISTORY` | `true` | Price history enrichment section |
+| `ENABLE_MACRO` | `true` | Macro data section |
+| `ENABLE_MACRO_AGENT` | `true` | Macro Strategist agent |
+| `ENABLE_RAG` | `false` | Pinecone RAG enrichment (requires seeded index) |
+| `ENABLE_WAREHOUSE` | `false` | Persistent filing warehouse (SQLite) |
+| `ENABLE_TIMESFM` | `false` | TimesFM nightly forecast batch + Redis cache |
+| `ENABLE_QUANTSTATS` | `true` | quantstats risk metrics in Pattern agent |
+| `ENABLE_SUPABASE_HISTORY` | `false` | Sync analysis history to Supabase |
+
+### LLM Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LLM_PROVIDER` | `anthropic` | `anthropic` or `openai` |
+| `OPENAI_BASE_URL` | CBS endpoint | Override for any OpenAI-compatible API |
+| `ENABLE_PROMPT_CACHING` | `true` | Anthropic prompt caching (reduces cost ~70%) |
+
+### Infrastructure
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CORS_ORIGINS` | — | Comma-separated extra origins (e.g. your Vercel URL) |
+| `SENTRY_DSN` | — | Sentry error tracking DSN |
+| `SENTRY_ENVIRONMENT` | `production` | Sentry environment tag |
+| `REDIS_URL` | — | Redis URL for TimesFM cache (required if `ENABLE_TIMESFM=true`) |
+| `WAREHOUSE_DB_PATH` | `.warehouse.db` | SQLite warehouse path (set to `/data/warehouse.db` on Railway) |
+
+### Context Budgets (tunable)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MAX_AGENT_CONTEXT_CHARS` | `12000` | Per-agent context cap before LLM call |
+| `MAX_AGENT_OUTPUT_TOKENS` | `1200` | Per-agent max output tokens |
+| `MAX_SYNTHESIS_OUTPUT_TOKENS` | `1500` | Synthesis agent max output tokens |
+| `SYNTHESIS_INPUT_MAX_CHARS` | `22000` | Combined agent reports cap into synthesis |
+| `SYNTHESIS_REPORT_MAX_CHARS` | `4500` | Per-agent report cap inside synthesis input |
+| `ENRICHMENT_MAX_CHARS` | `10000` | Hard cap on total enrichment text |
+
+Per-agent context overrides: `MAX_CONTEXT_DCF_CHARS`, `MAX_CONTEXT_RISK_CHARS`, `MAX_CONTEXT_EARNINGS_CHARS`, `MAX_CONTEXT_COMPETITIVE_CHARS`, `MAX_CONTEXT_PATTERN_CHARS`, `MAX_CONTEXT_MACRO_CHARS` (all default to `MAX_AGENT_CONTEXT_CHARS`).
+
+---
+
+## Agents
+
+| Agent | Style | Focus |
+|-------|-------|-------|
+| **DCF Analyst** | Morgan Stanley | Intrinsic valuation, FCF projections, WACC, price target |
+| **Risk Analyst** | Bridgewater | Balance sheet risk, macro sensitivity, tail scenarios |
+| **Earnings Analyst** | JPMorgan | EPS trajectory, margin analysis, earnings quality, surprises |
+| **Competitive Analyst** | Bain & Co. | Moat analysis, Porter's Five Forces, sector dynamics |
+| **Pattern Analyst** | Renaissance Tech | Quantitative trends, Sharpe/Sortino/VaR, mean reversion |
+| **Macro Strategist** | Goldman Sachs | Macro regime, monetary policy impact, sector rotation |
+
+The synthesis agent acts as CIO — reads all six reports, resolves contradictions, and issues a final verdict (Strong Buy → Strong Sell) with a 1–10 health score across each analytical dimension.
+
+Agent prompts live in `prompts/` as Markdown files. Edit them directly without touching Python code. Placeholder tokens: `[COMPANY NAME]`, `[STOCK NAME]`, `[TICKER]`.
+
+---
+
+## Warehouse + RAG
+
+### Filing Warehouse
+
+The warehouse (`ENABLE_WAREHOUSE=true`) persists SEC filings, XBRL facts, and filing narrative sections in SQLite. Agents read from warehouse first and fall back to live EDGAR fetches on cache miss.
 
 ```bash
-python main.py MSFT --save
+# Bootstrap a ticker
+python -m warehouse.cli bootstrap AAPL MSFT NVDA
+
+# Check warehouse status
+python -m warehouse.cli status
+
+# Run incremental update (detects new filings via SEC submissions endpoint)
+python -m warehouse.cli refresh
 ```
 
-Reports are saved to `reports/{TICKER}_{timestamp}.txt`.
+### Pinecone RAG
 
-### Save to a specific path
+RAG enrichment provides agents with vectorized historical 10-K context. Requires a seeded Pinecone index.
 
 ```bash
-python main.py TSLA --output my_report.txt
+# Seed the index (10 default tickers + any extras)
+python -m warehouse.seed
+
+# Seed specific tickers
+python3.10 -m warehouse.seed --tickers AAPL MSFT NVDA
+
+# Dry run (check what would be seeded)
+python3.10 -m warehouse.seed --dry-run
 ```
 
-### Custom SEC User-Agent
+After seeding, set `ENABLE_RAG=true` in `.env`.
 
-The SEC asks for a descriptive User-Agent header. The default works, but you can provide your own:
+The data flywheel in `orchestrator.py` auto-seeds new tickers in a background thread after each analysis run — first query uses live data, every subsequent query gets RAG enrichment.
+
+### TimesFM (Optional)
+
+Google TimesFM 2.5 runs as a nightly batch that pre-computes price/EPS forecasts and caches them in Redis. Query-time cost is a single Redis lookup (<5ms). Agents receive P10/P50/P90 forecast bands as enrichment sections.
 
 ```bash
-python main.py AAPL --user-agent "YourName your@email.com"
+# Install TimesFM (large dependency, ~800MB)
+pip install timesfm
+
+# Run batch manually to test
+python scripts/run_timesfm_batch.py --run-now
+
+# Start nightly scheduler (11 PM cron)
+python scripts/run_timesfm_batch.py
+
+# Check Redis cache
+redis-cli keys "timesfm:*"
 ```
 
-## Tech Stack
+Enable with `ENABLE_TIMESFM=true` and `REDIS_URL=redis://localhost:6379`.
 
-- **LLM**: Provider-selectable Anthropic Claude or OpenAI-compatible APIs
-- **Config & models**: Pydantic v2 + pydantic-settings for env and typed **`AnalysisData`** / **`AnalysisResult`**
-- **Data**: SEC EDGAR API (XBRL structured financials + 10-K filing text)
-- **Enrichment**: Yahoo Finance (price history, estimates, macro), dynamic peer comparison, Tavily research; parallel section fetch + overlap with SEC I/O where safe
-- **Filing parsing**: BeautifulSoup + lxml for 10-K HTML section extraction
-- **Orchestration**: `asyncio.to_thread(prepare_data)` + `asyncio.gather()` for parallel agents and synthesis
-- **Caching**: SQLite for SEC data (avoids redundant API calls across runs); in-memory Yahoo `.info` cache per enrichment run
-- **Data processing**: pandas + numpy for financial data manipulation
-- **Tests**: pytest + pytest-asyncio (`tests/`)
+---
+
+## API
+
+The FastAPI backend auto-generates interactive API docs at `/docs` (Swagger) and `/redoc`.
+
+### Key Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/analysis/run` | Start an analysis job |
+| `GET` | `/api/analysis/stream/{job_id}` | SSE stream of agent progress |
+| `GET` | `/api/analysis/result/{job_id}` | Completed analysis result |
+| `GET` | `/api/analysis/history` | Past analyses (filterable by ticker) |
+| `GET` | `/api/market/price-history/{ticker}` | OHLCV bars (periods: 1mo/3mo/1yr/3yr/5yr) |
+| `GET` | `/api/market/sparkline/{ticker}` | 60-day close + dates for sparklines |
+| `GET` | `/api/recommendations/history/{ticker}` | Past recommendations for a ticker |
+| `GET` | `/api/watchlist/` | Watchlist entries |
+| `POST` | `/api/watchlist/{ticker}` | Add to watchlist |
+| `GET` | `/api/watchlist/{ticker}/summary` | Latest analysis summary for watchlist card |
+| `POST` | `/api/backtest/run` | Run a walk-forward backtest |
+| `POST` | `/api/backtest/nl` | Natural-language backtest config parsing |
+| `GET` | `/api/paper-trading/positions` | Open paper trading positions |
+| `GET` | `/api/paper-trading/metrics` | Paper trading performance metrics |
+| `GET` | `/api/news/` | FMP news feed (filter by ticker or sector) |
+| `GET` | `/api/health` | Health check |
+
+---
+
+## Tests
+
+```bash
+# Run full test suite
+pytest
+
+# Run specific test files
+pytest tests/test_timesfm_cache.py -v
+pytest tests/test_timesfm_signals.py -v
+```
+
+Tests use `fakeredis` and `pytest-mock` — no live API dependencies required.
+
+---
+
+## Tech Stack Summary
+
+- **Python 3.11+** — FastAPI, Pydantic v2, asyncio, SQLite
+- **Node 18+** — Vite 6, React 19, TypeScript, Tailwind CSS v3
+- **LLM** — Anthropic Claude (`claude-sonnet-4-20250514`)
+- **Market data** — Tiingo, FMP, FRED, Yahoo Finance (fallback)
+- **SEC** — EDGAR API, edgartools, custom XBRL parser
+- **RAG** — Pinecone (llama-text-embed-v2)
+- **Time-series** — Google TimesFM 2.5 (optional)
+- **Hosting** — Railway (API) + Vercel (frontend)
+- **Monitoring** — Sentry
