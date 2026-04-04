@@ -14,9 +14,15 @@ __pycache__/
 .sec_cache.db
 .warehouse.db
 reports/
+.seeded_tickers.txt
 
 # Build artifacts
 *.egg-info/
+
+# Frontend
+node_modules/
+frontend/dist/
+frontend/.env.local
 
 # IDE / tooling
 .claude/
