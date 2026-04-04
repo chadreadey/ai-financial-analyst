@@ -12,7 +12,7 @@ interface Trade {
 }
 
 interface Props {
-  trades: Trade[];
+  trades: Trade[] | Record<string, any>[];
 }
 
 const reasonVariant: Record<string, "green" | "red" | "muted" | "amber"> = {

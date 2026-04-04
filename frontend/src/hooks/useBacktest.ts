@@ -9,7 +9,7 @@ export function useBacktest() {
   const [error, setError] = useState<string | null>(null);
   const [parsedConfig, setParsedConfig] = useState<BacktestConfig | null>(null);
   const [history, setHistory] = useState<Array<Record<string, any>>>([]);
-  const intervalRef = useRef<ReturnType<typeof setInterval>>();
+  const intervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   const pollJob = useCallback(async (id: string) => {
     intervalRef.current = setInterval(async () => {

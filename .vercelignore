@@ -1,0 +1,12 @@
+frontend/node_modules
+node_modules
+__pycache__
+*.pyc
+*.pyo
+.env
+*.db
+reports/
+infra/
+.claude/
+.sec_cache.db
+.warehouse.db

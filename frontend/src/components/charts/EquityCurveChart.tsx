@@ -37,7 +37,7 @@ export function EquityCurveChart({ data, height = 300 }: Props) {
         />
         <Tooltip
           contentStyle={{ background: "#111827", border: "1px solid #1e2d40", color: "#f0f4f8", fontSize: 12 }}
-          formatter={(v: number) => [`${v.toFixed(2)}%`, "Return"]}
+          formatter={(v: unknown) => [`${(v as number).toFixed(2)}%`, "Return"]}
         />
         <Area type="monotone" dataKey="pct" stroke={color} fill="url(#eqGrad)" strokeWidth={1.5} />
       </AreaChart>

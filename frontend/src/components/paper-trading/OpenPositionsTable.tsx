@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Badge } from "../common/Badge";
 
 interface Position {
   ticker: string;
