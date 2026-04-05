@@ -333,6 +333,7 @@ class Orchestrator:
                     data.enrichment_warnings = enrichment.get("warnings", [])
                     data.enrichment_sources = enrichment.get("sources", [])
                     data.enrichment_filter_stats = enrichment.get("filter_stats", {})
+                    data._signal_vector = enrichment.get("signal_vector")
 
                     raw_sector = enrichment.get("sector", "")
                     if raw_sector and raw_sector.lower() not in ("n/a", "none"):
@@ -474,6 +475,8 @@ class Orchestrator:
             enrichment_filter_stats=enrichment.get("filter_stats", {}),
             current_price=enrichment.get("current_price"),
         )
+        # Stash signal_vector for stop_loss computation later
+        data._signal_vector = enrichment.get("signal_vector")
 
     def _get_sector_specialist(self, data: AnalysisData) -> Optional[SectorSpecialistAgent]:
         prompt_path = SECTOR_SPECIALIST_MAP.get(data.sector)
@@ -670,6 +673,60 @@ class Orchestrator:
                         abs(llm_entry - data.current_price) / data.current_price * 100,
                     )
                 structured["entry_price"] = data.current_price
+
+            # Override stop_loss: compute from entry_price ± 2×ATR, never trust LLM
+            if data.current_price and data.current_price > 0:
+                entry = data.current_price
+                verdict_upper = (structured.get("verdict") or "").upper()
+                is_short = "SELL" in verdict_upper
+
+                # Try to get ATR from the signal vector computed during enrichment
+                atr_value = None
+                sv = getattr(data, "_signal_vector", None)
+                if sv and isinstance(sv, dict):
+                    atr_meta = (sv.get("signal_vector", {}).get("atr_regime", {})
+                                if "signal_vector" in sv else sv.get("atr_regime", {}))
+                    atr_value = _as_float(atr_meta.get("atr_value")) if atr_meta else None
+
+                if atr_value and atr_value > 0:
+                    # 2× ATR stop
+                    if is_short:
+                        computed_stop = round(entry + 2 * atr_value, 2)
+                    else:
+                        computed_stop = round(entry - 2 * atr_value, 2)
+                else:
+                    # Fallback: 8% adverse move
+                    if is_short:
+                        computed_stop = round(entry * 1.08, 2)
+                    else:
+                        computed_stop = round(entry * 0.92, 2)
+
+                llm_stop = None
+                raw_sl = structured.get("stop_loss")
+                if isinstance(raw_sl, dict):
+                    llm_stop = _as_float(raw_sl.get("value"))
+                elif isinstance(raw_sl, (int, float)):
+                    llm_stop = _as_float(raw_sl)
+
+                if llm_stop:
+                    # Sanity check: stop must be on the correct side of entry
+                    # and within reasonable range (within 25% of entry)
+                    stop_ok = True
+                    if not is_short and (llm_stop >= entry or llm_stop < entry * 0.5):
+                        stop_ok = False
+                    if is_short and (llm_stop <= entry or llm_stop > entry * 2.0):
+                        stop_ok = False
+
+                    if not stop_ok:
+                        logger.warning(
+                            "Overriding LLM stop_loss $%.2f with computed $%.2f for %s "
+                            "(entry=$%.2f, direction=%s)",
+                            llm_stop, computed_stop, data.ticker, entry,
+                            "SHORT" if is_short else "LONG",
+                        )
+                        structured["stop_loss"] = {"value": computed_stop, "unit": "price"}
+                else:
+                    structured["stop_loss"] = {"value": computed_stop, "unit": "price"}
 
             try:
                 if progress_callback:
