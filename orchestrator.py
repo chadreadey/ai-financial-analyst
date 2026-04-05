@@ -472,6 +472,7 @@ class Orchestrator:
             enrichment_warnings=enrichment.get("warnings", []),
             enrichment_sources=enrichment.get("sources", []),
             enrichment_filter_stats=enrichment.get("filter_stats", {}),
+            current_price=enrichment.get("current_price"),
         )
 
     def _get_sector_specialist(self, data: AnalysisData) -> Optional[SectorSpecialistAgent]:
@@ -659,6 +660,17 @@ class Orchestrator:
         structured, synthesis = _extract_structured_block(raw_synthesis)
 
         if structured:
+            # Force entry_price to actual current market price — never trust the LLM for this
+            if data.current_price and data.current_price > 0:
+                llm_entry = _as_float(structured.get("entry_price"))
+                if llm_entry and abs(llm_entry - data.current_price) / data.current_price > 0.05:
+                    logger.warning(
+                        "Overriding LLM entry_price %.2f with market price %.2f for %s (%.1f%% drift)",
+                        llm_entry, data.current_price, data.ticker,
+                        abs(llm_entry - data.current_price) / data.current_price * 100,
+                    )
+                structured["entry_price"] = data.current_price
+
             try:
                 if progress_callback:
                     progress_callback("Saving analysis history and metadata...", 94)

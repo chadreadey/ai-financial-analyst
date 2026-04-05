@@ -38,6 +38,7 @@ class AnalysisData(BaseModel):
     enrichment_warnings: list[str] = Field(default_factory=list)
     enrichment_sources: list[str] = Field(default_factory=list)
     enrichment_filter_stats: dict[str, int] = Field(default_factory=dict)
+    current_price: Optional[float] = None
 
 
 class AgentReport(BaseModel):

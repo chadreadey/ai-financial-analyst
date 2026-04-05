@@ -776,6 +776,7 @@ def _task_market_data(
 ) -> Dict[str, Any]:
     sector = ""
     industry = ""
+    current_price: Optional[float] = None
     entries: list[tuple[str, str]] = []
     sources: list[str] = []
     warnings: list[str] = []
@@ -792,6 +793,12 @@ def _task_market_data(
                 meta = tiingo_cache.get_meta(ticker)
                 sector = meta.get("sector", "") or ""
                 industry = meta.get("industry", "") or ""
+                # Extract current price from Tiingo quote
+                try:
+                    tq = tiingo_cache.get_quote(ticker)
+                    current_price = float(tq.get("last") or tq.get("close") or 0) or None
+                except Exception:
+                    pass
         except Exception as exc:
             logger.warning("tiingo quote failed for %s, falling back to FMP: %s", ticker, exc)
 
@@ -806,6 +813,8 @@ def _task_market_data(
                 fmp_quote = fmp_cache.get_quote(ticker)
                 if not sector:
                     sector = fmp_quote.get("sector", "") or ""
+                if current_price is None:
+                    current_price = float(fmp_quote.get("price") or 0) or None
         except Exception as exc:
             if not tiingo_ok:
                 logger.warning("fmp quote failed for %s, falling back to Yahoo: %s", ticker, exc)
@@ -817,6 +826,12 @@ def _task_market_data(
                 entries.append(("market_data", text))
                 sources.extend(src)
                 logger.info("market_data served by yahoo for %s", ticker)
+                if current_price is None:
+                    try:
+                        info = cache.get_info(ticker)
+                        current_price = float(info.get("currentPrice") or info.get("regularMarketPrice") or 0) or None
+                    except Exception:
+                        pass
         except Exception as exc:
             warnings.append(f"Yahoo enrichment unavailable: {exc}")
 
@@ -838,6 +853,7 @@ def _task_market_data(
         "filter_stats": {},
         "sector": sector,
         "industry": industry,
+        "current_price": current_price,
     }
 
 
@@ -1229,6 +1245,7 @@ def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object
 
         sector = ""
         industry = ""
+        current_price = None
         for name in _ENRICHMENT_TASK_ORDER:
             fut = futures.get(name)
             if fut is None:
@@ -1244,6 +1261,7 @@ def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object
             if name == "market_data":
                 sector = r.get("sector", "") or sector
                 industry = r.get("industry", "") or industry
+                current_price = r.get("current_price")
 
     if fmp_cache:
         logger.info("fmp_calls_this_run=%d", fmp_cache.call_count)
@@ -1263,4 +1281,5 @@ def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object
         "filter_stats": filter_stats,
         "sector": sector,
         "industry": industry,
+        "current_price": current_price,
     }
