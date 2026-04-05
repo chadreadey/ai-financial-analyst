@@ -8,6 +8,7 @@ Formats a structured comparison table with sector medians.
 
 import logging
 import re
+import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from importlib import import_module
 from statistics import median
@@ -19,6 +20,34 @@ from utils import env_flag, format_money
 from yahoo_cache import YahooLookupCache
 
 logger = logging.getLogger(__name__)
+
+# Module-level cache for SEC registered tickers (loaded once, ~13k entries).
+_SEC_TICKERS: Optional[set] = None
+_SEC_TICKERS_LOCK = threading.Lock()
+
+
+def _get_sec_ticker_set() -> set:
+    """Return the set of SEC-registered ticker symbols (uppercased). Empty set on failure."""
+    global _SEC_TICKERS
+    if _SEC_TICKERS is not None:
+        return _SEC_TICKERS
+    with _SEC_TICKERS_LOCK:
+        if _SEC_TICKERS is not None:
+            return _SEC_TICKERS
+        try:
+            import requests
+            resp = requests.get(
+                "https://www.sec.gov/files/company_tickers.json",
+                headers={"User-Agent": "ai-financial-analyst research@example.com"},
+                timeout=10,
+            )
+            data = resp.json()
+            _SEC_TICKERS = {entry["ticker"].upper() for entry in data.values()}
+            logger.debug("Loaded %d SEC tickers for peer validation", len(_SEC_TICKERS))
+        except Exception:
+            logger.warning("Failed to load SEC ticker map; peer SEC validation skipped")
+            _SEC_TICKERS = set()
+    return _SEC_TICKERS
 
 
 PEER_METRICS = [
@@ -53,6 +82,12 @@ def _validate_ticker(
     import yfinance as yf
 
     if sym in TICKER_BLOCKLIST or len(sym) < 2:
+        return None
+
+    # Reject candidates not in the SEC ticker registry (e.g. brand names like "NIKE", "ASICS").
+    sec_tickers = _get_sec_ticker_set()
+    if sec_tickers and sym not in sec_tickers:
+        logger.debug("Peer candidate '%s' rejected: not in SEC ticker map", sym)
         return None
 
     if fmp_cache and env_flag("ENABLE_FMP"):

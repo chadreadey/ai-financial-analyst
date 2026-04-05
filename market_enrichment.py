@@ -448,8 +448,12 @@ def _price_history_section(ticker: str, cache: YahooLookupCache) -> tuple[str, L
     cache.get_info(ticker)
     stock = yf.Ticker(ticker)
 
-    daily = stock.history(period="2y", interval="1d")
-    weekly = stock.history(period="2y", interval="1wk")
+    try:
+        daily = stock.history(period="2y", interval="1d")
+        weekly = stock.history(period="2y", interval="1wk")
+    except Exception:
+        logger.debug("Price history unavailable for %s", ticker, exc_info=True)
+        return "", []
 
     if weekly.empty or len(weekly) < 4:
         return "", []
