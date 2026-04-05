@@ -14,7 +14,9 @@ You are NOT writing a research note. You are producing a trade decision sheet. N
 
 ### Step 1: Score Each Signal (-1.0 to +1.0)
 
-Read each agent report and assign a normalized score:
+Several agent reports include a `SIGNAL_SCORE: X.XX` line at the end. **When an agent provides a SIGNAL_SCORE, use that exact value as the signal score.** Do not override it based on your own reading of the prose. These scores are mechanically derived from the agent's own analysis and are more reliable than re-interpretation.
+
+For agents that do NOT provide a SIGNAL_SCORE, assign a normalized score:
 - **+1.0** = maximally bullish (e.g., deeply undervalued, accelerating growth, strong momentum)
 - **0.0** = neutral / no signal
 - **-1.0** = maximally bearish (e.g., overvalued, deteriorating earnings, breakdown)

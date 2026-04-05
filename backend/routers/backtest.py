@@ -187,3 +187,72 @@ async def get_backtest_history():
         return {"runs": [dict(r) for r in rows]}
     except Exception:
         return {"runs": []}
+
+
+# ── Quant-only backtest endpoints ──────────────────────────────────────
+
+_quant_jobs: dict[str, dict] = {}
+
+
+def _run_quant_backtest(job_id: str, payload: dict):
+    from quant.backtest import BacktestConfig as QBacktestConfig, run_backtest as qbt_run, run_walk_forward as qbt_wf
+
+    _quant_jobs[job_id]["status"] = "running"
+    try:
+        config = QBacktestConfig(
+            tickers=payload["tickers"],
+            start_date=payload.get("start_date", "2020-01-01"),
+            end_date=payload.get("end_date", ""),
+            rebalance_freq=payload.get("rebalance_freq", "monthly"),
+            long_threshold=payload.get("long_threshold", 0.20),
+            short_threshold=payload.get("short_threshold", -0.20),
+            max_long_positions=payload.get("max_positions", 10),
+            max_short_positions=payload.get("max_positions", 10),
+        )
+
+        if payload.get("walk_forward"):
+            config.train_months = payload.get("train_months", 24)
+            config.test_months = payload.get("test_months", 6)
+            result = qbt_wf(config)
+        else:
+            result = qbt_run(config)
+
+        _quant_jobs[job_id] = result.to_dict()
+    except Exception as exc:
+        _quant_jobs[job_id] = {"status": "error", "error": str(exc)}
+
+
+@router.post("/quant/run")
+async def run_quant_backtest(payload: dict):
+    """Launch a quant-only backtest (no LLM). Returns job_id for polling."""
+    tickers = payload.get("tickers", [])
+    if not tickers:
+        raise HTTPException(status_code=400, detail="tickers list required")
+
+    job_id = str(uuid.uuid4())[:8]
+    _quant_jobs[job_id] = {"status": "pending"}
+    t = threading.Thread(target=_run_quant_backtest, args=(job_id, payload), daemon=True)
+    t.start()
+    return {"job_id": job_id}
+
+
+@router.get("/quant/result/{job_id}")
+async def get_quant_backtest_result(job_id: str):
+    """Poll for quant backtest results."""
+    job = _quant_jobs.get(job_id)
+    if not job:
+        return {"status": "not_found"}
+    return job
+
+
+@router.get("/quant/universes")
+async def list_quant_universes():
+    """List available stock universes for quant backtest."""
+    from quant.universe import LIQUID_10, LIQUID_20, LIQUID_50
+    return {
+        "universes": {
+            "liquid_10": {"tickers": LIQUID_10, "count": len(LIQUID_10)},
+            "liquid_20": {"tickers": LIQUID_20, "count": len(LIQUID_20)},
+            "liquid_50": {"tickers": LIQUID_50, "count": len(LIQUID_50)},
+        }
+    }

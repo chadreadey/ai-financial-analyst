@@ -375,7 +375,7 @@ class Orchestrator:
             try:
                 metrics = parser.supplement_with_edgartools(raw["ticker"], metrics)
                 logger.info("Supplemented metrics via edgartools")
-            except (ImportError, AttributeError, ValueError, RuntimeError) as exc:
+            except Exception as exc:
                 logger.warning("edgartools supplement skipped: %s", exc)
 
         emit("Building trend metrics and financial summaries...", 18)
@@ -685,8 +685,47 @@ class Orchestrator:
                     stop_loss_value = _as_float(raw_stop_loss)
                     stop_loss_unit = "price"
 
-                conviction_score = _as_float(structured.get("conviction_score"))
                 weighted_score = _as_float(structured.get("weighted_score"))
+
+                # Deterministic verdict/conviction: derive from weighted_score, don't trust LLM
+                if weighted_score is not None:
+                    conviction_score = round(abs(weighted_score), 4)
+                    llm_conviction = _as_float(structured.get("conviction_score"))
+                    if llm_conviction and abs(llm_conviction - conviction_score) > 0.05:
+                        logger.info(
+                            "Overriding LLM conviction_score %.4f with deterministic %.4f (from weighted_score %.4f)",
+                            llm_conviction, conviction_score, weighted_score,
+                        )
+                    structured["conviction_score"] = conviction_score
+
+                    # Deterministic verdict from weighted_score thresholds
+                    if weighted_score >= 0.60:
+                        det_verdict = "STRONG BUY"
+                    elif weighted_score >= 0.30:
+                        det_verdict = "BUY"
+                    elif weighted_score <= -0.60:
+                        det_verdict = "STRONG SELL"
+                    elif weighted_score <= -0.30:
+                        det_verdict = "SELL"
+                    else:
+                        det_verdict = "HOLD"
+                    llm_verdict = structured.get("verdict", "")
+                    if llm_verdict != det_verdict:
+                        logger.info(
+                            "Overriding LLM verdict '%s' with deterministic '%s' (weighted_score=%.4f)",
+                            llm_verdict, det_verdict, weighted_score,
+                        )
+                    structured["verdict"] = det_verdict
+
+                    # Deterministic conviction label
+                    if conviction_score >= 0.60:
+                        structured["conviction"] = "HIGH"
+                    elif conviction_score >= 0.30:
+                        structured["conviction"] = "MEDIUM"
+                    else:
+                        structured["conviction"] = "LOW"
+                else:
+                    conviction_score = _as_float(structured.get("conviction_score"))
                 bull_prob = _as_float(structured.get("prior_bull_probability"))
                 bear_prob = _as_float(structured.get("prior_bear_probability"))
                 sizing = str(structured.get("sizing_guidance") or "")

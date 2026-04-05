@@ -26,6 +26,9 @@ import numpy as np
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
 
 def run_quant_signals(ticker: str, runs: int) -> dict:
     """Run math-based signal computation N times. Should be perfectly deterministic."""

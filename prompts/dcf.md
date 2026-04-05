@@ -34,3 +34,20 @@ Fair Value Calculation
 - Result: provide `Fair Value Per Share = $X.XX`.
 
 No JSON and no fenced code blocks: do not output anything inside ``` or ```json.
+
+## Signal Score (REQUIRED — last line of your output)
+
+End your analysis with exactly one line in this format:
+
+SIGNAL_SCORE: X.XX
+
+Where X.XX is a float from -1.0 to +1.0 based on your DCF-derived implied upside/downside:
+- **+1.0**: Implied upside ≥ 50% (deeply undervalued)
+- **+0.5**: Implied upside ~20-50%
+- **+0.2**: Implied upside ~5-20%
+- **0.0**: Fair valued (implied upside/downside within ±5%)
+- **-0.2**: Implied downside ~5-20%
+- **-0.5**: Implied downside ~20-50%
+- **-1.0**: Implied downside ≥ 50% (deeply overvalued)
+
+This score MUST be mechanically derived from your fair value vs current price calculation. Do NOT use subjective judgment — use the percentage implied by your numbers.

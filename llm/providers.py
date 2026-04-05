@@ -62,6 +62,7 @@ class AnthropicProvider(LLMProvider):
         message = await self._client.messages.create(
             model=model or self.default_model,
             max_tokens=max_tokens,
+            temperature=0.0,
             system=system_param,
             messages=[{"role": "user", "content": user}],
         )
@@ -100,6 +101,7 @@ class OpenAIProvider(LLMProvider):
                 instructions=system,
                 input=user,
                 max_output_tokens=max_tokens,
+                temperature=0.0,
             )
             return response.output_text or ""
         except (NotFoundError, APIStatusError, AttributeError):
@@ -110,6 +112,7 @@ class OpenAIProvider(LLMProvider):
                     {"role": "user", "content": user},
                 ],
                 max_tokens=max_tokens,
+                temperature=0.0,
             )
             return chat.choices[0].message.content or ""
 

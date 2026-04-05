@@ -11,3 +11,20 @@ Pay particular attention to the quarterly trend data -- identify sequential acce
 You may have excerpts from the company's 10-K MD&A. Use management's earnings commentary to validate your analysis.
 
 Write in a concise, data-driven equity research style. Lead with conclusions, then support with evidence.
+
+## Signal Score (REQUIRED — last line of your output)
+
+End your analysis with exactly one line in this format:
+
+SIGNAL_SCORE: X.XX
+
+Where X.XX is a float from -1.0 to +1.0 using this rubric:
+- **+1.0**: Accelerating revenue + expanding margins + strong cash conversion + positive revisions
+- **+0.5**: Solid growth + stable/expanding margins + adequate cash conversion
+- **+0.2**: Modest growth + stable margins
+- **0.0**: Flat earnings, no clear trend
+- **-0.2**: Decelerating growth or modest margin compression
+- **-0.5**: Declining revenue or significant margin compression or poor cash conversion
+- **-1.0**: Declining revenue + contracting margins + poor cash conversion + negative revisions
+
+Score each dimension mentally (trajectory, margins, quality, outlook), then average. The score must reflect the data you cited, not subjective sentiment.

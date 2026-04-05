@@ -22,34 +22,18 @@ This plan captures all remaining work from the GAN-style evaluation, organized b
 
 ## IN PROGRESS
 
-### P0: Quant-Only Backtest Engine
-**Goal:** Backtest the 6 technical signals on 10 years of price data without any LLM calls.
-**Why:** Cheapest path to a track record. Proves signal quality independently.
+### P0: Quant-Only Backtest Engine (COMPLETED)
+- `quant/backtest.py` — core engine: walk-forward + single-pass backtesting
+- `quant/universe.py` — liquid_10/20/50 stock universes
+- `scripts/run_backtest.py` — CLI with `--walk-forward`, `--universe`, `--rebalance` flags
+- `backend/routers/backtest.py` — `/api/backtest/quant/run` + `/quant/result/{id}` + `/quant/universes`
+- Local CSV price cache (`.price_cache/`) to avoid Tiingo rate limits
+- Features: 10bps costs, 1-day execution delay, ATR-based sizing, stop-loss at 2x ATR
+- Metrics: Sharpe, Sortino, Calmar, max drawdown, win rate by conviction band, SPY alpha
+- Validated: signals compute correctly (composites -0.53 to +0.42), 22 rebalance dates per year
 
-**Design:**
-1. Fetch 10-year daily OHLCV for a universe (S&P 500 or subset)
-2. At each rebalance point (weekly or monthly), compute `SignalVector` for each stock
-3. Rank stocks by composite score, go long top decile, short bottom decile
-4. Track returns with realistic assumptions:
-   - 10bps round-trip transaction costs
-   - 1-day execution delay (no same-day fills)
-   - Position sizing based on ATR regime
-5. Compute: Sharpe, Sortino, max drawdown, Calmar, win rate by conviction band
-6. Compare to SPY buy-and-hold benchmark
-7. Walk-forward: train weights on rolling 2-year window, test on next 6 months
-
-**TimeSeriesFM integration:**
-- Run TimeSeriesFM price forecasts for each stock at each rebalance point
-- Add P50 forecast return as a 7th signal
-- Test whether TimeSeriesFM overlay improves Sharpe over quant-only
-
-**Files to create:**
-- `quant/backtest.py` — core backtesting engine
-- `quant/universe.py` — stock universe management (S&P 500 constituents)
-- `scripts/run_backtest.py` — CLI entry point
-- `scripts/run_timesfm_backtest.py` — backtest with TimeSeriesFM overlay
-
-**Data source:** Tiingo EOD (free tier supports historical data)
+**Still needed for TimeSeriesFM overlay:**
+- `scripts/run_timesfm_backtest.py` — backtest with P50 forecast as 7th signal
 
 ### P1: IC Weight Calibration
 **Goal:** Replace hardcoded IC weights with data-derived weights.

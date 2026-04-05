@@ -76,6 +76,8 @@ orchestrator.py              ← prepare_data() + asyncio.gather() + synthesis
 agents/{dcf,risk,earnings,competitive,pattern,macro}.py
 market_enrichment.py         ← parallel enrichment: Tiingo, FMP, FRED, Tavily, peers, RAG
 warehouse/                   ← SQLite persistent filing warehouse
+quant/backtest.py            ← quant-only backtest engine (no LLM)
+quant/universe.py            ← S&P 500 subset ticker lists (liquid_10/20/50)
 quant/timesfm/               ← TimesFM nightly batch + Redis cache (ENABLE_TIMESFM=false)
 ```
 
@@ -169,7 +171,7 @@ Reproducibility tester: `python scripts/test_reproducibility.py AAPL --runs 5`
 - ~~Signal reproducibility tester~~ — `scripts/test_reproducibility.py`
 
 **Next priority — see `PLAN_NEXT.md` for full roadmap:**
-1. **Quant-only backtest engine** — backtest `quant/signals.py` on 10yr price data, no LLM. Target Sharpe > 0.7.
+1. ~~**Quant-only backtest engine**~~ — DONE. `quant/backtest.py` + `scripts/run_backtest.py`. Run: `python scripts/run_backtest.py --universe liquid_20 --start 2018-01-01 --walk-forward`
 2. **TimeSeriesFM backtest overlay** — add P50 forecast as 7th signal, test additive value.
 3. **IC weight calibration** — replace hardcoded weights with data-derived IC from backtest results.
 4. **API authentication** — add API key middleware before any investor demos.

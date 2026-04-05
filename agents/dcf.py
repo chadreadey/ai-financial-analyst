@@ -108,7 +108,7 @@ Be rigorous but concise. Use actual numbers from the provided financials."""
             parts.append(f"\n{data.quarterly_summary}")
 
         if settings.enable_wacc_helpers:
-            wacc_block = self._build_wacc_context()
+            wacc_block = self._build_wacc_context(data)
             if wacc_block:
                 parts.append(f"\n{wacc_block}")
 
@@ -116,10 +116,11 @@ Be rigorous but concise. Use actual numbers from the provided financials."""
         return "\n".join(parts)
 
     @staticmethod
-    def _build_wacc_context() -> Optional[str]:
-        """Compute and format WACC inputs from FRED yield curve data."""
+    def _build_wacc_context(data: AnalysisData) -> Optional[str]:
+        """Compute and format WACC inputs from FRED yield curve + XBRL balance sheet."""
         try:
             from quant.discount_rate import (
+                estimate_wacc,
                 get_risk_free_rate,
                 get_yield_curve_snapshot,
                 format_wacc_context,
@@ -129,6 +130,30 @@ Be rigorous but concise. Use actual numbers from the provided financials."""
             curve = get_yield_curve_snapshot()
             if risk_free is None and curve is None:
                 return None
-            return format_wacc_context("", risk_free, curve)
+            base_block = format_wacc_context("", risk_free, curve)
+
+            # Try to compute a full WACC from XBRL balance sheet data
+            m = data.metrics or {}
+            debt = m.get("long_term_debt")
+            equity = m.get("stockholders_equity")
+            if risk_free and debt is not None and equity is not None and equity > 0:
+                total_capital = debt + equity
+                debt_ratio = debt / total_capital if total_capital > 0 else 0.3
+                # Use sector-average beta=1.0 as default; agents can adjust
+                wacc_val, components = estimate_wacc(
+                    risk_free_rate=risk_free,
+                    beta=1.0,
+                    debt_ratio=min(debt_ratio, 0.9),
+                )
+                base_block += (
+                    f"\n  Pre-computed WACC Estimate: {wacc_val*100:.2f}%"
+                    f"\n    (debt_ratio={debt_ratio:.2f}, beta=1.0 default, Rf={risk_free*100:.2f}%)"
+                    f"\n    Cost of Equity: {components['cost_of_equity']*100:.2f}%"
+                    f"\n    Cost of Debt (after-tax): {components['cost_of_debt_aftertax']*100:.2f}%"
+                    f"\n  NOTE: Use this WACC as your baseline. Adjust beta only if you have"
+                    f" strong evidence the company's systematic risk differs materially from 1.0."
+                )
+
+            return base_block
         except Exception:
             return None

@@ -1,0 +1,78 @@
+{
+  "ticker": "AAPL",
+  "runs": 3,
+  "quant": {
+    "type": "quant_only",
+    "runs": 3,
+    "composite": {
+      "mean": -0.1153,
+      "std": 0.0,
+      "values": [
+        -0.1153,
+        -0.1153,
+        -0.1153
+      ]
+    },
+    "signals": {
+      "sma_trend": {
+        "mean": 0.5,
+        "std": 0.0,
+        "values": [
+          0.5,
+          0.5,
+          0.5
+        ]
+      },
+      "mean_reversion_z": {
+        "mean": 0.222,
+        "std": 0.0,
+        "values": [
+          0.222,
+          0.222,
+          0.222
+        ]
+      },
+      "bollinger_pctb": {
+        "mean": -0.3,
+        "std": 0.0,
+        "values": [
+          -0.3,
+          -0.3,
+          -0.3
+        ]
+      },
+      "rsi": {
+        "mean": -0.165,
+        "std": 0.0,
+        "values": [
+          -0.165,
+          -0.165,
+          -0.165
+        ]
+      },
+      "obv_trend": {
+        "mean": -1.0,
+        "std": 0.0,
+        "values": [
+          -1.0,
+          -1.0,
+          -1.0
+        ]
+      },
+      "atr_regime": {
+        "mean": 0.0,
+        "std": 0.0,
+        "values": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    },
+    "directions": {
+      "HOLD": 3
+    },
+    "deterministic": true
+  },
+  "llm": null
+}

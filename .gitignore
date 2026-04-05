@@ -27,3 +27,4 @@ frontend/.env.local
 # IDE / tooling
 .claude/
 .vercel
+.price_cache/
