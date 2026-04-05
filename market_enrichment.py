@@ -28,6 +28,7 @@ _ENRICHMENT_TASK_ORDER = (
     "peers",
     "estimates",
     "price",
+    "computed_signals",
     "macro",
     "rag",
     "fmp_extra",
@@ -1001,6 +1002,31 @@ def _task_price(
     }
 
 
+def _task_computed_signals(ticker: str, tiingo_cache=None) -> Dict[str, Any]:
+    """Compute mathematical technical signals (deterministic, no LLM)."""
+    try:
+        from quant.signals import compute_signal_vector_from_tiingo
+        api_key = os.getenv("TIINGO_API_KEY", "").strip()
+        if not api_key or not tiingo_cache:
+            return {"section_entries": [], "sources": [], "warnings": [], "filter_stats": {}}
+
+        sv = compute_signal_vector_from_tiingo(ticker, api_key)
+        if sv is None:
+            return {"section_entries": [], "sources": [], "warnings": [], "filter_stats": {}}
+
+        text = sv.to_enrichment_text()
+        return {
+            "section_entries": [("computed_signals", text)],
+            "sources": ["Computed Technical Signals (math-based)"],
+            "warnings": [],
+            "filter_stats": {},
+            "signal_vector": sv.to_dict(),
+        }
+    except Exception:
+        logger.debug("Computed signals failed for %s", ticker, exc_info=True)
+        return {"section_entries": [], "sources": [], "warnings": [], "filter_stats": {}}
+
+
 def _task_macro(
     ticker: str, cache: YahooLookupCache, tiingo_cache=None, sector: str = ""
 ) -> Dict[str, Any]:
@@ -1234,6 +1260,9 @@ def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object
             futures["price"] = pool.submit(
                 _task_price, ticker, cache, tiingo_cache
             )
+        futures["computed_signals"] = pool.submit(
+            _task_computed_signals, ticker, tiingo_cache
+        )
         if settings.enable_macro:
             futures["macro"] = pool.submit(
                 _task_macro, ticker, cache, tiingo_cache, pre_sector
@@ -1246,6 +1275,7 @@ def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object
         sector = ""
         industry = ""
         current_price = None
+        signal_vector = None
         for name in _ENRICHMENT_TASK_ORDER:
             fut = futures.get(name)
             if fut is None:
@@ -1262,6 +1292,8 @@ def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object
                 sector = r.get("sector", "") or sector
                 industry = r.get("industry", "") or industry
                 current_price = r.get("current_price")
+            if name == "computed_signals" and r.get("signal_vector"):
+                signal_vector = r["signal_vector"]
 
     if fmp_cache:
         logger.info("fmp_calls_this_run=%d", fmp_cache.call_count)
@@ -1282,4 +1314,5 @@ def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object
         "sector": sector,
         "industry": industry,
         "current_price": current_price,
+        "signal_vector": signal_vector,
     }
