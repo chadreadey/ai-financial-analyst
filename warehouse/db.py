@@ -17,8 +17,14 @@ from datetime import datetime, timezone
 from typing import Optional
 
 
+def _default_db_path() -> str:
+    return os.environ.get("WAREHOUSE_DB_PATH", ".warehouse.db")
+
+
 class WarehouseDB:
-    def __init__(self, db_path: str = ".warehouse.db"):
+    def __init__(self, db_path: str | None = None):
+        if db_path is None:
+            db_path = _default_db_path()
         self._dsn = os.environ.get("DATABASE_URL", "").strip()
         self._pg = bool(self._dsn)
         if self._pg:
