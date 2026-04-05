@@ -40,7 +40,7 @@ class FMPClient:
 
     def get_quote(self, symbol: str) -> dict:
         try:
-            data = self._get(f"/api/v3/quote/{symbol}")
+            data = self._get("/stable/quote", {"symbol": symbol})
             row = data[0] if data else {}
             if row:
                 row["marketCap"] = int(row.get("marketCap") or 0)
@@ -54,7 +54,7 @@ class FMPClient:
 
     def get_key_metrics(self, symbol: str) -> dict:
         try:
-            data = self._get(f"/api/v3/key-metrics-ttm/{symbol}")
+            data = self._get("/stable/key-metrics-ttm", {"symbol": symbol})
             return data[0] if data else {}
         except Exception as exc:
             logger.debug("fmp key-metrics-ttm/%s failed: %s", symbol, exc, exc_info=True)
@@ -62,14 +62,17 @@ class FMPClient:
 
     def get_analyst_estimates(self, symbol: str, limit: int = 4) -> list[dict]:
         try:
-            return self._get(f"/api/v3/analyst-estimates/{symbol}", {"limit": limit})
+            return self._get(
+                "/stable/analyst-estimates",
+                {"symbol": symbol, "period": "annual", "limit": limit},
+            )
         except Exception as exc:
             logger.debug("fmp analyst-estimates/%s failed: %s", symbol, exc, exc_info=True)
             return []
 
     def get_price_target(self, symbol: str) -> dict:
         try:
-            data = self._get("/api/v4/price-target-summary", {"symbol": symbol})
+            data = self._get("/stable/price-target-summary", {"symbol": symbol})
             return data[0] if data else {}
         except Exception as exc:
             logger.debug("fmp price-target-summary/%s failed: %s", symbol, exc, exc_info=True)
@@ -77,9 +80,12 @@ class FMPClient:
 
     def get_earnings_surprises(self, symbol: str, limit: int = 4) -> list[dict]:
         try:
-            return self._get(f"/api/v3/earnings-surprises/{symbol}", {"limit": limit})
+            return self._get(
+                "/stable/earnings-calendar",
+                {"symbol": symbol},
+            )
         except Exception as exc:
-            logger.debug("fmp earnings-surprises/%s failed: %s", symbol, exc, exc_info=True)
+            logger.debug("fmp earnings-calendar/%s failed: %s", symbol, exc, exc_info=True)
             return []
 
     def get_income_statement_quarterly(self, symbol: str, limit: int = 5) -> list[dict]:
@@ -114,32 +120,32 @@ class FMPClient:
 
     def get_grades_summary(self, symbol: str) -> list[dict]:
         try:
-            return self._get(f"/api/v3/grade/{symbol}", {"limit": 20})
+            return self._get("/stable/grades-consensus", {"symbol": symbol})
         except Exception as exc:
-            logger.debug("fmp grade/%s failed: %s", symbol, exc, exc_info=True)
+            logger.debug("fmp grades-consensus/%s failed: %s", symbol, exc, exc_info=True)
             return []
 
     def get_stock_news(self, symbol: str, limit: int = 5) -> list[dict]:
         try:
-            return self._get("/api/v3/stock_news", {"tickers": symbol, "limit": limit})
+            return self._get(
+                "/stable/news/stock",
+                {"symbol": symbol, "limit": limit},
+            )
         except Exception as exc:
-            logger.debug("fmp stock_news/%s failed: %s", symbol, exc, exc_info=True)
+            logger.debug("fmp stock-news/%s failed: %s", symbol, exc, exc_info=True)
             return []
 
     def get_dcf_valuation(self, symbol: str) -> dict:
         try:
-            data = self._get(f"/api/v3/discounted-cash-flow/{symbol}")
+            data = self._get("/stable/discounted-cash-flow", {"symbol": symbol})
             return data[0] if data else {}
         except Exception as exc:
             logger.debug("fmp dcf/%s failed: %s", symbol, exc, exc_info=True)
             return {}
 
     def get_institutional_holders(self, symbol: str) -> list[dict]:
-        try:
-            return self._get(f"/api/v3/institutional-holder/{symbol}")
-        except Exception as exc:
-            logger.debug("fmp institutional-holder/%s failed: %s", symbol, exc, exc_info=True)
-            return []
+        """Not available on free/starter FMP plans — returns [] gracefully."""
+        return []
 
 
 class FMPCache:

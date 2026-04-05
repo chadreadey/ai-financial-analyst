@@ -180,8 +180,8 @@ def _fmp_estimates_section(ticker: str, fmp_cache) -> tuple[str, list[str]]:
         lines.append("  -- Recent Earnings Surprises --")
         for s in surprises[:4]:
             date = s.get("date", "?")
-            actual = s.get("actualEarningResult")
-            est_eps = s.get("estimatedEarning")
+            actual = s.get("epsActual") or s.get("actualEarningResult")
+            est_eps = s.get("epsEstimated") or s.get("estimatedEarning")
             if actual is not None and est_eps is not None:
                 beat = "BEAT" if float(actual) > float(est_eps) else "MISS"
                 lines.append(f"  {date}: ${float(actual):.2f} vs ${float(est_eps):.2f} ({beat})")
@@ -1046,20 +1046,25 @@ def _task_rag(ticker: str) -> Dict[str, Any]:
 
 
 def _fmp_analyst_grades_section(ticker: str, fmp_cache) -> tuple[str, List[str]]:
-    """Recent analyst grade changes from FMP."""
+    """Analyst grades consensus from FMP."""
     grades = fmp_cache.get_grades_summary(ticker)
     if not grades:
         return "", []
-    lines = ["=== Analyst Grade Changes (FMP) ==="]
-    for g in grades[:10]:
-        firm = g.get("gradingCompany", "Unknown")
-        prev = g.get("previousGrade", "—")
-        new = g.get("newGrade", "—")
-        action = g.get("gradeAction", "")
-        date = g.get("date", "")[:10]
-        lines.append(f"  {date} {firm}: {prev} → {new} ({action})")
+    g = grades[0]
+    consensus = g.get("consensus", "N/A")
+    strong_buy = g.get("strongBuy", 0)
+    buy = g.get("buy", 0)
+    hold = g.get("hold", 0)
+    sell = g.get("sell", 0)
+    strong_sell = g.get("strongSell", 0)
+    total = strong_buy + buy + hold + sell + strong_sell
+    if total == 0:
+        return "", []
+    lines = ["=== Analyst Grades Consensus (FMP) ==="]
+    lines.append(f"  Consensus: {consensus} ({total} analysts)")
+    lines.append(f"  Strong Buy: {strong_buy}  |  Buy: {buy}  |  Hold: {hold}  |  Sell: {sell}  |  Strong Sell: {strong_sell}")
     section = "\n".join(lines)
-    return trim_text(section, 800), ["FMP (analyst grades)"]
+    return section, ["FMP (analyst grades)"]
 
 
 def _fmp_news_section(ticker: str, fmp_cache) -> tuple[str, List[str]]:
@@ -1082,7 +1087,7 @@ def _fmp_dcf_section(ticker: str, fmp_cache) -> tuple[str, List[str]]:
     dcf = fmp_cache.get_dcf_valuation(ticker)
     if not dcf:
         return "", []
-    price = dcf.get("stockPrice")
+    price = dcf.get("Stock Price") or dcf.get("stockPrice")
     dcf_val = dcf.get("dcf")
     if dcf_val is None:
         return "", []
