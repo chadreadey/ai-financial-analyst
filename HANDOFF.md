@@ -89,6 +89,46 @@ quant/timesfm/               ← TimesFM nightly batch + Redis cache (ENABLE_TIM
 - **LWC v5:** `PriceChart.tsx` uses `createSeriesMarkers(series, markers)` — NOT `series.setMarkers()` (that's v4, will crash).
 - **TimesFM:** Fully scaffolded in `quant/timesfm/` but `ENABLE_TIMESFM=false`. Not tested with real model yet.
 - **CORS:** Backend reads `CORS_ORIGINS` env var for extra allowed origins (Railway has `https://frontend-sage-nu-51.vercel.app` set).
+- **Peer validation:** Peer candidates from Tavily are validated against the SEC ticker map (~13k tickers). Prevents brand names (NIKE, ASICS) from being treated as tickers.
+
+---
+
+## Signal Architecture (as of 2026-04-05)
+
+The system has been redesigned from equity-research narration to systematic trading signals.
+
+### Synthesis Agent → Signal Aggregator
+
+`prompts/synthesis.md` replaces the CIO persona with a **Systematic Investment Decision Engine**:
+- Each of the 6 agent reports is scored on a normalized -1.0 to +1.0 scale
+- Scores are combined using IC-weighted averages (Earnings 0.22, Pattern 0.18, Risk 0.17, DCF 0.17, Competitive 0.14, Macro 0.12)
+- Macro operates as a **regime multiplier** (adverse macro scales all conviction by 0.7), not an additive signal
+- Output is JSON-first with `conviction_score` (0-1), `weighted_score` (-1 to +1), `signal_breakdown`, `prior_bull_probability`, `sizing_guidance`
+- Verdict maps directly to sizing: STRONG BUY = 1.5× weight, BUY = 1.0×, HOLD = 0×, SELL = 1.0× short, STRONG SELL = 1.5× short
+- Price targets are triangulated across DCF intrinsic value, peer multiples, analyst consensus, and technical levels
+
+### Pattern Agent → Scored Signal Vector
+
+`prompts/pattern.md` now outputs a machine-parsed JSON signal vector:
+- **SMA Trend** (weight 0.25) — 50/200-day crossover, gate signal for longs
+- **Mean Reversion Z-score** (weight 0.20) — suppressed on trending stocks (>30% drift)
+- **Bollinger %B** (weight 0.20) — with squeeze detection
+- **RSI** (weight 0.15) — with divergence detection bonus
+- **OBV Trend** (weight 0.20) — volume confirmation
+- **ATR Regime** (no weight) — position sizing and stop-loss calculation only
+- Composite score: weighted sum, |score| ≥ 0.40 is actionable for paper trading
+
+### Auto-Paper-Trade Pipeline
+
+`orchestrator.py → _auto_paper_trade()` fires after every analysis:
+- If `conviction_score ≥ settings.auto_paper_trade_min_conviction` (default 0.40):
+  - BUY/STRONG BUY → LONG position auto-created
+  - SELL/STRONG SELL → SHORT position auto-created
+  - HOLD → no action
+- Stop-loss and horizon are written as `exit_conditions` on the position
+- Paper positions now have `direction` (LONG/SHORT) and `conviction_score` columns
+- PnL math is direction-aware: LONG = (exit - entry) / entry, SHORT = (entry - exit) / entry
+- Controlled by `AUTO_PAPER_TRADE=true` and `AUTO_PAPER_TRADE_MIN_CONVICTION=0.40` env vars
 
 ---
 
@@ -98,7 +138,7 @@ quant/timesfm/               ← TimesFM nightly batch + Redis cache (ENABLE_TIM
 |-------|------|--------|
 | `/analysis` | Stock analysis with SSE progress stream | ✅ Working |
 | `/portfolio` | Watchlist grid with sparklines | ✅ Working |
-| `/stock/:ticker` | Deep dive with price history + rec markers | ⚠️ Thin — needs work |
+| `/stock/:ticker` | Deep dive with price chart, hit rate, rec cards, re-run button | ✅ Working |
 | `/news` | FMP news feed | ✅ Working |
 | `/industry` | Sector overview | ✅ Working |
 | `/backtest` | Walk-forward backtest with NL config | ✅ Working |
@@ -108,18 +148,26 @@ quant/timesfm/               ← TimesFM nightly batch + Redis cache (ENABLE_TIM
 
 ## What's Left (see TODO.md for full detail)
 
+**Completed (2026-04-05):**
+- ~~Railway Volume~~ — `/data` volume attached, `WAREHOUSE_DB_PATH=/data/warehouse.db`
+- ~~Sentry on frontend~~ — `@sentry/react` installed, `VITE_SENTRY_DSN` in Vercel
+- ~~Schema migration~~ — `conviction_score`, `bull_probability`, `bear_probability`, `weighted_score`, `sizing_guidance` columns added
+- ~~StockDeepDivePage~~ — entry/target prices, hit rate, re-run analysis button wired
+- ~~Synthesis → Decision Engine~~ — signal aggregator with IC-weighted scoring, JSON-first output
+- ~~Pattern Agent → Signal Vector~~ — SMA, Bollinger, RSI, OBV, mean reversion, ATR signals
+- ~~Auto-paper-trade~~ — orchestrator auto-enters positions on conviction ≥ 0.40
+- ~~Short position support~~ — direction column, correct PnL math
+
 **High priority:**
-1. **Railway Volume** — add `/data` volume so SQLite survives redeploys
-2. **Sentry on frontend** — install `@sentry/react` in `frontend/`, init in `main.tsx` with `VITE_SENTRY_DSN`
-3. **`analysis_history` schema migration** — `entry_price` + `target_price` columns need `ALTER TABLE` guard in `warehouse/db.py`; orchestrator should write them on each run
-4. **`StockDeepDivePage`** — currently a thin wrapper; wire up `HistoricalPerformanceCards` and `PerformanceMetricsPanel` components (already exist)
-5. **FMP section wiring** — `fmp_client.py` has `get_grades_summary()`, `get_stock_news()`, `get_dcf_valuation()`, `get_institutional_holders()` but none are wired into `market_enrichment.py` sections yet
+1. **FMP section wiring** — `fmp_client.py` has `get_grades_summary()`, `get_stock_news()`, `get_dcf_valuation()`, `get_institutional_holders()` but none are wired into `market_enrichment.py` sections yet
+2. **Alpha vs SPY** — compute in watchlist summary endpoint using SPY benchmark comparison
+3. **Signal IC validation** — track and validate signal IC over time (calibration endpoint)
 
 **Medium priority:**
-6. **Insider Transactions Agent** — Form 4 via edgartools → `agents/insider.py`
-7. **Earnings Call Transcript Agent** — 8-K exhibit text → `agents/transcript.py`
-8. **RAG auto-reseed** — after `change_detector.incremental_update()` finds new filings, re-seed Pinecone
-9. **Multi-ticker scanner page** — batch analysis of 3-10 tickers with ranked table
+4. **Insider Transactions Agent** — Form 4 via edgartools → `agents/insider.py`
+5. **Earnings Call Transcript Agent** — 8-K exhibit text → `agents/transcript.py`
+6. **RAG auto-reseed** — after `change_detector.incremental_update()` finds new filings, re-seed Pinecone
+7. **Multi-ticker scanner page** — batch analysis of 3-10 tickers with ranked table
 
 ---
 
@@ -144,14 +192,13 @@ vercel deploy --prod --yes --scope chadreadey-7282s-projects
 ## Recent Git History
 
 ```
+(latest) feat: signal engine + auto-paper-trade pipeline
+762885c feat: wire StockDeepDivePage with entry/target prices, hit rate, re-run button
+83b3c5a feat: add Sentry error monitoring to React frontend
+bc01325 fix: reject brand-name peer candidates via SEC ticker map, guard price history
+391ce94 fix: WarehouseDB reads WAREHOUSE_DB_PATH env var for SQLite path
 aec55a6 fix: resolve TypeScript build errors blocking Vercel deploy
 04ad9fd docs: replace planning docs with TODO.md and full README rewrite
-1cc173d feat: expand warehouse, RAG pipeline, and SEC parsers
-55b8149 feat: add TimesFM nightly batch + Redis cache module
-dbf3a4f feat: expand core analysis engine with new enrichment signals
-dcda0c7 feat: add React + Vite frontend replacing Streamlit UI
-e0bfe3c feat: add FastAPI backend replacing Streamlit
-857fdcd chore: migrate hosting from Fly.io to Railway + Vercel
 ```
 
 ---

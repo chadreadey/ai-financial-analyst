@@ -20,11 +20,13 @@ Unimplemented items from the original expansion plans. Each item is self-contain
 - Wire into `orchestrator.py` behind `ENABLE_TRANSCRIPT_AGENT=true`
 - **Dependency:** edgartools already installed
 
-### ARIMA Forecasting (Pattern Agent)
-- Add `forecast_series()` to `agents/pattern.py` using `pmdarima.auto_arima`
-- Forecasts 3-year revenue + FCF with 95% confidence bands
-- Add `pmdarima>=2.0` to `requirements.txt` and `pyproject.toml`
-- Gate behind `ENABLE_ARIMA=true` in `config.py`
+### ~~ARIMA Forecasting (Pattern Agent)~~ — SUPERSEDED
+Pattern agent now outputs a scored signal vector (SMA, Bollinger, RSI, OBV, mean reversion Z-score, ATR). ARIMA forecasting is replaced by the systematic signal approach.
+
+### Signal IC Validation + Calibration Endpoint
+- Track each agent's signal scores vs actual price outcomes over time
+- `GET /api/backtest/calibration`: win rate, avg return, trade count per conviction band and direction
+- Use to dynamically update IC weights in the synthesis prompt
 
 ### FMP Enrichment Sections (client methods exist, not wired)
 `fmp_client.py` has these methods but none are wired into `market_enrichment.py` sections yet:
@@ -51,27 +53,15 @@ Each follows the existing `_task_*` pattern in `market_enrichment.py`. Total new
 - Gate on `settings.enable_rag` — no-op if Pinecone key missing
 - File to modify: `warehouse/change_detector.py` → add post-update hook
 
-### `analysis_history` Schema Migration
-The `entry_price` and `target_price` columns exist in the code but may not exist in deployed DB instances.
-- Add migration guard in `warehouse/db.py` `_init_schema()`:
-  ```python
-  try:
-      conn.execute("ALTER TABLE analysis_history ADD COLUMN entry_price REAL")
-      conn.execute("ALTER TABLE analysis_history ADD COLUMN target_price REAL")
-  except sqlite3.OperationalError:
-      pass  # columns already exist
-  ```
-- Wire `orchestrator.py` to write `entry_price` (price at time of run) and `target_price` (from structured verdict) on each save
+### ~~`analysis_history` Schema Migration~~ — DONE
+Migration in `sec/cache.py` covers `entry_price_at_run`, `price_target`, `conviction_score`, `bull_probability`, `bear_probability`, `weighted_score`, `sizing_guidance`. Orchestrator writes all fields.
 
 ---
 
 ## Frontend
 
-### Sentry in React Frontend
-- Install `@sentry/react` in `frontend/`
-- Initialize in `frontend/src/main.tsx` with DSN from `VITE_SENTRY_DSN` env var
-- Wrap `App` in `Sentry.ErrorBoundary`
-- Add `VITE_SENTRY_DSN=` to `frontend/.env.example`
+### ~~Sentry in React Frontend~~ — DONE
+`@sentry/react` installed, initialized in `main.tsx`, `VITE_SENTRY_DSN` in Vercel prod env.
 
 ### Multi-Ticker Portfolio Scanner Page
 - Existing `/portfolio` (Watchlist) page shows one ticker at a time
@@ -80,11 +70,8 @@ The `entry_price` and `target_price` columns exist in the code but may not exist
 - Backend: new `POST /api/analysis/scan` endpoint in `backend/routers/analysis.py`
 - Frontend: new `ScannerPage.tsx` at `/scanner`
 
-### `StockDeepDivePage` is incomplete
-`frontend/src/pages/StockDeepDivePage.tsx` is a thin wrapper. Needs:
-- Historical performance cards (component exists at `components/deepdive/HistoricalPerformanceCards.tsx`)
-- Performance metrics panel (component exists at `components/deepdive/PerformanceMetricsPanel.tsx`)
-- Wire up the actual analysis re-run button that pre-populates the ticker in AnalysisPage
+### ~~`StockDeepDivePage`~~ — DONE
+Entry/target prices from DB, hit rate computed from outcomes, re-run analysis button navigates to `/analysis?ticker=X`.
 
 ---
 
@@ -100,8 +87,8 @@ The TimesFM module (`quant/timesfm/`) is fully scaffolded but has only been test
 - Verify Redis keys are written: `redis-cli keys "timesfm:*"`
 - Set `ENABLE_TIMESFM=true` after validation
 
-### Railway Persistent Volume
-After deploying to Railway, attach a persistent volume at `/data` for SQLite files (`warehouse.db`, `sec_cache.db`). Without this, the DB resets on every deploy.
+### ~~Railway Persistent Volume~~ — DONE
+Volume at `/data`, `WAREHOUSE_DB_PATH=/data/warehouse.db` set in Railway. `WarehouseDB` reads env var.
 
 ---
 

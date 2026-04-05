@@ -79,6 +79,11 @@ class SECCache:
             ("stop_loss_unit", "TEXT"),
             ("entry_price_at_run", "REAL"),
             ("result_json", "TEXT"),
+            ("conviction_score", "REAL"),
+            ("bull_probability", "REAL"),
+            ("bear_probability", "REAL"),
+            ("weighted_score", "REAL"),
+            ("sizing_guidance", "TEXT"),
         ]
         for column, col_type in migration_columns:
             if not self._column_exists("analysis_history", column):
@@ -169,6 +174,11 @@ class SECCache:
         result_json: Optional[dict] = None,
         run_at: Optional[float] = None,
         analysis_id: str = "",
+        conviction_score: Optional[float] = None,
+        bull_probability: Optional[float] = None,
+        bear_probability: Optional[float] = None,
+        weighted_score: Optional[float] = None,
+        sizing_guidance: str = "",
     ) -> str:
         """Persist a structured analysis result for drift tracking."""
         analysis_id = analysis_id or str(uuid.uuid4())
@@ -178,9 +188,11 @@ class SECCache:
             INSERT OR REPLACE INTO analysis_history (
                 analysis_id, ticker, run_at, company_name, verdict, conviction,
                 time_horizon, composite_score, health_scores, price_target,
-                stop_loss_value, stop_loss_unit, entry_price_at_run, result_json
+                stop_loss_value, stop_loss_unit, entry_price_at_run, result_json,
+                conviction_score, bull_probability, bear_probability,
+                weighted_score, sizing_guidance
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 analysis_id,
@@ -197,6 +209,11 @@ class SECCache:
                 stop_loss_unit,
                 entry_price_at_run,
                 json.dumps(result_json) if result_json else None,
+                conviction_score,
+                bull_probability,
+                bear_probability,
+                weighted_score,
+                sizing_guidance,
             ),
         )
         self._conn.commit()

@@ -139,6 +139,10 @@ class Settings(BaseSettings):
     supabase_service_key: str = ""
     supabase_history_table: str = "analyses"
 
+    # ── Auto paper trading ────────────────────────────────────────────
+    auto_paper_trade: bool = True
+    auto_paper_trade_min_conviction: float = 0.40
+
     # ── TimesFM ──────────────────────────────────────────────────────
     enable_timesfm: bool = False
     redis_url: str = ""

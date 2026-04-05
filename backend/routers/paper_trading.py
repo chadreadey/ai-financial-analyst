@@ -29,7 +29,9 @@ def _ensure_tables():
             entry_date TEXT,
             current_price REAL,
             verdict TEXT DEFAULT '',
-            exit_conditions TEXT DEFAULT ''
+            exit_conditions TEXT DEFAULT '',
+            direction TEXT DEFAULT 'LONG',
+            conviction_score REAL
         )
     """)
     conn.execute("""
@@ -41,9 +43,19 @@ def _ensure_tables():
             exit_price REAL,
             exit_date TEXT,
             pnl_pct REAL,
-            exit_reason TEXT DEFAULT ''
+            exit_reason TEXT DEFAULT '',
+            direction TEXT DEFAULT 'LONG'
         )
     """)
+    # Migrate existing tables
+    for table, cols in [
+        ("paper_positions", [("direction", "TEXT DEFAULT 'LONG'"), ("conviction_score", "REAL")]),
+        ("paper_trades", [("direction", "TEXT DEFAULT 'LONG'")]),
+    ]:
+        existing = {r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+        for col_name, col_type in cols:
+            if col_name not in existing:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}")
     conn.commit()
     conn.close()
 
@@ -76,7 +88,14 @@ async def get_positions():
     for r in rows:
         current = _fetch_current_price(r["ticker"])
         entry = r["entry_price"]
-        unrealized = round((current - entry) / entry * 100, 2) if current and entry else None
+        direction = r["direction"] if "direction" in r.keys() else "LONG"
+        if current and entry:
+            if direction == "SHORT":
+                unrealized = round((entry - current) / entry * 100, 2)
+            else:
+                unrealized = round((current - entry) / entry * 100, 2)
+        else:
+            unrealized = None
         days_held = 0
         if r["entry_date"]:
             try:
@@ -92,6 +111,8 @@ async def get_positions():
             "current_price": current,
             "verdict": r["verdict"] or "",
             "exit_conditions": r["exit_conditions"] or "",
+            "direction": direction,
+            "conviction_score": r["conviction_score"] if "conviction_score" in r.keys() else None,
             "unrealized_pnl_pct": unrealized,
             "days_held": days_held,
         })
@@ -108,19 +129,22 @@ async def add_position(position: dict):
 
     conn = sqlite3.connect(_db_path())
     conn.execute(
-        "INSERT OR REPLACE INTO paper_positions (ticker, entry_price, entry_date, verdict, exit_conditions) "
-        "VALUES (?, ?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO paper_positions "
+        "(ticker, entry_price, entry_date, verdict, exit_conditions, direction, conviction_score) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
         (
             ticker,
             float(position.get("entry_price", 0)),
             position.get("entry_date", time.strftime("%Y-%m-%d")),
             position.get("verdict", ""),
             position.get("exit_conditions", ""),
+            position.get("direction", "LONG"),
+            position.get("conviction_score"),
         ),
     )
     conn.commit()
     conn.close()
-    return {"status": "ok", "ticker": ticker}
+    return {"status": "ok", "ticker": ticker, "direction": position.get("direction", "LONG")}
 
 
 @router.put("/positions/{ticker}/close")
@@ -137,12 +161,19 @@ async def close_position(ticker: str, body: dict):
     exit_price = float(body.get("exit_price", 0))
     exit_reason = body.get("exit_reason", "manual_close")
     entry_price = row["entry_price"]
-    pnl_pct = round((exit_price - entry_price) / entry_price * 100, 2) if entry_price else 0
+    direction = row["direction"] if "direction" in row.keys() else "LONG"
+    if entry_price:
+        if direction == "SHORT":
+            pnl_pct = round((entry_price - exit_price) / entry_price * 100, 2)
+        else:
+            pnl_pct = round((exit_price - entry_price) / entry_price * 100, 2)
+    else:
+        pnl_pct = 0
 
     conn.execute(
-        "INSERT INTO paper_trades (ticker, entry_price, entry_date, exit_price, exit_date, pnl_pct, exit_reason) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (ticker, entry_price, row["entry_date"], exit_price, time.strftime("%Y-%m-%d"), pnl_pct, exit_reason),
+        "INSERT INTO paper_trades (ticker, entry_price, entry_date, exit_price, exit_date, pnl_pct, exit_reason, direction) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (ticker, entry_price, row["entry_date"], exit_price, time.strftime("%Y-%m-%d"), pnl_pct, exit_reason, direction),
     )
     conn.execute("DELETE FROM paper_positions WHERE ticker = ?", (ticker,))
     conn.commit()

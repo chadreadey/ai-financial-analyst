@@ -153,6 +153,75 @@ def _flywheel_ingest(ticker: str) -> None:
         logger.warning("Flywheel ingestion failed for %s", ticker, exc_info=True)
 
 
+def _auto_paper_trade(ticker: str, structured: dict) -> None:
+    """
+    Auto-enter a paper trading position when conviction meets threshold.
+    BUY/STRONG BUY → LONG. SELL/STRONG SELL → SHORT. HOLD → no action.
+    """
+    import sqlite3 as _sqlite3
+
+    conviction_score = _as_float(structured.get("conviction_score")) or 0.0
+    if conviction_score < settings.auto_paper_trade_min_conviction:
+        logger.debug("Auto-paper-trade: conviction %.2f below threshold %.2f for %s",
+                      conviction_score, settings.auto_paper_trade_min_conviction, ticker)
+        return
+
+    verdict = (structured.get("verdict") or "").upper()
+    if "BUY" in verdict:
+        direction = "LONG"
+    elif "SELL" in verdict:
+        direction = "SHORT"
+    else:
+        logger.debug("Auto-paper-trade: HOLD verdict for %s, skipping", ticker)
+        return
+
+    entry_price = _as_float(structured.get("entry_price")) or 0.0
+    if entry_price <= 0:
+        logger.warning("Auto-paper-trade: no entry_price for %s, skipping", ticker)
+        return
+
+    stop_loss = structured.get("stop_loss", {})
+    stop_value = ""
+    if isinstance(stop_loss, dict) and stop_loss.get("value"):
+        stop_value = f"stop_loss=${stop_loss['value']}"
+    elif isinstance(stop_loss, (int, float)):
+        stop_value = f"stop_loss=${stop_loss}"
+
+    horizon = structured.get("primary_horizon_days") or structured.get("horizon_days") or ""
+    exit_conditions = f"{stop_value}; horizon={horizon}d; sizing={structured.get('sizing_guidance', '')}"
+
+    try:
+        conn = _sqlite3.connect(settings.warehouse_db_path)
+        # Ensure tables exist
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS paper_positions (
+                ticker TEXT PRIMARY KEY, entry_price REAL, entry_date TEXT,
+                current_price REAL, verdict TEXT DEFAULT '', exit_conditions TEXT DEFAULT '',
+                direction TEXT DEFAULT 'LONG', conviction_score REAL
+            )
+        """)
+        conn.execute(
+            "INSERT OR REPLACE INTO paper_positions "
+            "(ticker, entry_price, entry_date, verdict, exit_conditions, direction, conviction_score) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                ticker.upper(),
+                entry_price,
+                __import__("time").strftime("%Y-%m-%d"),
+                verdict,
+                exit_conditions,
+                direction,
+                conviction_score,
+            ),
+        )
+        conn.commit()
+        conn.close()
+        logger.info("Auto-paper-trade: %s %s @ $%.2f (conviction=%.2f)",
+                     direction, ticker, entry_price, conviction_score)
+    except Exception as exc:
+        logger.warning("Auto-paper-trade failed for %s: %s", ticker, exc)
+
+
 class Orchestrator:
     """
     Coordinates the two-phase analysis pipeline.
@@ -506,6 +575,12 @@ class Orchestrator:
                     stop_loss_value = _as_float(raw_stop_loss)
                     stop_loss_unit = "price"
 
+                conviction_score = _as_float(structured.get("conviction_score"))
+                weighted_score = _as_float(structured.get("weighted_score"))
+                bull_prob = _as_float(structured.get("prior_bull_probability"))
+                bear_prob = _as_float(structured.get("prior_bear_probability"))
+                sizing = str(structured.get("sizing_guidance") or "")
+
                 self.sec_client.cache.save_analysis(
                     ticker=data.ticker,
                     company_name=data.company_name,
@@ -518,6 +593,11 @@ class Orchestrator:
                     stop_loss_value=stop_loss_value,
                     stop_loss_unit=stop_loss_unit,
                     entry_price_at_run=_as_float(structured.get("entry_price")),
+                    conviction_score=conviction_score,
+                    bull_probability=bull_prob,
+                    bear_probability=bear_prob,
+                    weighted_score=weighted_score,
+                    sizing_guidance=sizing,
                     result_json={
                         "ticker": data.ticker,
                         "company_name": data.company_name,
@@ -531,6 +611,11 @@ class Orchestrator:
                     },
                 )
                 logger.info("Analysis saved to history")
+
+                # Auto-paper-trade: enter position if conviction meets threshold
+                if settings.auto_paper_trade:
+                    _auto_paper_trade(data.ticker, structured)
+
             except Exception as exc:
                 logger.warning("Failed to save analysis history: %s", exc)
 
