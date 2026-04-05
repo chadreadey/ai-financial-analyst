@@ -107,9 +107,9 @@ The system has been redesigned from equity-research narration to systematic trad
 - Verdict maps directly to sizing: STRONG BUY = 1.5× weight, BUY = 1.0×, HOLD = 0×, SELL = 1.0× short, STRONG SELL = 1.5× short
 - Price targets are triangulated across DCF intrinsic value, peer multiples, analyst consensus, and technical levels
 
-### Pattern Agent → Scored Signal Vector
+### Pattern Agent → Math-Based Signals + LLM Interpretation
 
-`prompts/pattern.md` now outputs a machine-parsed JSON signal vector:
+Technical signals are now **computed with exact math** in `quant/signals.py` (not LLM-approximated):
 - **SMA Trend** (weight 0.25) — 50/200-day crossover, gate signal for longs
 - **Mean Reversion Z-score** (weight 0.20) — suppressed on trending stocks (>30% drift)
 - **Bollinger %B** (weight 0.20) — with squeeze detection
@@ -117,6 +117,10 @@ The system has been redesigned from equity-research narration to systematic trad
 - **OBV Trend** (weight 0.20) — volume confirmation
 - **ATR Regime** (no weight) — position sizing and stop-loss calculation only
 - Composite score: weighted sum, |score| ≥ 0.40 is actionable for paper trading
+
+Computed signals flow via the `computed_signals` enrichment section. The pattern agent LLM **interprets** pre-computed scores (does not compute them). Proven deterministic: std=0.000000 across runs.
+
+Reproducibility tester: `python scripts/test_reproducibility.py AAPL --runs 5`
 
 ### Auto-Paper-Trade Pipeline
 
@@ -157,16 +161,26 @@ The system has been redesigned from equity-research narration to systematic trad
 - ~~Pattern Agent → Signal Vector~~ — SMA, Bollinger, RSI, OBV, mean reversion, ATR signals
 - ~~Auto-paper-trade~~ — orchestrator auto-enters positions on conviction ≥ 0.40
 - ~~Short position support~~ — direction column, correct PnL math
+- ~~FMP stable API migration~~ — all FMP endpoints migrated from legacy v3/v4 to /stable/
+- ~~FMP enrichment wiring~~ — analyst grades, DCF cross-check, news, institutional holders
+- ~~Entry price override~~ — orchestrator forces market price, never trusts LLM
+- ~~Auto-paper-trade fallback~~ — derives conviction from old-format JSON when conviction_score missing
+- ~~Math-based technical signals~~ — `quant/signals.py` replaces LLM-approximated indicators
+- ~~Signal reproducibility tester~~ — `scripts/test_reproducibility.py`
 
-**High priority:**
-1. **FMP section wiring** — `fmp_client.py` has `get_grades_summary()`, `get_stock_news()`, `get_dcf_valuation()`, `get_institutional_holders()` but none are wired into `market_enrichment.py` sections yet
-2. **Alpha vs SPY** — compute in watchlist summary endpoint using SPY benchmark comparison
-3. **Signal IC validation** — track and validate signal IC over time (calibration endpoint)
+**Next priority — see `PLAN_NEXT.md` for full roadmap:**
+1. **Quant-only backtest engine** — backtest `quant/signals.py` on 10yr price data, no LLM. Target Sharpe > 0.7.
+2. **TimeSeriesFM backtest overlay** — add P50 forecast as 7th signal, test additive value.
+3. **IC weight calibration** — replace hardcoded weights with data-derived IC from backtest results.
+4. **API authentication** — add API key middleware before any investor demos.
+5. **50+ paper trades** — daily scan script to accumulate tracked outcomes.
 
-**Medium priority:**
-4. **Insider Transactions Agent** — Form 4 via edgartools → `agents/insider.py`
-5. **Earnings Call Transcript Agent** — 8-K exhibit text → `agents/transcript.py`
-6. **RAG auto-reseed** — after `change_detector.incremental_update()` finds new filings, re-seed Pinecone
+**Also remaining (lower priority):**
+6. **Alpha vs SPY** — compute in watchlist summary endpoint
+7. **Replace SQLite with Postgres** — for concurrent safety
+8. **Insider Transactions Agent** — Form 4 via edgartools → `agents/insider.py`
+9. **Earnings Call Transcript Agent** — 8-K exhibit text → `agents/transcript.py`
+10. **RAG auto-reseed** — after `change_detector.incremental_update()` finds new filings, re-seed Pinecone
 7. **Multi-ticker scanner page** — batch analysis of 3-10 tickers with ranked table
 
 ---
@@ -192,12 +206,15 @@ vercel deploy --prod --yes --scope chadreadey-7282s-projects
 ## Recent Git History
 
 ```
-(latest) feat: signal engine + auto-paper-trade pipeline
+055441a feat: math-based technical signals + reproducibility tester + plan
+2991e74 fix: override LLM entry_price with actual market price
+400e543 fix: auto-paper-trade fallback for missing conviction_score
+7225d27 fix: migrate FMP client from legacy v3/v4 to stable API endpoints
+2a8cc71 feat: wire FMP enrichment sections into agent pipeline
+773363d fix: capture prose both before and after JSON block in synthesis output
+2a4498e feat: signal engine rewrite + auto-paper-trade pipeline
 762885c feat: wire StockDeepDivePage with entry/target prices, hit rate, re-run button
 83b3c5a feat: add Sentry error monitoring to React frontend
-bc01325 fix: reject brand-name peer candidates via SEC ticker map, guard price history
-391ce94 fix: WarehouseDB reads WAREHOUSE_DB_PATH env var for SQLite path
-aec55a6 fix: resolve TypeScript build errors blocking Vercel deploy
 04ad9fd docs: replace planning docs with TODO.md and full README rewrite
 ```
 
