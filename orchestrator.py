@@ -163,9 +163,30 @@ def _auto_paper_trade(ticker: str, structured: dict) -> None:
     import sqlite3 as _sqlite3
 
     conviction_score = _as_float(structured.get("conviction_score")) or 0.0
+
+    # Fallback: derive from old-style scores (1-10 → 0-1) or conviction string
+    if conviction_score == 0.0:
+        cs = _as_float(structured.get("composite_score"))
+        if not cs:
+            health = structured.get("health_scores") or {}
+            cs = _as_float(health.get("overall"))
+        if cs and cs > 1:
+            conviction_score = cs / 10.0
+    if conviction_score == 0.0:
+        conv_str = (structured.get("conviction") or "").upper()
+        if conv_str == "HIGH":
+            conviction_score = 0.80
+        elif conv_str == "MEDIUM":
+            conviction_score = 0.55
+        elif conv_str == "LOW":
+            conviction_score = 0.30
+
+    logger.info("Auto-paper-trade: %s conviction=%.2f (threshold=%.2f) verdict=%s",
+                ticker, conviction_score, settings.auto_paper_trade_min_conviction,
+                structured.get("verdict", "?"))
+
     if conviction_score < settings.auto_paper_trade_min_conviction:
-        logger.debug("Auto-paper-trade: conviction %.2f below threshold %.2f for %s",
-                      conviction_score, settings.auto_paper_trade_min_conviction, ticker)
+        logger.info("Auto-paper-trade: conviction below threshold for %s, skipping", ticker)
         return
 
     verdict = (structured.get("verdict") or "").upper()
