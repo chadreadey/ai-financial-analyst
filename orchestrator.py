@@ -82,7 +82,9 @@ def _extract_structured_block(synthesis_text: str) -> Tuple[Optional[dict], str]
     if not isinstance(data, dict):
         return None, synthesis_text
 
-    prose = synthesis_text[:match.start()].rstrip()
+    before = synthesis_text[:match.start()].strip()
+    after = synthesis_text[match.end():].strip()
+    prose = f"{before}\n\n{after}".strip() if before and after else (before or after)
     return data, prose
 
 
