@@ -31,6 +31,7 @@ function matchStage(step: string): number {
 
 export function ProgressStream({ progress }: ProgressStreamProps): React.ReactElement {
   const [history, setHistory] = useState<StepRecord[]>([]);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const prevStep = useRef<string>("");
 
   useEffect(() => {
@@ -42,6 +43,14 @@ export function ProgressStream({ progress }: ProgressStreamProps): React.ReactEl
       ]);
     }
   }, [progress.step, progress.pct]);
+
+  useEffect(() => {
+    const startedAt = Date.now();
+    const timer = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const currentPct = progress.pct ?? 0;
   const currentStage = matchStage(progress.step ?? "");
@@ -61,9 +70,14 @@ export function ProgressStream({ progress }: ProgressStreamProps): React.ReactEl
           {progress.step || "Initializing analysis..."}
         </span>
         {currentPct > 0 && (
-          <span className="ml-auto text-xs font-semibold tabular-nums" style={{ color: "var(--accent-blue)" }}>
-            {currentPct}%
-          </span>
+          <div className="ml-auto flex items-center gap-3">
+            <span className="text-[11px] tabular-nums" style={{ color: "var(--text-muted)" }}>
+              Elapsed: {elapsedSeconds}s
+            </span>
+            <span className="text-xs font-semibold tabular-nums" style={{ color: "var(--accent-blue)" }}>
+              {currentPct}%
+            </span>
+          </div>
         )}
       </div>
 

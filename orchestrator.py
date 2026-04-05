@@ -14,7 +14,7 @@ import re
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from agents import (
     DCFAgent,
@@ -255,11 +255,23 @@ class Orchestrator:
                 MacroAgent(provider=self.provider, model=self.synthesis_model)
             )
 
-    def prepare_data(self, ticker: str) -> AnalysisData:
+    def prepare_data(
+        self,
+        ticker: str,
+        progress_callback: Optional[Callable[[str, Optional[int]], None]] = None,
+    ) -> AnalysisData:
         """
         Fetch and parse all SEC data for a ticker.
         Returns the unified AnalysisData that agents consume.
         """
+        def emit(message: str, pct: Optional[int] = None) -> None:
+            if progress_callback:
+                try:
+                    progress_callback(message, pct)
+                except Exception:
+                    pass
+
+        emit(f"Preparing data for {ticker.upper()}...", 4)
         if os.getenv("ENABLE_WAREHOUSE", "").lower() == "true":
             try:
                 from warehouse.db import WarehouseDB
@@ -267,17 +279,21 @@ class Orchestrator:
                 from warehouse.change_detector import needs_update, incremental_update
                 from warehouse.reader import build_analysis_data_from_warehouse
 
+                emit("Checking warehouse cache...", 7)
                 db = WarehouseDB()
                 company = db.get_company(ticker.upper())
                 if company is None:
+                    emit("Bootstrapping warehouse data...", 10)
                     logger.info("Warehouse: bootstrapping %s...", ticker.upper())
                     bootstrap_ticker(ticker.upper(), db, self.sec_client)
                 elif needs_update(ticker.upper(), db, self.sec_client):
+                    emit("Refreshing stale warehouse data...", 12)
                     logger.info("Warehouse: updating %s...", ticker.upper())
                     incremental_update(ticker.upper(), db, self.sec_client)
 
                 data = build_analysis_data_from_warehouse(ticker.upper(), db)
                 if data is not None:
+                    emit("Warehouse data loaded. Enriching context...", 15)
                     logger.info("Warehouse: loaded %s from warehouse", ticker.upper())
                     info = self.sec_client.resolve_ticker(ticker)
                     with ThreadPoolExecutor(max_workers=1) as overlap_pool:
@@ -304,10 +320,12 @@ class Orchestrator:
                     if raw_industry and raw_industry.lower() not in ("n/a", "none"):
                         data.industry = raw_industry
 
+                    emit("Data preparation complete", 22)
                     return data
             except Exception as exc:
                 logger.warning("Warehouse read failed, falling back to live: %s", exc)
 
+        emit("Resolving ticker identity and fetching SEC filings...", 8)
         logger.info("Fetching SEC data for %s...", ticker.upper())
         info = self.sec_client.resolve_ticker(ticker)
         ticker_upper = ticker.upper()
@@ -327,6 +345,7 @@ class Orchestrator:
             "company_facts": company_facts,
         }
 
+        emit("Parsing XBRL fundamentals and key metrics...", 14)
         logger.info("Parsing XBRL financial data...")
         parser = XBRLParser(raw["company_facts"])
         metrics = parser.compute_metrics()
@@ -338,6 +357,7 @@ class Orchestrator:
             except (ImportError, AttributeError, ValueError, RuntimeError) as exc:
                 logger.warning("edgartools supplement skipped: %s", exc)
 
+        emit("Building trend metrics and financial summaries...", 18)
         financial_summary = parser.to_summary_text(metrics=metrics)
 
         quarterly_metrics = parser.compute_quarterly_metrics(quarters=8)
@@ -353,6 +373,7 @@ class Orchestrator:
                     if f.get("form") == "10-K" and f.get("primaryDocument")
                 ]
                 if tenk_filings:
+                    emit("Extracting filing narratives (10-K sections)...", 20)
                     latest_10k = tenk_filings[0]
                     logger.info("Fetching 10-K filing text for narrative extraction...")
                     html = self.sec_client.get_filing_text(
@@ -380,6 +401,7 @@ class Orchestrator:
 
         if settings.enable_timesfm:
             try:
+                emit("Loading TimesFM cached signals...", 22)
                 from quant.timesfm.cache import get_signals
                 from quant.timesfm.enrichment import format_price_signals, format_eps_signals
                 tfm_signals = get_signals(ticker_upper)
@@ -405,6 +427,7 @@ class Orchestrator:
         if not raw_industry or raw_industry.lower() in ("n/a", "none"):
             raw_industry = ""
 
+        emit("Data preparation complete", 25)
         return AnalysisData(
             ticker=raw["ticker"],
             company_name=raw["company_name"],
@@ -440,23 +463,41 @@ class Orchestrator:
             model=self.synthesis_model,
         )
 
-    async def _run_agent(self, agent, data: AnalysisData) -> AgentReport:
+    async def _run_agent(
+        self,
+        agent,
+        data: AnalysisData,
+        progress_callback: Optional[Callable[[str, Optional[int]], None]] = None,
+    ) -> AgentReport:
+        if progress_callback:
+            progress_callback(f"Agent started: {agent.name}", None)
         logger.info("  %s analyzing...", agent.name)
         result = await agent.analyze(data)
         logger.info("  %s complete", agent.name)
+        if progress_callback:
+            progress_callback(f"Agent complete: {agent.name}", None)
         return AgentReport(agent_name=agent.name, analysis=result)
 
     async def run_phase1(
-        self, data: AnalysisData
+        self,
+        data: AnalysisData,
+        progress_callback: Optional[Callable[[str, Optional[int]], None]] = None,
     ) -> List[AgentReport]:
         """
         Phase 1: Run all agents in parallel.
         Returns list of AgentReport instances.
         """
         logger.info("Phase 1: Running analyst agents in parallel")
+        if progress_callback:
+            progress_callback(f"Launching {len(self.agents)} analyst agents in parallel...", 30)
         results = await asyncio.gather(
-            *[self._run_agent(agent, data) for agent in self.agents]
+            *[
+                self._run_agent(agent, data, progress_callback=progress_callback)
+                for agent in self.agents
+            ]
         )
+        if progress_callback:
+            progress_callback("All primary agents completed", 68)
         return list(results)
 
     async def run_phase2(
@@ -464,12 +505,15 @@ class Orchestrator:
         ticker: str,
         company_name: str,
         agent_reports: List[AgentReport],
+        progress_callback: Optional[Callable[[str, Optional[int]], None]] = None,
     ) -> str:
         """
         Phase 2: Synthesis agent cross-references all reports.
         Returns the final synthesized analysis.
         """
         logger.info("Phase 2: Synthesis & cross-referencing")
+        if progress_callback:
+            progress_callback("Preparing synthesis context from agent reports...", 74)
 
         report_sections = []
         per_report_cap = settings.synthesis_report_max_chars
@@ -499,6 +543,8 @@ class Orchestrator:
         )
 
         agent_count = len(agent_reports)
+        if progress_callback:
+            progress_callback(f"Synthesizing final brief from {agent_count} agent reports...", 82)
         synthesis_text = await self.provider.generate(
             system=synthesis_system_prompt,
             user=(
@@ -512,9 +558,15 @@ class Orchestrator:
         )
 
         logger.info("Synthesis complete")
+        if progress_callback:
+            progress_callback("Synthesis completed", 90)
         return synthesis_text
 
-    async def run(self, ticker: str) -> AnalysisResult:
+    async def run(
+        self,
+        ticker: str,
+        progress_callback: Optional[Callable[[str, Optional[int]], None]] = None,
+    ) -> AnalysisResult:
         """
         Execute the full two-phase analysis pipeline for a ticker.
 
@@ -524,7 +576,10 @@ class Orchestrator:
           Wave 2: CompetitiveAgent (sees the briefing)
         Otherwise falls back to the single-gather run_phase1.
         """
-        data = await asyncio.to_thread(self.prepare_data, ticker)
+        if progress_callback:
+            progress_callback(f"Starting analysis for {ticker.upper()}...", 3)
+            progress_callback("Fetching SEC/XBRL data and enrichment...", 6)
+        data = await asyncio.to_thread(self.prepare_data, ticker, progress_callback)
 
         specialist = (
             self._get_sector_specialist(data)
@@ -537,11 +592,21 @@ class Orchestrator:
             competitive_agents = [a for a in self.agents if isinstance(a, CompetitiveAgent)]
 
             logger.info("Phase 1 wave 1: Sector specialist + %d agents", len(non_competitive))
+            if progress_callback:
+                progress_callback(
+                    f"Wave 1: running sector specialist + {len(non_competitive)} agents...",
+                    32,
+                )
             specialist_coro = specialist.analyze(data)
-            wave1_coros = [self._run_agent(a, data) for a in non_competitive]
+            wave1_coros = [
+                self._run_agent(a, data, progress_callback=progress_callback)
+                for a in non_competitive
+            ]
             specialist_result, *wave1_reports = await asyncio.gather(
                 specialist_coro, *wave1_coros
             )
+            if progress_callback:
+                progress_callback("Sector specialist completed. Updating competitive context...", 58)
 
             data.enrichment_sections = {
                 **data.enrichment_sections,
@@ -551,21 +616,31 @@ class Orchestrator:
             }
 
             logger.info("Phase 1 wave 2: Competitive agent (with sector briefing)")
-            wave2_reports = [await self._run_agent(a, data) for a in competitive_agents]
+            if progress_callback:
+                progress_callback("Wave 2: running competitive analysis with sector briefing...", 62)
+            wave2_reports = [
+                await self._run_agent(a, data, progress_callback=progress_callback)
+                for a in competitive_agents
+            ]
             agent_reports = list(wave1_reports) + list(wave2_reports)
+            if progress_callback:
+                progress_callback("All analyst waves completed", 68)
         else:
-            agent_reports = await self.run_phase1(data)
+            agent_reports = await self.run_phase1(data, progress_callback=progress_callback)
 
         raw_synthesis = await self.run_phase2(
             data.ticker,
             data.company_name,
             agent_reports,
+            progress_callback=progress_callback,
         )
 
         structured, synthesis = _extract_structured_block(raw_synthesis)
 
         if structured:
             try:
+                if progress_callback:
+                    progress_callback("Saving analysis history and metadata...", 94)
                 health = structured.get("health_scores", {})
                 stop_loss_value = None
                 stop_loss_unit = ""
@@ -613,6 +688,8 @@ class Orchestrator:
                     },
                 )
                 logger.info("Analysis saved to history")
+                if progress_callback:
+                    progress_callback("History save complete", 97)
 
                 # Auto-paper-trade: enter position if conviction meets threshold
                 if settings.auto_paper_trade:
@@ -628,7 +705,11 @@ class Orchestrator:
                 daemon=True,
                 name=f"flywheel-{data.ticker}",
             ).start()
+            if progress_callback:
+                progress_callback("Queued background RAG refresh", 98)
 
+        if progress_callback:
+            progress_callback("Finalizing report output...", 99)
         return AnalysisResult(
             ticker=data.ticker,
             company_name=data.company_name,

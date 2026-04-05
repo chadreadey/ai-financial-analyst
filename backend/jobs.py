@@ -58,9 +58,12 @@ class ProgressReporter:
         self._step = 0
         self._total = 5
 
-    def write(self, message: str) -> None:
-        self._step += 1
-        pct = min(int(self._step / self._total * 100), 99)
+    def write(self, message: str, pct: Optional[int] = None) -> None:
+        if pct is None:
+            self._step += 1
+            pct = min(int(self._step / self._total * 100), 99)
+        else:
+            pct = max(1, min(int(pct), 99))
         self._job.progress_queue.put({"step": message, "pct": pct})
 
 
@@ -117,8 +120,8 @@ def run_analysis_job(job: JobState, request) -> None:
         )
 
         async def _pipeline():
-            reporter.write("Running full analysis pipeline...")
-            return await orchestrator.run(job.ticker)
+            reporter.write(f"Initializing analysis for {job.ticker}...", 2)
+            return await orchestrator.run(job.ticker, progress_callback=reporter.write)
 
         try:
             result = asyncio.run(_pipeline())
