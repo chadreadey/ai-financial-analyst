@@ -30,6 +30,7 @@ _ENRICHMENT_TASK_ORDER = (
     "price",
     "macro",
     "rag",
+    "fmp_extra",
 )
 
 
@@ -1044,6 +1045,99 @@ def _task_rag(ticker: str) -> Dict[str, Any]:
         }
 
 
+def _fmp_analyst_grades_section(ticker: str, fmp_cache) -> tuple[str, List[str]]:
+    """Recent analyst grade changes from FMP."""
+    grades = fmp_cache.get_grades_summary(ticker)
+    if not grades:
+        return "", []
+    lines = ["=== Analyst Grade Changes (FMP) ==="]
+    for g in grades[:10]:
+        firm = g.get("gradingCompany", "Unknown")
+        prev = g.get("previousGrade", "—")
+        new = g.get("newGrade", "—")
+        action = g.get("gradeAction", "")
+        date = g.get("date", "")[:10]
+        lines.append(f"  {date} {firm}: {prev} → {new} ({action})")
+    section = "\n".join(lines)
+    return trim_text(section, 800), ["FMP (analyst grades)"]
+
+
+def _fmp_news_section(ticker: str, fmp_cache) -> tuple[str, List[str]]:
+    """Recent stock news from FMP."""
+    news = fmp_cache.get_stock_news(ticker, limit=5)
+    if not news:
+        return "", []
+    lines = ["=== Recent News (FMP) ==="]
+    for n in news[:5]:
+        title = n.get("title", "")
+        date = (n.get("publishedDate") or "")[:10]
+        source = n.get("site", "")
+        lines.append(f"  [{date}] {title} ({source})")
+    section = "\n".join(lines)
+    return trim_text(section, 800), ["FMP (news)"]
+
+
+def _fmp_dcf_section(ticker: str, fmp_cache) -> tuple[str, List[str]]:
+    """FMP's automated DCF valuation for cross-check."""
+    dcf = fmp_cache.get_dcf_valuation(ticker)
+    if not dcf:
+        return "", []
+    price = dcf.get("stockPrice")
+    dcf_val = dcf.get("dcf")
+    if dcf_val is None:
+        return "", []
+    lines = ["=== DCF Cross-Check (FMP) ==="]
+    lines.append(f"  FMP DCF Fair Value: ${float(dcf_val):.2f}")
+    if price is not None:
+        upside = (float(dcf_val) - float(price)) / float(price) * 100
+        lines.append(f"  Current Price: ${float(price):.2f}")
+        lines.append(f"  Implied Upside/Downside: {upside:+.1f}%")
+    return "\n".join(lines), ["FMP (DCF valuation)"]
+
+
+def _fmp_institutional_section(ticker: str, fmp_cache) -> tuple[str, List[str]]:
+    """Top institutional holders from FMP."""
+    holders = fmp_cache.get_institutional_holders(ticker)
+    if not holders:
+        return "", []
+    lines = ["=== Top Institutional Holders (FMP) ==="]
+    for h in holders[:10]:
+        name = h.get("holder", "Unknown")
+        shares = h.get("shares", 0)
+        change = h.get("change", 0)
+        change_str = f" ({change:+,} shares)" if change else ""
+        lines.append(f"  {name}: {shares:,} shares{change_str}")
+    section = "\n".join(lines)
+    return trim_text(section, 800), ["FMP (institutional holders)"]
+
+
+def _task_fmp_extra(ticker: str, fmp_cache) -> Dict[str, Any]:
+    """Run the 4 FMP enrichment sections that aren't wired elsewhere."""
+    entries: list[tuple[str, str]] = []
+    sources: list[str] = []
+
+    for name, fn in [
+        ("fmp_analyst_grades", _fmp_analyst_grades_section),
+        ("fmp_news", _fmp_news_section),
+        ("fmp_dcf", _fmp_dcf_section),
+        ("fmp_institutional", _fmp_institutional_section),
+    ]:
+        try:
+            text, src = fn(ticker, fmp_cache)
+            if text:
+                entries.append((name, text))
+                sources.extend(src)
+        except Exception:
+            logger.debug("FMP %s failed for %s", name, ticker, exc_info=True)
+
+    return {
+        "section_entries": entries,
+        "sources": sources,
+        "warnings": [],
+        "filter_stats": {},
+    }
+
+
 def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object]:
     """
     Build optional enrichment context for downstream prompts.
@@ -1125,6 +1219,8 @@ def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object
             )
         if settings.enable_rag:
             futures["rag"] = pool.submit(_task_rag, ticker)
+        if fmp_cache:
+            futures["fmp_extra"] = pool.submit(_task_fmp_extra, ticker, fmp_cache)
 
         sector = ""
         industry = ""

@@ -31,6 +31,9 @@ class DCFAgent(BaseAgent):
         "segment_data",
         "rag_research",
         "timesfm_eps",
+        "fmp_dcf",
+        "fmp_analyst_grades",
+        "fmp_news",
     )
 
     system_prompt = """You are a senior equity research analyst at Morgan Stanley, \

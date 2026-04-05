@@ -22,7 +22,7 @@ class FMPClient:
     def call_count(self) -> int:
         return self._call_count
 
-    def _get(self, path: str, params: dict | None = None) -> Any:
+    def _get(self, path: str, params: Optional[dict] = None) -> Any:
         merged = dict(params) if params else {}
         merged["apikey"] = self._api_key
         with self._call_lock:
@@ -112,6 +112,35 @@ class FMPClient:
             logger.debug("fmp cash-flow (Q)/%s failed: %s", symbol, exc, exc_info=True)
             return []
 
+    def get_grades_summary(self, symbol: str) -> list[dict]:
+        try:
+            return self._get(f"/api/v3/grade/{symbol}", {"limit": 20})
+        except Exception as exc:
+            logger.debug("fmp grade/%s failed: %s", symbol, exc, exc_info=True)
+            return []
+
+    def get_stock_news(self, symbol: str, limit: int = 5) -> list[dict]:
+        try:
+            return self._get("/api/v3/stock_news", {"tickers": symbol, "limit": limit})
+        except Exception as exc:
+            logger.debug("fmp stock_news/%s failed: %s", symbol, exc, exc_info=True)
+            return []
+
+    def get_dcf_valuation(self, symbol: str) -> dict:
+        try:
+            data = self._get(f"/api/v3/discounted-cash-flow/{symbol}")
+            return data[0] if data else {}
+        except Exception as exc:
+            logger.debug("fmp dcf/%s failed: %s", symbol, exc, exc_info=True)
+            return {}
+
+    def get_institutional_holders(self, symbol: str) -> list[dict]:
+        try:
+            return self._get(f"/api/v3/institutional-holder/{symbol}")
+        except Exception as exc:
+            logger.debug("fmp institutional-holder/%s failed: %s", symbol, exc, exc_info=True)
+            return []
+
 
 class FMPCache:
     """Per-run cache for FMP responses. Two-lock pattern like YahooLookupCache."""
@@ -127,6 +156,10 @@ class FMPCache:
         self._income_q_cache: Dict[str, list] = {}
         self._balance_q_cache: Dict[str, list] = {}
         self._cashflow_q_cache: Dict[str, list] = {}
+        self._grades_cache: Dict[str, list] = {}
+        self._news_cache: Dict[str, list] = {}
+        self._dcf_cache: Dict[str, dict] = {}
+        self._holders_cache: Dict[str, list] = {}
 
     @property
     def call_count(self) -> int:
@@ -239,4 +272,49 @@ class FMPCache:
 
         with self._lock:
             self._cashflow_q_cache[key] = result
+            return list(result)
+
+    def get_grades_summary(self, symbol: str) -> list[dict]:
+        sym = symbol.upper()
+        with self._lock:
+            cached = self._grades_cache.get(sym)
+            if cached is not None:
+                return list(cached)
+        result = self._client.get_grades_summary(sym)
+        with self._lock:
+            self._grades_cache[sym] = result
+            return list(result)
+
+    def get_stock_news(self, symbol: str, limit: int = 5) -> list[dict]:
+        sym = symbol.upper()
+        key = f"{sym}:{limit}"
+        with self._lock:
+            cached = self._news_cache.get(key)
+            if cached is not None:
+                return list(cached)
+        result = self._client.get_stock_news(sym, limit)
+        with self._lock:
+            self._news_cache[key] = result
+            return list(result)
+
+    def get_dcf_valuation(self, symbol: str) -> dict:
+        sym = symbol.upper()
+        with self._lock:
+            cached = self._dcf_cache.get(sym)
+            if cached is not None:
+                return dict(cached)
+        result = self._client.get_dcf_valuation(sym)
+        with self._lock:
+            self._dcf_cache[sym] = result
+            return dict(result)
+
+    def get_institutional_holders(self, symbol: str) -> list[dict]:
+        sym = symbol.upper()
+        with self._lock:
+            cached = self._holders_cache.get(sym)
+            if cached is not None:
+                return list(cached)
+        result = self._client.get_institutional_holders(sym)
+        with self._lock:
+            self._holders_cache[sym] = result
             return list(result)
