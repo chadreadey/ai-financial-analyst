@@ -1,6 +1,6 @@
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, RefreshCw } from "lucide-react";
 import { Card } from "../components/common/Card";
 import { PriceHistoryTab } from "../components/deepdive/PriceHistoryTab";
 import { HistoricalPerformanceCards } from "../components/deepdive/HistoricalPerformanceCards";
@@ -11,6 +11,7 @@ import type { WatchlistSummary } from "../api/types";
 
 export function StockDeepDivePage() {
   const { ticker } = useParams<{ ticker: string }>();
+  const navigate = useNavigate();
   const t = ticker?.toUpperCase() || "";
   const { records } = useRecommendationHistory(t);
   const [summary, setSummary] = useState<WatchlistSummary | undefined>();
@@ -23,13 +24,22 @@ export function StockDeepDivePage() {
 
   return (
     <div className="space-y-6">
-      <Link
-        to="/portfolio"
-        className="flex items-center gap-2 text-sm"
-        style={{ color: "var(--accent-blue)" }}
-      >
-        <ArrowLeft size={16} /> Back to Watchlist
-      </Link>
+      <div className="flex items-center justify-between">
+        <Link
+          to="/portfolio"
+          className="flex items-center gap-2 text-sm"
+          style={{ color: "var(--accent-blue)" }}
+        >
+          <ArrowLeft size={16} /> Back to Watchlist
+        </Link>
+        <button
+          onClick={() => navigate(`/analysis?ticker=${t}`)}
+          className="flex items-center gap-2 text-sm px-3 py-1.5 rounded"
+          style={{ background: "var(--accent-blue)", color: "#fff" }}
+        >
+          <RefreshCw size={14} /> Re-run Analysis
+        </button>
+      </div>
 
       <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
         {t}

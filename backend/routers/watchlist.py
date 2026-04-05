@@ -90,6 +90,20 @@ async def remove_from_watchlist(ticker: str):
     return {"status": "ok", "ticker": ticker.upper()}
 
 
+def _compute_outcome(verdict: str, entry_price: float | None, current_price: float | None) -> str | None:
+    if entry_price is None or current_price is None or entry_price <= 0:
+        return None
+    v = (verdict or "").upper()
+    bullish = any(x in v for x in ("BUY",))
+    bearish = any(x in v for x in ("SELL",))
+    if not bullish and not bearish:
+        return None
+    price_up = current_price > entry_price
+    if (bullish and price_up) or (bearish and not price_up):
+        return "hit"
+    return "miss"
+
+
 @router.get("/{ticker}/summary")
 async def get_watchlist_summary(ticker: str):
     ticker = ticker.upper()
@@ -101,9 +115,30 @@ async def get_watchlist_summary(ticker: str):
             client = TiingoClient(tiingo_key)
             data = client.get_quote(ticker)
             if data:
-                current_price = float(data.get("last") or data.get("close") or 0)
+                current_price = float(data.get("last") or data.get("close") or 0) or None
         except Exception:
             pass
+
+    # Compute hit rate from analysis_history outcomes
+    hit_rate_pct: float | None = None
+    try:
+        conn = sqlite3.connect(settings.warehouse_db_path)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT verdict, entry_price_at_run FROM analysis_history WHERE ticker = ? ORDER BY run_at DESC LIMIT 20",
+            (ticker,),
+        ).fetchall()
+        conn.close()
+        outcomes = [
+            _compute_outcome(r["verdict"], r["entry_price_at_run"], current_price)
+            for r in rows
+        ]
+        scored = [o for o in outcomes if o is not None]
+        if scored:
+            hits = sum(1 for o in scored if o == "hit")
+            hit_rate_pct = round(hits / len(scored) * 100, 1)
+    except Exception:
+        pass
 
     period_statuses = {
         "3mo": "pending",
@@ -116,5 +151,6 @@ async def get_watchlist_summary(ticker: str):
     return WatchlistSummary(
         ticker=ticker,
         current_price=current_price,
+        hit_rate_pct=hit_rate_pct,
         period_statuses=period_statuses,
     )

@@ -25,14 +25,16 @@ async def get_recommendation_history(ticker: str):
 
         records = []
         for r in rows:
+            entry = r["entry_price_at_run"] if "entry_price_at_run" in r.keys() else None
+            target = r["price_target"] if "price_target" in r.keys() else None
             records.append({
                 "run_at": r["run_at"],
                 "verdict": r["verdict"],
                 "conviction": r["conviction"] or "",
                 "composite_score": r["composite_score"],
-                "entry_price": None,
-                "target_price": None,
-                "time_horizon": None,
+                "entry_price": entry,
+                "target_price": target,
+                "time_horizon": r["time_horizon"] if "time_horizon" in r.keys() else None,
                 "outcome": None,
                 "outcome_price": None,
                 "outcome_date": None,
