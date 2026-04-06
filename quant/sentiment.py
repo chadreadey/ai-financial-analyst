@@ -59,19 +59,19 @@ def compute_news_sentiment_score(
     if _vader is None:
         return SignalResult(0.0, "vaderSentiment not installed", {"n_articles": 0})
 
-    if client is None:
-        return SignalResult(0.0, "no finnhub client", {"n_articles": 0})
-
     from_date = (as_of_date - timedelta(days=news_window_days)).strftime("%Y-%m-%d")
     to_date = as_of_date.strftime("%Y-%m-%d")
     sym = ticker.upper()
 
-    # Try disk cache first
+    # Try disk cache first — works even without a live client
     articles = None
     if disk_cache is not None:
         articles = disk_cache.load_news(sym, from_date, to_date)
 
+    # Fall back to live API only if cache missed and client is available
     if articles is None:
+        if client is None:
+            return SignalResult(0.0, "no finnhub client and no cache hit", {"n_articles": 0})
         articles = client.get_company_news(sym, from_date, to_date)
         if disk_cache is not None:
             disk_cache.save_news(sym, from_date, to_date, articles)
@@ -137,9 +137,6 @@ def compute_insider_sentiment_score(
     Uses the average MSPR over the last `lookback_months` months,
     lagged by 1 month to avoid lookahead (insider filings have ~2 day delay).
     """
-    if client is None:
-        return SignalResult(0.0, "no finnhub client", {"n_months": 0})
-
     sym = ticker.upper()
     # Lag by 1 month for point-in-time safety
     end = as_of_date - timedelta(days=30)
@@ -148,12 +145,15 @@ def compute_insider_sentiment_score(
     from_date = start.strftime("%Y-%m-%d")
     to_date = end.strftime("%Y-%m-%d")
 
-    # Try disk cache
+    # Try disk cache first — works even without a live client
     records = None
     if disk_cache is not None:
         records = disk_cache.load_insider(sym, from_date, to_date)
 
+    # Fall back to live API only if cache missed and client is available
     if records is None:
+        if client is None:
+            return SignalResult(0.0, "no finnhub client and no cache hit", {"n_months": 0})
         records = client.get_insider_sentiment(sym, from_date, to_date)
         if disk_cache is not None:
             disk_cache.save_insider(sym, from_date, to_date, records)

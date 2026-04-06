@@ -1239,14 +1239,16 @@ def run_backtest(
 
     # Auto-init Finnhub client if sentiment is enabled
     global _finnhub_client, _sentiment_cache
-    if config.enable_news_sentiment and _finnhub_client is None:
-        finnhub_key = os.getenv("FINNHUB_API_KEY", "").strip()
-        if finnhub_key:
-            from finnhub_client import FinnhubClient, SentimentDiskCache
-            _finnhub_client = FinnhubClient(finnhub_key)
+    if config.enable_news_sentiment:
+        from finnhub_client import FinnhubClient, SentimentDiskCache
+        if _sentiment_cache is None:
             _sentiment_cache = SentimentDiskCache()
-        else:
-            logger.warning("enable_news_sentiment=True but FINNHUB_API_KEY not set")
+        if _finnhub_client is None:
+            finnhub_key = os.getenv("FINNHUB_API_KEY", "").strip()
+            if finnhub_key:
+                _finnhub_client = FinnhubClient(finnhub_key)
+            else:
+                logger.info("FINNHUB_API_KEY not set — sentiment will run from cache only")
 
     # ── 1. Load data ──────────────────────────────────────────────
     if progress_cb:
@@ -1356,7 +1358,7 @@ def run_backtest(
                 )
 
         # Sentiment overlay (after IC + LSTM blends)
-        if config.enable_news_sentiment and _finnhub_client is not None:
+        if config.enable_news_sentiment and (_finnhub_client is not None or _sentiment_cache is not None):
             sent_scores = compute_sentiment_scores(
                 universe_data, reb_date, config,
                 client=_finnhub_client, disk_cache=_sentiment_cache,
@@ -1536,14 +1538,16 @@ def run_walk_forward(
 
     # Auto-init Finnhub client if sentiment is enabled
     global _finnhub_client, _sentiment_cache
-    if config.enable_news_sentiment and _finnhub_client is None:
-        finnhub_key = os.getenv("FINNHUB_API_KEY", "").strip()
-        if finnhub_key:
-            from finnhub_client import FinnhubClient, SentimentDiskCache
-            _finnhub_client = FinnhubClient(finnhub_key)
+    if config.enable_news_sentiment:
+        from finnhub_client import FinnhubClient, SentimentDiskCache
+        if _sentiment_cache is None:
             _sentiment_cache = SentimentDiskCache()
-        else:
-            logger.warning("enable_news_sentiment=True but FINNHUB_API_KEY not set")
+        if _finnhub_client is None:
+            finnhub_key = os.getenv("FINNHUB_API_KEY", "").strip()
+            if finnhub_key:
+                _finnhub_client = FinnhubClient(finnhub_key)
+            else:
+                logger.info("FINNHUB_API_KEY not set — sentiment will run from cache only")
 
     # Load all data once
     if progress_cb:
@@ -1696,7 +1700,7 @@ def run_walk_forward(
                     )
 
             # Sentiment overlay (after IC + LSTM blends)
-            if config.enable_news_sentiment and _finnhub_client is not None:
+            if config.enable_news_sentiment and (_finnhub_client is not None or _sentiment_cache is not None):
                 sent_scores = compute_sentiment_scores(
                     universe_data, reb_date, config,
                     client=_finnhub_client, disk_cache=_sentiment_cache,
