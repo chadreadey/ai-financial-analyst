@@ -84,15 +84,25 @@ class TimesFMModel:
                 logger.warning("No TimesFM loader found in timesfm package")
                 return None
 
-            # Compile with ForecastConfig if available (2.5+)
+            # Compile with ForecastConfig if available (2.0+)
+            # horizon must be set at compile time, not forecast time
             if hasattr(timesfm, "ForecastConfig"):
-                model.compile(
-                    timesfm.ForecastConfig(
-                        normalize_inputs=True,
-                        use_continuous_quantile_head=True,
-                        fix_quantile_crossing=True,
+                compile_kwargs = {"horizon": 128}
+                # 2.5 added these options
+                try:
+                    model.compile(
+                        timesfm.ForecastConfig(
+                            normalize_inputs=True,
+                            use_continuous_quantile_head=True,
+                            fix_quantile_crossing=True,
+                            **compile_kwargs,
+                        )
                     )
-                )
+                except TypeError:
+                    # Older ForecastConfig may not accept all kwargs
+                    model.compile(
+                        timesfm.ForecastConfig(**compile_kwargs)
+                    )
 
             inst = cls(model, backend="timesfm")
             # Pre-warm
