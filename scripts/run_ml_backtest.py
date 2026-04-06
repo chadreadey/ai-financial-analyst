@@ -194,22 +194,25 @@ def run_lstm_walk_forward(config: BacktestConfig) -> BacktestResult:
         from quant.backtest import load_vix_data
         vix_df = load_vix_data(fetch_start)
 
-    # Generate walk-forward windows
+    # Generate walk-forward windows (rolling: advance by test_months each step)
+    from datetime import timedelta
     bt_start = pd.Timestamp(config.start_date)
     bt_end = pd.Timestamp(config.end_date)
 
     windows = []
     cursor = bt_start
-    while cursor < bt_end:
-        train_start = cursor - pd.DateOffset(months=config.train_months)
-        test_end = min(cursor + pd.DateOffset(months=config.test_months), bt_end)
+    while True:
+        train_end = cursor + timedelta(days=config.train_months * 30)
+        test_end = train_end + timedelta(days=config.test_months * 30)
+        if test_end > bt_end:
+            break
         windows.append({
-            "train_start": train_start.strftime("%Y-%m-%d"),
-            "train_end": cursor.strftime("%Y-%m-%d"),
-            "test_start": cursor.strftime("%Y-%m-%d"),
+            "train_start": cursor.strftime("%Y-%m-%d"),
+            "train_end": train_end.strftime("%Y-%m-%d"),
+            "test_start": train_end.strftime("%Y-%m-%d"),
             "test_end": test_end.strftime("%Y-%m-%d"),
         })
-        cursor = test_end
+        cursor += timedelta(days=config.test_months * 30)
 
     progress(f"Walk-forward: {len(windows)} windows, train={config.train_months}mo, test={config.test_months}mo")
 
@@ -416,6 +419,16 @@ def main():
     parser.add_argument("--horizon", type=int, default=20,
                         help="Forward return prediction horizon in days (default: 20)")
     parser.add_argument("--max-epochs", type=int, default=100)
+    parser.add_argument("--no-shorts", action="store_true",
+                        help="Disable short selling entirely (long-only mode)")
+    parser.add_argument("--no-ic-calibration", action="store_true",
+                        help="Disable IC-based signal weight calibration")
+    parser.add_argument("--train-months", type=int, default=24,
+                        help="Walk-forward train window months (default: 24)")
+    parser.add_argument("--test-months", type=int, default=6,
+                        help="Walk-forward test window months (default: 6)")
+    parser.add_argument("--enable-news-sentiment", action="store_true",
+                        help="Enable Finnhub news sentiment signal")
     parser.add_argument("--output", default="", help="Save results to JSON file")
     parser.add_argument("--verbose", "-v", action="store_true")
 
@@ -447,6 +460,11 @@ def main():
         start_date=args.start,
         end_date=args.end,
         rebalance_freq=args.rebalance,
+        short_threshold=-999.0 if args.no_shorts else -0.40,
+        enable_ic_calibration=not args.no_ic_calibration,
+        enable_news_sentiment=args.enable_news_sentiment,
+        train_months=args.train_months,
+        test_months=args.test_months,
         # LSTM params
         enable_lstm=False,  # start with baseline
         lstm_weight=args.lstm_weight,

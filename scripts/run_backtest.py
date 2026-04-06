@@ -129,6 +129,8 @@ def main():
                         help="Disable death/golden cross detection (enabled by default)")
     parser.add_argument("--short-min-signals", type=int, default=3,
                         help="Min bearish signals (of 5) to allow a short (default: 3)")
+    parser.add_argument("--no-shorts", action="store_true",
+                        help="Disable short selling entirely (long-only mode)")
     parser.add_argument("--no-ic-calibration", action="store_true",
                         help="Disable IC-based signal weight calibration (enabled by default)")
     parser.add_argument("--ic-shrinkage", type=float, default=0.90,
@@ -182,7 +184,7 @@ def main():
         end_date=args.end,
         rebalance_freq=args.rebalance,
         long_threshold=args.long_threshold,
-        short_threshold=args.short_threshold,
+        short_threshold=-999.0 if args.no_shorts else args.short_threshold,
         enable_regime_filter=regime_on,
         vix_caution_threshold=args.vix_caution,
         vix_risk_off_threshold=args.vix_risk_off,

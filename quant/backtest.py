@@ -1649,7 +1649,7 @@ def run_walk_forward(
             "test_start": train_end.strftime("%Y-%m-%d"),
             "test_end": test_end.strftime("%Y-%m-%d"),
         })
-        cursor = train_end  # slide forward by test_months
+        cursor += timedelta(days=config.test_months * 30)  # slide forward by test_months (rolling windows)
 
     if not windows:
         result.status = "error"
