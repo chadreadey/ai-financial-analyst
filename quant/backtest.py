@@ -707,15 +707,20 @@ def compute_sentiment_scores(
     Compute news sentiment score for each stock as of a date.
     Returns {ticker: (score, n_articles)} where score is in [-1, +1].
 
-    n_articles is the raw news article count — used by blend_sentiment_into_signals
-    to scale effective weight by coverage density. Insider MSPR always counts as
-    full coverage (it's a clean signal, not sparse text).
+    Scores are cross-sectionally z-score normalized across the universe before
+    returning. This removes the structural bullish bias in financial news (VADER
+    on headlines skews positive for nearly all stocks) so what's blended is
+    *relative* sentiment — a stock with better-than-average news vs one with
+    worse-than-average — rather than an absolute level that inflates all scores.
 
-    Blends news sentiment (VADER on headlines) with insider MSPR if available.
+    Normalization: z = (raw - universe_mean) / universe_std, scaled to [-1, +1]
+    via tanh(z) so extreme outliers are capped smoothly. Only tickers with
+    sufficient coverage (n_articles >= min_articles) participate in the
+    normalization pool; insider-only tickers are normalized separately.
     """
     from quant.sentiment import compute_news_sentiment_score, compute_insider_sentiment_score
 
-    scores = {}
+    raw_scores: dict[str, tuple[float, int]] = {}
     for ticker in universe_data:
         # News sentiment
         news_result = compute_news_sentiment_score(
@@ -746,9 +751,33 @@ def compute_sentiment_scores(
         else:
             continue  # no signal
 
-        scores[ticker] = (float(np.clip(combined, -1.0, 1.0)), n_articles)
+        raw_scores[ticker] = (float(np.clip(combined, -1.0, 1.0)), n_articles)
 
-    return scores
+    if not raw_scores:
+        return raw_scores
+
+    # Cross-sectional z-score normalization — remove universe-wide bullish bias
+    # Only news-covered tickers drive the mean/std (insider-only are sparse noise)
+    news_vals = [s for s, n in raw_scores.values() if n >= config.news_sentiment_min_articles]
+    if len(news_vals) >= 3:
+        mean_s = float(np.mean(news_vals))
+        std_s = float(np.std(news_vals))
+        if std_s < 1e-6:
+            std_s = 1e-6
+        normalized: dict[str, tuple[float, int]] = {}
+        for ticker, (score, n_articles) in raw_scores.items():
+            if n_articles >= config.news_sentiment_min_articles:
+                z = (score - mean_s) / std_s
+                # tanh maps z-score smoothly to (-1, +1); scale=0.5 keeps it conservative
+                norm_score = float(np.tanh(z * 0.5))
+            else:
+                # Insider-only: pass through unmodified (MSPR is already relative)
+                norm_score = score
+            normalized[ticker] = (norm_score, n_articles)
+        return normalized
+
+    # Not enough covered tickers to normalize — return raw (rare case)
+    return raw_scores
 
 
 _SENTIMENT_COVERAGE_FULL = 20   # articles/month for full weight
@@ -805,6 +834,20 @@ def blend_sentiment_into_signals(
             # No meaningful weight — skip blend but still log the raw signal
             sv.flags.append(
                 f"sentiment_suppressed(articles={n_articles},regime={vol_regime})"
+            )
+            continue
+
+        # Asymmetric blend: sentiment and quant signal must agree on direction
+        # for shorts. Positive news on a bearish stock is a conflict — flag it
+        # and skip the blend rather than diluting short conviction.
+        # For longs, sentiment can both add and reduce conviction (symmetric).
+        is_short_candidate = sv.composite_score < 0
+        sentiment_conflicts_short = is_short_candidate and score > 0
+
+        if sentiment_conflicts_short:
+            sv.flags.append(
+                f"sentiment_conflict(quant=bearish,news=bullish,score={score:.2f},"
+                f"articles={n_articles})"
             )
             continue
 
