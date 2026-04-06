@@ -15,6 +15,8 @@ __pycache__/
 .warehouse.db
 reports/
 .seeded_tickers.txt
+backtest_*.json
+reproducibility_*.json
 
 # Build artifacts
 *.egg-info/

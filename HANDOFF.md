@@ -24,17 +24,6 @@ Production 6-agent equity research platform. User inputs a stock ticker → 6 sp
 **Railway project:** `eloquent-alignment`, service `ai-financial-analyst`  
 **Vercel project:** `frontend` under team `chadreadey-7282s-projects`
 
-### CLI Access (already configured locally)
-```bash
-railway link --project 06865ced-9179-4296-82f1-9a846ad61588 --environment production
-railway service ai-financial-analyst
-vercel link --scope chadreadey-7282s-projects --yes  # run from frontend/
-```
-
-### One pending Railway task
-Add a **Volume** at `/data` in the Railway dashboard so SQLite DBs persist across deploys.  
-Dashboard → `ai-financial-analyst` service → Volumes → Add → mount path `/data`
-
 ---
 
 ## Stack
@@ -47,7 +36,7 @@ Dashboard → `ai-financial-analyst` service → Volumes → Add → mount path 
 | LLM | Anthropic `claude-sonnet-4-20250514` (default) |
 | Market data | Tiingo (price/quotes), FMP (estimates/earnings), FRED (macro) |
 | SEC data | EDGAR API + edgartools + custom XBRL parser |
-| RAG | Pinecone, index `financial-analyst`, llama-text-embed-v2 |
+| RAG | Pinecone, index `financial-analyst`, llama-text-embed-v2 (currently disabled) |
 | Cache | SQLite (SEC + warehouse), Redis (TimesFM — optional) |
 | Hosting | Railway (API) + Vercel (frontend) |
 | Monitoring | Sentry (FastAPI only — frontend Sentry not yet wired) |
@@ -77,27 +66,89 @@ agents/{dcf,risk,earnings,competitive,pattern,macro}.py
 market_enrichment.py         ← parallel enrichment: Tiingo, FMP, FRED, Tavily, peers, RAG
 warehouse/                   ← SQLite persistent filing warehouse
 quant/backtest.py            ← quant-only backtest engine (no LLM)
+quant/signals.py             ← 6 deterministic technical signals
 quant/universe.py            ← S&P 500 subset ticker lists (liquid_10/20/50)
-quant/timesfm/               ← TimesFM nightly batch + Redis cache (ENABLE_TIMESFM=false)
+quant/timesfm/               ← TimesFM/Chronos model wrapper + signal extraction
 ```
 
 ---
 
-## Key Architecture Rules
+## Quant Backtest Engine (as of 2026-04-05)
 
-- **SQLite thread safety:** Never pass SQLite connections across threads. Every `WarehouseDB` method opens a fresh connection.
-- **ENABLE_* flags:** All features gated via Pydantic `BaseSettings` in `config.py`. Use `settings.enable_*` in new code.
-- **Context budget:** `context_budget.py` `trim_text()` enforces per-agent char caps before LLM calls.
-- **LWC v5:** `PriceChart.tsx` uses `createSeriesMarkers(series, markers)` — NOT `series.setMarkers()` (that's v4, will crash).
-- **TimesFM:** Fully scaffolded in `quant/timesfm/` but `ENABLE_TIMESFM=false`. Not tested with real model yet.
-- **CORS:** Backend reads `CORS_ORIGINS` env var for extra allowed origins (Railway has `https://frontend-sage-nu-51.vercel.app` set).
-- **Peer validation:** Peer candidates from Tavily are validated against the SEC ticker map (~13k tickers). Prevents brand names (NIKE, ASICS) from being treated as tickers.
+### What's Built
+
+`quant/backtest.py` — full quant-only backtest engine with:
+- **6 technical signals**: SMA trend, mean reversion Z-score, Bollinger %B, RSI, OBV trend, ATR regime
+- **Multi-level regime detection**: VIX thresholds (caution=20, risk-off=28) + SPY 200d SMA + death/golden cross (50d vs 200d SMA)
+- **Position sizing by regime**: risk_off=25%, bearish=50%, cautious=70%, bullish/strong_bull=100%
+- **VIX-driven risk-off blocks ALL positions** (both longs and shorts) to prevent snap-back losses
+- **Golden cross lowers long threshold** by 0.10 (more aggressive entries in strong trends)
+- **IC weight calibration** (adaptive signal weights from trailing Spearman rank IC) — works but equal weights outperform OOS
+- **TimesFM/Chronos overlay** as optional 7th signal (blended into composite score)
+- **Walk-forward validation** with rolling train/test windows
+- **Local CSV price cache** in `.price_cache/` to avoid Tiingo rate limits
+- **VIX data** fetched from yfinance with local cache
+
+### Best Configuration Found
+
+| Parameter | Value | Why |
+|-----------|-------|-----|
+| Regime filter | ON | VIX + death/golden cross |
+| VIX caution threshold | 20 | Reduce sizing when elevated |
+| VIX risk-off threshold | 28 | Go to cash (no longs or shorts) |
+| Death/golden cross | ON | SPY 50d vs 200d SMA |
+| Short threshold | -0.40 | Tightened from -0.20 |
+| Long threshold | 0.20 | Standard |
+| IC calibration | OFF | Equal weights more robust OOS |
+| Rebalance | Monthly (in-sample), Weekly (walk-forward) | Weekly survives crises better |
+
+### Performance Results
+
+**Single-period (liquid_10, 2022-2026, monthly):**
+- **Sharpe 1.10**, +51.76% return, +6.21% alpha over SPY, 9.63% max drawdown
+
+**Walk-forward (liquid_20, 2018-2026, weekly):**
+- **Sharpe 0.42**, +4.08% return, 10.62% max drawdown, positive across all windows
+
+**Previous (before VIX regime):** Sharpe 0.58 single-period, -0.50 walk-forward
+
+### CLI
+
+```bash
+# Single backtest
+python scripts/run_backtest.py --universe liquid_10 --start 2022-01-01 --no-ic-calibration
+
+# Walk-forward
+python scripts/run_backtest.py --universe liquid_20 --start 2018-01-01 --walk-forward --rebalance weekly --no-ic-calibration
+
+# TimesFM/Chronos overlay A/B
+python scripts/run_timesfm_backtest.py --universe liquid_10 --start 2022-01-01 --sweep-weights
+
+# All flags
+--universe liquid_10|liquid_20|liquid_50
+--tickers AAPL,MSFT,GOOGL
+--start/--end YYYY-MM-DD
+--rebalance weekly|monthly
+--long-threshold 0.20 / --short-threshold -0.40
+--vix-caution 20 / --vix-risk-off 28
+--no-regime-filter / --no-cross-detection
+--no-ic-calibration / --ic-shrinkage 0.90
+--walk-forward / --train-months 24 / --test-months 6
+--max-positions 10 / --short-min-signals 3
+```
+
+### TimesFM / Chronos Status
+
+- **Model wrapper** (`quant/timesfm/model.py`): Tries Google TimesFM first, falls back to Amazon Chronos-T5-Small
+- **TimesFM** requires Linux + `pip install timesfm torch`. API compat for v2.0: uses `max_horizon` in `ForecastConfig`, `inspect.signature` to detect `freq` param support
+- **Chronos** works on macOS x86_64 CPU: `pip install chronos-forecasting torch` (py312 env)
+- **Chronos A/B result**: Neutral impact — Sharpe 0.81 vs 0.82 baseline at 15% weight
+- **TimesFM A/B on Colab T4**: IN PROGRESS — user running on Google Colab with T4 GPU. Results pending.
+- Local py312 env for Chronos: `/Users/chadreadey/opt/anaconda3/envs/py312/bin/python`
 
 ---
 
-## Signal Architecture (as of 2026-04-05)
-
-The system has been redesigned from equity-research narration to systematic trading signals.
+## Signal Architecture
 
 ### Synthesis Agent → Signal Aggregator
 
@@ -106,119 +157,72 @@ The system has been redesigned from equity-research narration to systematic trad
 - Scores are combined using IC-weighted averages (Earnings 0.22, Pattern 0.18, Risk 0.17, DCF 0.17, Competitive 0.14, Macro 0.12)
 - Macro operates as a **regime multiplier** (adverse macro scales all conviction by 0.7), not an additive signal
 - Output is JSON-first with `conviction_score` (0-1), `weighted_score` (-1 to +1), `signal_breakdown`, `prior_bull_probability`, `sizing_guidance`
-- Verdict maps directly to sizing: STRONG BUY = 1.5× weight, BUY = 1.0×, HOLD = 0×, SELL = 1.0× short, STRONG SELL = 1.5× short
-- Price targets are triangulated across DCF intrinsic value, peer multiples, analyst consensus, and technical levels
 
 ### Pattern Agent → Math-Based Signals + LLM Interpretation
 
-Technical signals are now **computed with exact math** in `quant/signals.py` (not LLM-approximated):
-- **SMA Trend** (weight 0.25) — 50/200-day crossover, gate signal for longs
-- **Mean Reversion Z-score** (weight 0.20) — suppressed on trending stocks (>30% drift)
+Technical signals computed with exact math in `quant/signals.py` (not LLM-approximated):
+- **SMA Trend** (weight 0.25) — 50/200-day crossover
+- **Mean Reversion Z-score** (weight 0.20) — suppressed on trending stocks
 - **Bollinger %B** (weight 0.20) — with squeeze detection
-- **RSI** (weight 0.15) — with divergence detection bonus
+- **RSI** (weight 0.15) — with divergence detection
 - **OBV Trend** (weight 0.20) — volume confirmation
-- **ATR Regime** (no weight) — position sizing and stop-loss calculation only
-- Composite score: weighted sum, |score| ≥ 0.40 is actionable for paper trading
-
-Computed signals flow via the `computed_signals` enrichment section. The pattern agent LLM **interprets** pre-computed scores (does not compute them). Proven deterministic: std=0.000000 across runs.
-
-Reproducibility tester: `python scripts/test_reproducibility.py AAPL --runs 5`
+- **ATR Regime** (no weight) — position sizing / stop-loss only
 
 ### Auto-Paper-Trade Pipeline
 
 `orchestrator.py → _auto_paper_trade()` fires after every analysis:
-- If `conviction_score ≥ settings.auto_paper_trade_min_conviction` (default 0.40):
-  - BUY/STRONG BUY → LONG position auto-created
-  - SELL/STRONG SELL → SHORT position auto-created
-  - HOLD → no action
-- Stop-loss and horizon are written as `exit_conditions` on the position
-- Paper positions now have `direction` (LONG/SHORT) and `conviction_score` columns
-- PnL math is direction-aware: LONG = (exit - entry) / entry, SHORT = (entry - exit) / entry
-- Controlled by `AUTO_PAPER_TRADE=true` and `AUTO_PAPER_TRADE_MIN_CONVICTION=0.40` env vars
+- conviction_score ≥ 0.40 → auto-enter position (LONG for BUY, SHORT for SELL)
+- Stop-loss override: deterministic from 2×ATR, sanity checks on LLM output
+- Entry price override: always uses market price, never trusts LLM
 
 ---
 
-## Frontend Pages
+## LLM Variance Problem
 
-| Route | Page | Status |
-|-------|------|--------|
-| `/analysis` | Stock analysis with SSE progress stream | ✅ Working |
-| `/portfolio` | Watchlist grid with sparklines | ✅ Working |
-| `/stock/:ticker` | Deep dive with price chart, hit rate, rec cards, re-run button | ✅ Working |
-| `/news` | FMP news feed | ✅ Working |
-| `/industry` | Sector overview | ✅ Working |
-| `/backtest` | Walk-forward backtest with NL config | ✅ Working |
-| `/paper-trading` | Virtual portfolio + equity curve | ✅ Working |
-
----
-
-## What's Left (see TODO.md for full detail)
-
-**Completed (2026-04-05):**
-- ~~Railway Volume~~ — `/data` volume attached, `WAREHOUSE_DB_PATH=/data/warehouse.db`
-- ~~Sentry on frontend~~ — `@sentry/react` installed, `VITE_SENTRY_DSN` in Vercel
-- ~~Schema migration~~ — `conviction_score`, `bull_probability`, `bear_probability`, `weighted_score`, `sizing_guidance` columns added
-- ~~StockDeepDivePage~~ — entry/target prices, hit rate, re-run analysis button wired
-- ~~Synthesis → Decision Engine~~ — signal aggregator with IC-weighted scoring, JSON-first output
-- ~~Pattern Agent → Signal Vector~~ — SMA, Bollinger, RSI, OBV, mean reversion, ATR signals
-- ~~Auto-paper-trade~~ — orchestrator auto-enters positions on conviction ≥ 0.40
-- ~~Short position support~~ — direction column, correct PnL math
-- ~~FMP stable API migration~~ — all FMP endpoints migrated from legacy v3/v4 to /stable/
-- ~~FMP enrichment wiring~~ — analyst grades, DCF cross-check, news, institutional holders
-- ~~Entry price override~~ — orchestrator forces market price, never trusts LLM
-- ~~Auto-paper-trade fallback~~ — derives conviction from old-format JSON when conviction_score missing
-- ~~Math-based technical signals~~ — `quant/signals.py` replaces LLM-approximated indicators
-- ~~Signal reproducibility tester~~ — `scripts/test_reproducibility.py`
-
-**Next priority — see `PLAN_NEXT.md` for full roadmap:**
-1. ~~**Quant-only backtest engine**~~ — DONE. `quant/backtest.py` + `scripts/run_backtest.py`. Run: `python scripts/run_backtest.py --universe liquid_20 --start 2018-01-01 --walk-forward`
-2. **TimeSeriesFM backtest overlay** — add P50 forecast as 7th signal, test additive value.
-3. **IC weight calibration** — replace hardcoded weights with data-derived IC from backtest results.
-4. **API authentication** — add API key middleware before any investor demos.
-5. **50+ paper trades** — daily scan script to accumulate tracked outcomes.
-
-**Also remaining (lower priority):**
-6. **Alpha vs SPY** — compute in watchlist summary endpoint
-7. **Replace SQLite with Postgres** — for concurrent safety
-8. **Insider Transactions Agent** — Form 4 via edgartools → `agents/insider.py`
-9. **Earnings Call Transcript Agent** — 8-K exhibit text → `agents/transcript.py`
-10. **RAG auto-reseed** — after `change_detector.incremental_update()` finds new filings, re-seed Pinecone
-7. **Multi-ticker scanner page** — batch analysis of 3-10 tickers with ranked table
-
----
-
-## Env Vars (already set in Railway + local .env)
-
-All keys are populated: `ANTHROPIC_API_KEY`, `TIINGO_API_KEY`, `FMP_API_KEY`, `FRED_API_KEY`, `TAVILY_API_KEY`, `PINECONE_API_KEY`, `SENTRY_DSN`.
-
-To add a new env var to Railway:
-```bash
-railway service ai-financial-analyst
-railway variables set KEY=VALUE
-```
-
-To add to Vercel frontend:
-```bash
-cd frontend && echo "VALUE" | vercel env add KEY production
-vercel deploy --prod --yes --scope chadreadey-7282s-projects
-```
+Documented in memory. Key stats from 5-run AAPL reproducibility test:
+- DCF std=0.30, conviction std=0.22 — high variance across identical inputs
+- **Mitigations implemented**: deterministic signal computation, entry/stop-loss overrides
+- **Mitigations planned**: GraphRAG (see `PLAN_GRAPHRAG.md`), constrained DCF inputs, ensemble averaging
 
 ---
 
 ## Recent Git History
 
 ```
+85b5f41 fix: use max_horizon (not horizon) in TimesFM ForecastConfig
+3ae9cb2 fix: set horizon=128 at TimesFM compile time, not forecast time
+c8223e6 fix: TimesFM 2.0 API compat — remove freq param, fix singleton caching
+28cf3ae feat: VIX regime detection, death/golden cross, IC calibration, Chronos fallback
+7b6e4b5 fix: override LLM stop_loss with computed value when nonsensical
+0a7addf chore: planning + reproducibility testing
+2c75ec7 docs: update handoff and plan for session handover
 055441a feat: math-based technical signals + reproducibility tester + plan
 2991e74 fix: override LLM entry_price with actual market price
 400e543 fix: auto-paper-trade fallback for missing conviction_score
-7225d27 fix: migrate FMP client from legacy v3/v4 to stable API endpoints
-2a8cc71 feat: wire FMP enrichment sections into agent pipeline
-773363d fix: capture prose both before and after JSON block in synthesis output
-2a4498e feat: signal engine rewrite + auto-paper-trade pipeline
-762885c feat: wire StockDeepDivePage with entry/target prices, hit rate, re-run button
-83b3c5a feat: add Sentry error monitoring to React frontend
-04ad9fd docs: replace planning docs with TODO.md and full README rewrite
 ```
+
+---
+
+## What's Next
+
+### Immediate (in priority order)
+1. **TimesFM backtest results** — user running sweep on Colab T4. Analyze results when available.
+2. **Two-tier rebalancing** — quant signals run weekly (free), trigger LLM analysis only on material signal changes (new entry/exit, regime shift, stop-loss hit). Saves API costs while keeping weekly responsiveness.
+3. **GraphRAG Phase 1** — SQLite property graph for deterministic agent context (plan in `PLAN_GRAPHRAG.md`, approved by user)
+
+### Backlog
+4. API authentication before investor demos
+5. 50+ paper trades (daily scan script)
+6. Replace SQLite with Postgres for concurrent safety
+7. Insider Transactions Agent (Form 4)
+8. RAG auto-reseed after filing updates
+9. Multi-ticker scanner page
+
+---
+
+## Env Vars (already set in Railway + local .env)
+
+All keys populated: `ANTHROPIC_API_KEY`, `TIINGO_API_KEY`, `FMP_API_KEY`, `FRED_API_KEY`, `TAVILY_API_KEY`, `PINECONE_API_KEY`, `SENTRY_DSN`.
 
 ---
 
@@ -227,9 +231,6 @@ vercel deploy --prod --yes --scope chadreadey-7282s-projects
 ```bash
 # Backend health
 curl https://ai-financial-analyst-production-b148.up.railway.app/api/health
-
-# Railway logs
-railway logs --tail 50
 
 # Local backend dev
 uvicorn backend.main:app --reload --port 8000
@@ -240,6 +241,10 @@ cd frontend && npm run dev
 # Run analysis CLI
 python main.py AAPL
 
-# TypeScript check
-cd frontend && npx tsc --noEmit
+# Run quant backtest (best config)
+set -a && source .env && set +a
+python scripts/run_backtest.py --universe liquid_10 --start 2022-01-01 --no-ic-calibration
+
+# Run walk-forward (out-of-sample validation)
+python scripts/run_backtest.py --universe liquid_20 --start 2018-01-01 --walk-forward --rebalance weekly --no-ic-calibration
 ```
