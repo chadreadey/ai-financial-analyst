@@ -2,6 +2,7 @@
 # One-shot: run both quant backtests after Tiingo rate limit resets.
 set -euo pipefail
 cd /Users/chadreadey/portfolio-analyst/ai-financial-analyst
+export PATH="/Users/chadreadey/opt/anaconda3/bin:$PATH"
 set -a && source .env && set +a
 
 echo "=== $(date) — Starting quant backtests ==="

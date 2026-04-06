@@ -112,10 +112,24 @@ def main():
                         help="Rebalance frequency (default: monthly)")
     parser.add_argument("--long-threshold", type=float, default=0.20,
                         help="Composite score threshold for long (default: 0.20)")
-    parser.add_argument("--short-threshold", type=float, default=-0.20,
-                        help="Composite score threshold for short (default: -0.20)")
+    parser.add_argument("--short-threshold", type=float, default=-0.40,
+                        help="Composite score threshold for short (default: -0.40)")
     parser.add_argument("--max-positions", type=int, default=10,
                         help="Max positions per side (default: 10)")
+    parser.add_argument("--no-regime-filter", action="store_true",
+                        help="Disable regime filter entirely (enabled by default)")
+    parser.add_argument("--vix-caution", type=float, default=20.0,
+                        help="VIX threshold for cautious regime / reduced sizing (default: 20)")
+    parser.add_argument("--vix-risk-off", type=float, default=28.0,
+                        help="VIX threshold for risk-off / no new longs (default: 28)")
+    parser.add_argument("--no-cross-detection", action="store_true",
+                        help="Disable death/golden cross detection (enabled by default)")
+    parser.add_argument("--short-min-signals", type=int, default=3,
+                        help="Min bearish signals (of 5) to allow a short (default: 3)")
+    parser.add_argument("--no-ic-calibration", action="store_true",
+                        help="Disable IC-based signal weight calibration (enabled by default)")
+    parser.add_argument("--ic-shrinkage", type=float, default=0.90,
+                        help="IC calibration shrinkage toward equal weights (default: 0.90)")
     parser.add_argument("--walk-forward", action="store_true",
                         help="Run walk-forward validation instead of single backtest")
     parser.add_argument("--train-months", type=int, default=24,
@@ -140,8 +154,17 @@ def main():
     else:
         tickers = get_universe(args.universe)
 
+    regime_on = not args.no_regime_filter
+    ic_on = not args.no_ic_calibration
+    cross_on = not args.no_cross_detection
     print(f"\nQuant Backtest: {len(tickers)} tickers, {args.start} to {args.end or 'today'}")
     print(f"Rebalance: {args.rebalance} | Thresholds: long={args.long_threshold}, short={args.short_threshold}")
+    if regime_on:
+        print(f"Regime: VIX caution={args.vix_caution}, risk-off={args.vix_risk_off} | "
+              f"Cross detect: {'ON' if cross_on else 'OFF'} | Short min signals: {args.short_min_signals}/5")
+    else:
+        print("Regime filter: OFF")
+    print(f"IC calibration: {'ON' if ic_on else 'OFF'} | Shrinkage: {args.ic_shrinkage}")
     if args.walk_forward:
         print(f"Walk-forward: {args.train_months}mo train / {args.test_months}mo test")
     print()
@@ -153,6 +176,13 @@ def main():
         rebalance_freq=args.rebalance,
         long_threshold=args.long_threshold,
         short_threshold=args.short_threshold,
+        enable_regime_filter=regime_on,
+        vix_caution_threshold=args.vix_caution,
+        vix_risk_off_threshold=args.vix_risk_off,
+        enable_death_golden_cross=cross_on,
+        short_min_bearish_signals=args.short_min_signals,
+        enable_ic_calibration=ic_on,
+        ic_shrinkage=args.ic_shrinkage,
         max_long_positions=args.max_positions,
         max_short_positions=args.max_positions,
     )

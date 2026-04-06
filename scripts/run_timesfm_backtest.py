@@ -132,27 +132,12 @@ def run_comparison(config_base: BacktestConfig, walk_forward: bool, weight: floa
 
     # ── Overlay: quant + TimesFM ──
     print("\n--- Phase 2: Quant + TimesFM Overlay ---")
-    config_overlay = BacktestConfig(
-        tickers=config_base.tickers,
-        start_date=config_base.start_date,
-        end_date=config_base.end_date,
-        rebalance_freq=config_base.rebalance_freq,
-        lookback_days=config_base.lookback_days,
-        long_threshold=config_base.long_threshold,
-        short_threshold=config_base.short_threshold,
-        max_long_positions=config_base.max_long_positions,
-        max_short_positions=config_base.max_short_positions,
-        transaction_cost_bps=config_base.transaction_cost_bps,
-        execution_delay_days=config_base.execution_delay_days,
-        stop_loss_atr_mult=config_base.stop_loss_atr_mult,
-        initial_capital=config_base.initial_capital,
-        train_months=config_base.train_months,
-        test_months=config_base.test_months,
-        enable_timesfm=True,
-        timesfm_weight=weight,
-        timesfm_horizon=config_base.timesfm_horizon,
-        timesfm_lookback=config_base.timesfm_lookback,
-    )
+    # Copy all config from baseline, just enable TimesFM overlay
+    from dataclasses import asdict
+    overlay_kwargs = asdict(config_base)
+    overlay_kwargs["enable_timesfm"] = True
+    overlay_kwargs["timesfm_weight"] = weight
+    config_overlay = BacktestConfig(**overlay_kwargs)
 
     if walk_forward:
         overlay = run_walk_forward(config_overlay, progress_cb=progress)
@@ -193,14 +178,26 @@ def main():
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
 
-    # Check TimesFM is available
+    # Check time-series model is available (TimesFM preferred, Chronos fallback)
+    has_model = False
     try:
         import timesfm  # noqa: F401
-        print("TimesFM package: found")
+        print("TimesFM package: found (preferred)")
+        has_model = True
     except ImportError:
-        print("ERROR: timesfm package not installed.")
-        print("  Install: pip install 'timesfm[torch]'")
-        print("  Or: pip install 'timesfm[jax]'")
+        pass
+    if not has_model:
+        try:
+            from chronos import ChronosPipeline  # noqa: F401
+            print("Chronos package: found (fallback)")
+            has_model = True
+        except ImportError:
+            pass
+    if not has_model:
+        print("ERROR: No time-series model installed.")
+        print("  Install one of:")
+        print("    pip install 'timesfm[torch]'          # preferred, needs Linux + GPU")
+        print("    pip install chronos-forecasting torch  # fallback, CPU OK")
         sys.exit(1)
 
     tickers = ([t.strip().upper() for t in args.tickers.split(",") if t.strip()]

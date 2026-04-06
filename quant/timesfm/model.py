@@ -13,8 +13,20 @@ _instance: Optional["TimesFMModel"] = None
 
 
 class TimesFMModel:
-    def __init__(self, model):
+    """
+    Time-series foundation model wrapper.
+
+    Tries Google TimesFM first (requires `timesfm` + GPU recommended).
+    Falls back to Amazon Chronos-T5-Small if TimesFM is unavailable
+    (e.g., macOS x86_64 where paxml/lingvo don't install).
+
+    The interface is identical regardless of backend — callers get
+    (point_forecast, quantiles) tuples from .forecast().
+    """
+
+    def __init__(self, model, backend: str):
         self._model = model
+        self.backend = backend  # "timesfm" or "chronos"
 
     @classmethod
     def get(cls) -> "TimesFMModel":
@@ -26,19 +38,35 @@ class TimesFMModel:
             if _instance is not None:
                 return _instance
 
-            try:
-                import timesfm
-            except ImportError:
+            # Try TimesFM first (preferred — Google's purpose-built model)
+            inst = cls._try_timesfm()
+            if inst is None:
+                inst = cls._try_chronos()
+            if inst is None:
                 raise RuntimeError(
-                    "timesfm package not installed. Run: pip install 'timesfm[torch]'"
+                    "No time-series model available. Install one of:\n"
+                    "  pip install 'timesfm[torch]'   # preferred, needs Linux + GPU\n"
+                    "  pip install chronos-forecasting torch  # fallback, CPU OK"
                 )
 
-            import os
-            checkpoint_dir = os.getenv("TIMESFM_CHECKPOINT_DIR", "").strip() or None
-            kwargs = {}
-            if checkpoint_dir:
-                kwargs["cache_dir"] = checkpoint_dir
+            _instance = inst
+            return _instance
 
+    @classmethod
+    def _try_timesfm(cls) -> Optional["TimesFMModel"]:
+        try:
+            import timesfm
+        except ImportError:
+            logger.info("timesfm not installed — skipping")
+            return None
+
+        import os
+        kwargs = {}
+        checkpoint_dir = os.getenv("TIMESFM_CHECKPOINT_DIR", "").strip()
+        if checkpoint_dir:
+            kwargs["cache_dir"] = checkpoint_dir
+
+        try:
             logger.info("Loading TimesFM 2.5 200M model...")
             model = timesfm.TimesFM_2p5_200M_torch.from_pretrained(
                 "google/timesfm-2.5-200m-pytorch", **kwargs
@@ -50,16 +78,54 @@ class TimesFMModel:
                     fix_quantile_crossing=True,
                 )
             )
-
-            inst = cls(model)
-            inst.forecast([1.0] * 64, horizon=5)
+            inst = cls(model, backend="timesfm")
+            inst.forecast([1.0] * 64, horizon=5)  # pre-warm
             logger.info("TimesFM model loaded and pre-warmed")
-            _instance = inst
-            return _instance
+            return inst
+        except Exception as exc:
+            logger.warning("TimesFM load failed: %s — trying Chronos", exc)
+            return None
+
+    @classmethod
+    def _try_chronos(cls) -> Optional["TimesFMModel"]:
+        try:
+            import torch
+            from chronos import ChronosPipeline
+        except ImportError:
+            logger.info("chronos-forecasting not installed — skipping")
+            return None
+
+        try:
+            import torch as _torch
+            logger.info("Loading Chronos-T5-Small model (fallback)...")
+            pipeline = ChronosPipeline.from_pretrained(
+                "amazon/chronos-t5-small",
+                device_map="cpu",
+                torch_dtype=_torch.float32,
+            )
+            inst = cls(pipeline, backend="chronos")
+            inst.forecast([1.0] * 64, horizon=5)  # pre-warm
+            logger.info("Chronos model loaded and pre-warmed")
+            return inst
+        except Exception as exc:
+            logger.warning("Chronos load failed: %s", exc)
+            return None
 
     def forecast(
         self, series: list[float], horizon: int = 10, freq: int = 0
     ) -> tuple[list[float], dict[str, list[float]]]:
+        """
+        Produce point forecast + quantiles from a price series.
+
+        Returns:
+            (point_forecast, {"p10": [...], "p50": [...], "p90": [...]})
+        """
+        if self.backend == "timesfm":
+            return self._forecast_timesfm(series, horizon, freq)
+        else:
+            return self._forecast_chronos(series, horizon)
+
+    def _forecast_timesfm(self, series, horizon, freq):
         result = self._model.forecast(
             inputs=[np.array(series, dtype=np.float32)],
             freq=[freq],
@@ -73,3 +139,20 @@ class TimesFMModel:
             "p90": quantile_matrix[:, 9].tolist(),
         }
         return point, quantiles
+
+    def _forecast_chronos(self, series, horizon):
+        import torch
+        context = torch.tensor(series, dtype=torch.float32)
+        samples = self._pipeline_predict(context, horizon)
+        samples_np = samples[0].numpy()
+
+        point = np.median(samples_np, axis=0).tolist()
+        quantiles = {
+            "p10": np.percentile(samples_np, 10, axis=0).tolist(),
+            "p50": np.percentile(samples_np, 50, axis=0).tolist(),
+            "p90": np.percentile(samples_np, 90, axis=0).tolist(),
+        }
+        return point, quantiles
+
+    def _pipeline_predict(self, context, horizon):
+        return self._model.predict(context, horizon, num_samples=50)
