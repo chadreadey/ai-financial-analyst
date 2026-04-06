@@ -842,6 +842,7 @@ class Position:
     shares: float
     stop_price: float
     composite_score: float
+    flags: list = field(default_factory=list)
 
     @property
     def notional(self) -> float:
@@ -964,6 +965,7 @@ def build_target_portfolio(
             entry_date=future.index[config.execution_delay_days - 1],
             entry_price=entry_price, shares=shares,
             stop_price=stop_price, composite_score=score,
+            flags=list(sv.flags),
         ))
 
     for ticker, score, sv in shorts:
@@ -991,6 +993,7 @@ def build_target_portfolio(
             entry_date=future.index[config.execution_delay_days - 1],
             entry_price=entry_price, shares=shares,
             stop_price=stop_price, composite_score=score,
+            flags=list(sv.flags),
         ))
 
     return positions
@@ -1035,6 +1038,7 @@ class TradeRecord:
     exit_reason: str
     composite_score: float
     holding_days: int
+    flags: list = field(default_factory=list)
 
 
 @dataclass
@@ -1176,6 +1180,7 @@ def _compute_daily_portfolio_returns(
             exit_reason=exit_reason,
             composite_score=round(pos.composite_score, 4),
             holding_days=(exit_date - pos.entry_date).days,
+            flags=pos.flags,
         ))
 
     # Convert daily_pnl dict to sorted Series
