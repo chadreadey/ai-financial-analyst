@@ -920,10 +920,16 @@ def build_target_portfolio(
         # Only allow shorts in risk-off — longs are too dangerous
         longs = []
     else:
-        # Golden cross / strong_bull: lower the long threshold to catch more entries
+        # Golden cross / strong_bull: lower the long threshold to catch more entries,
+        # but only down to a minimum floor (0.15) — prevents admitting stocks with
+        # genuinely weak signals just because the macro regime is bullish.
         effective_long_threshold = config.long_threshold
+        _GOLDEN_CROSS_FLOOR = 0.15
         if regime.level == "strong_bull" and config.enable_death_golden_cross:
-            effective_long_threshold = config.long_threshold - config.golden_cross_boost
+            effective_long_threshold = max(
+                _GOLDEN_CROSS_FLOOR,
+                config.long_threshold - config.golden_cross_boost,
+            )
             logger.debug("Golden cross active: long threshold lowered to %.2f", effective_long_threshold)
 
         longs = [(t, sc, sv) for t, sc, sv in scored if sc >= effective_long_threshold]
@@ -1001,9 +1007,12 @@ def build_target_portfolio(
         adjusted_capital = per_position_capital * vol_scalar * regime_scalar
         shares = adjusted_capital / entry_price
 
-        # Stop loss at 2x ATR below entry
+        # Stop loss: widen multiplier in high-vol regime so normal daily
+        # swings don't trigger exits — standard risk management practice.
         atr_val = sv.atr_regime.metadata.get("atr_value", entry_price * 0.02)
-        stop_price = entry_price - config.stop_loss_atr_mult * atr_val
+        vol_regime = sv.atr_regime.metadata.get("volatility_regime", "normal")
+        effective_atr_mult = config.stop_loss_atr_mult * (1.5 if vol_regime == "high_vol" else 1.0)
+        stop_price = entry_price - effective_atr_mult * atr_val
 
         positions.append(Position(
             ticker=ticker, direction="LONG",
@@ -1031,7 +1040,9 @@ def build_target_portfolio(
         shares = adjusted_capital / entry_price
 
         atr_val = sv.atr_regime.metadata.get("atr_value", entry_price * 0.02)
-        stop_price = entry_price + config.stop_loss_atr_mult * atr_val
+        vol_regime = sv.atr_regime.metadata.get("volatility_regime", "normal")
+        effective_atr_mult = config.stop_loss_atr_mult * (1.5 if vol_regime == "high_vol" else 1.0)
+        stop_price = entry_price + effective_atr_mult * atr_val
 
         positions.append(Position(
             ticker=ticker, direction="SHORT",
