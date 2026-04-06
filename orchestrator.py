@@ -421,6 +421,7 @@ class Orchestrator:
         if segment_data:
             enrichment_sections["segment_data"] = f"=== Revenue Segments ===\n{segment_data}"
 
+        # TimesFM/Chronos (DEPRECATED — prefer LSTM via enable_lstm)
         if settings.enable_timesfm:
             try:
                 emit("Loading TimesFM cached signals...", 22)
@@ -436,6 +437,35 @@ class Orchestrator:
                         enrichment_sections["timesfm_eps"] = format_eps_signals(ticker_upper, eps_sig)
             except Exception as exc:
                 logger.warning("TimesFM enrichment injection failed: %s", exc)
+
+        # LSTM ML forecast (runs live — fast enough for single-ticker)
+        if settings.enable_lstm:
+            try:
+                emit("Running LSTM price forecast...", 22)
+                from quant.lstm.model import ReturnForecaster, build_features, LSTMConfig
+                lstm_model_path = Path(__file__).parent / ".lstm_model"
+                if lstm_model_path.exists():
+                    forecaster = ReturnForecaster.load(lstm_model_path)
+                    # Get price history for this ticker
+                    price_df = enrichment.get("price_history_df")
+                    if price_df is not None and len(price_df) >= 252:
+                        feats = build_features(price_df)
+                        score_series = forecaster.predict_momentum_score(feats)
+                        last_score = score_series.dropna()
+                        if not last_score.empty:
+                            score = float(last_score.iloc[-1])
+                            trend = "bullish" if score > 0.1 else "bearish" if score < -0.1 else "neutral"
+                            enrichment_sections["lstm_forecast"] = (
+                                f"=== LSTM Price Forecast ({ticker_upper}) ===\n"
+                                f"  Momentum Score: {score:+.2f}\n"
+                                f"  Trend Direction: {trend}\n"
+                                f"  Model: 2-layer LSTM, {forecaster.config.lookback_days}d lookback, "
+                                f"{forecaster.config.forecast_horizon}d horizon"
+                            )
+                else:
+                    logger.info("No saved LSTM model at %s — run scripts/run_ml_backtest.py first", lstm_model_path)
+            except Exception as exc:
+                logger.warning("LSTM enrichment injection failed: %s", exc)
 
         recent_filings = [
             FilingInfo(**{k: f[k] for k in FilingInfo.model_fields if k in f})

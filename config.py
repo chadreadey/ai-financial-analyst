@@ -143,7 +143,7 @@ class Settings(BaseSettings):
     auto_paper_trade: bool = True
     auto_paper_trade_min_conviction: float = 0.40
 
-    # ── TimesFM ──────────────────────────────────────────────────────
+    # ── TimesFM (DEPRECATED — prefer LSTM) ─────────────────────────
     enable_timesfm: bool = False
     redis_url: str = ""
     timesfm_checkpoint_dir: str = ""
@@ -151,6 +151,9 @@ class Settings(BaseSettings):
     timesfm_horizon_days: int = 10
     timesfm_price_lookback_days: int = 512
     timesfm_ttl_seconds: int = 86400
+
+    # ── LSTM ────────────────────────────────────────────────────────
+    enable_lstm: bool = False
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

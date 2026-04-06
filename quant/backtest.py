@@ -63,11 +63,21 @@ class BacktestConfig:
     vix_risk_off_threshold: float = 28.0      # VIX above this = risk-off (no new longs, allow shorts)
     enable_death_golden_cross: bool = True     # SPY 50/200 SMA cross detection
     golden_cross_boost: float = 0.10           # lower long threshold by this during golden cross
-    # TimesFM overlay
+    # TimesFM overlay (DEPRECATED — prefer LSTM)
     enable_timesfm: bool = False
     timesfm_weight: float = 0.15             # weight for 7th signal
     timesfm_horizon: int = 10                # forecast horizon in days
     timesfm_lookback: int = 512              # input context length
+    # LSTM overlay
+    enable_lstm: bool = False
+    lstm_weight: float = 0.15                # weight for ML signal in composite
+    lstm_lookback_days: int = 60             # LSTM sequence length
+    lstm_forecast_horizon: int = 20          # predict N-day forward return
+    lstm_hidden_size: int = 64
+    lstm_num_layers: int = 2
+    lstm_dropout: float = 0.3
+    lstm_max_epochs: int = 100
+    lstm_patience: int = 10
 
     def __post_init__(self):
         if not self.end_date:
@@ -499,6 +509,7 @@ def count_bearish_signals(sv: SignalVector) -> int:
 # ── TimesFM forecast at a point in time ────────────────────────────────
 
 _timesfm_model = None
+_lstm_forecaster = None  # Set externally by run_ml_backtest.py before each window
 
 
 def _get_timesfm_model():
@@ -579,6 +590,75 @@ def blend_timesfm_into_signals(
         sv.composite_score = float(np.clip(blended, -1.0, 1.0))
 
         # Re-derive direction from blended score
+        if sv.composite_score >= 0.30:
+            sv.composite_direction = "BUY"
+        elif sv.composite_score <= -0.30:
+            sv.composite_direction = "SELL"
+        else:
+            sv.composite_direction = "HOLD"
+        sv.actionable = abs(sv.composite_score) >= 0.40
+
+    return signals
+
+
+# ── LSTM scoring at a point in time ──────────────────────────────────
+
+def compute_lstm_scores(
+    universe_data: dict[str, pd.DataFrame],
+    as_of_date: pd.Timestamp,
+    forecaster: "quant.lstm.model.ReturnForecaster",
+) -> dict[str, float]:
+    """
+    Run LSTM predictions for each stock as of a date.
+    Returns {ticker: momentum_score} where score is in [-1, +1].
+
+    The forecaster must already be fitted on training data.
+    """
+    from quant.lstm.model import build_features
+
+    scores = {}
+    for ticker, df in universe_data.items():
+        available = df[df.index <= as_of_date]
+        if len(available) < 252:  # need enough history for features
+            continue
+
+        try:
+            feats = build_features(available)
+            score_series = forecaster.predict_momentum_score(feats)
+            last_valid = score_series.dropna()
+            if not last_valid.empty:
+                scores[ticker] = float(last_valid.iloc[-1])
+        except Exception as exc:
+            logger.debug("LSTM prediction failed for %s at %s: %s",
+                         ticker, as_of_date.date(), exc)
+
+    return scores
+
+
+def blend_lstm_into_signals(
+    signals: dict[str, SignalVector],
+    lstm_scores: dict[str, float],
+    lstm_weight: float = 0.15,
+) -> dict[str, SignalVector]:
+    """
+    Blend LSTM momentum score into each stock's composite.
+
+    Same mechanics as blend_timesfm_into_signals — scales down quant
+    signals and adds the ML signal.
+    """
+    if not lstm_scores:
+        return signals
+
+    quant_scale = 1.0 - lstm_weight
+
+    for ticker, sv in signals.items():
+        score = lstm_scores.get(ticker)
+        if score is None:
+            continue
+
+        blended = sv.composite_score * quant_scale + score * lstm_weight
+        sv.composite_score = float(np.clip(blended, -1.0, 1.0))
+
         if sv.composite_score >= 0.30:
             sv.composite_direction = "BUY"
         elif sv.composite_score <= -0.30:
@@ -981,6 +1061,8 @@ def run_backtest(
         "ic_trailing_periods": config.ic_trailing_periods if config.enable_ic_calibration else None,
         "enable_timesfm": config.enable_timesfm,
         "timesfm_weight": config.timesfm_weight if config.enable_timesfm else None,
+        "enable_lstm": config.enable_lstm,
+        "lstm_weight": config.lstm_weight if config.enable_lstm else None,
     }
 
     api_key = os.getenv("TIINGO_API_KEY", "").strip()
@@ -1074,7 +1156,7 @@ def run_backtest(
         if calibrated_weights:
             signals = apply_calibrated_weights(signals, calibrated_weights)
 
-        # Blend TimesFM 7th signal if enabled
+        # Blend TimesFM 7th signal if enabled (DEPRECATED — prefer LSTM)
         if config.enable_timesfm:
             tfm_scores = compute_timesfm_scores(
                 universe_data, reb_date,
@@ -1084,6 +1166,16 @@ def run_backtest(
             if tfm_scores:
                 signals = blend_timesfm_into_signals(
                     signals, tfm_scores, config.timesfm_weight,
+                )
+
+        # Blend LSTM ML signal if enabled and forecaster is provided
+        if config.enable_lstm and _lstm_forecaster is not None:
+            lstm_scores = compute_lstm_scores(
+                universe_data, reb_date, _lstm_forecaster,
+            )
+            if lstm_scores:
+                signals = blend_lstm_into_signals(
+                    signals, lstm_scores, config.lstm_weight,
                 )
 
         # Detect market regime for short filtering + position sizing
@@ -1332,6 +1424,8 @@ def run_walk_forward(
             timesfm_weight=config.timesfm_weight,
             timesfm_horizon=config.timesfm_horizon,
             timesfm_lookback=config.timesfm_lookback,
+            enable_lstm=config.enable_lstm,
+            lstm_weight=config.lstm_weight,
         )
 
         # Reuse loaded data — compute signals within the window
@@ -1377,7 +1471,7 @@ def run_walk_forward(
             if calibrated_weights:
                 signals = apply_calibrated_weights(signals, calibrated_weights)
 
-            # Blend TimesFM if enabled
+            # Blend TimesFM if enabled (DEPRECATED — prefer LSTM)
             if config.enable_timesfm:
                 tfm_scores = compute_timesfm_scores(
                     universe_data, reb_date,
@@ -1387,6 +1481,16 @@ def run_walk_forward(
                 if tfm_scores:
                     signals = blend_timesfm_into_signals(
                         signals, tfm_scores, config.timesfm_weight,
+                    )
+
+            # Blend LSTM ML signal if enabled
+            if config.enable_lstm and _lstm_forecaster is not None:
+                lstm_scores = compute_lstm_scores(
+                    universe_data, reb_date, _lstm_forecaster,
+                )
+                if lstm_scores:
+                    signals = blend_lstm_into_signals(
+                        signals, lstm_scores, config.lstm_weight,
                     )
 
             if config.enable_regime_filter:
