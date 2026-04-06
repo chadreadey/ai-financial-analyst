@@ -101,6 +101,8 @@ def _load_cached(ticker: str, start_date: str) -> Optional[pd.DataFrame]:
         return None
     try:
         df = pd.read_csv(cache_file, parse_dates=["date"], index_col="date")
+        # Normalize index to midnight — guards against cached files with time components
+        df.index = df.index.normalize()
         # Check if cache covers the requested start date (allow 7-day slack for weekends)
         cache_start = pd.Timestamp(df.index[0])
         request_start = pd.Timestamp(start_date)
@@ -137,7 +139,7 @@ def _fetch_ohlcv(ticker: str, start_date: str, provider=None) -> Optional[pd.Dat
             return None
 
         df = pd.DataFrame(data)
-        df["date"] = pd.to_datetime(df["date"], utc=True).dt.tz_convert(None)
+        df["date"] = pd.to_datetime(df["date"], utc=True).dt.tz_convert(None).dt.normalize()
         df = df.sort_values("date").set_index("date")
 
         # Prefer adjusted prices (split/dividend corrected) for backtesting
