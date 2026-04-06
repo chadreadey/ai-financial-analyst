@@ -45,7 +45,7 @@ class TimesFMModel:
             if inst is None:
                 raise RuntimeError(
                     "No time-series model available. Install one of:\n"
-                    "  pip install 'timesfm[torch]'   # preferred, needs Linux + GPU\n"
+                    "  pip install timesfm torch   # preferred, needs Linux + GPU\n"
                     "  pip install chronos-forecasting torch  # fallback, CPU OK"
                 )
 
@@ -67,20 +67,37 @@ class TimesFMModel:
             kwargs["cache_dir"] = checkpoint_dir
 
         try:
-            logger.info("Loading TimesFM 2.5 200M model...")
-            model = timesfm.TimesFM_2p5_200M_torch.from_pretrained(
-                "google/timesfm-2.5-200m-pytorch", **kwargs
-            )
-            model.compile(
-                timesfm.ForecastConfig(
-                    normalize_inputs=True,
-                    use_continuous_quantile_head=True,
-                    fix_quantile_crossing=True,
+            logger.info("Loading TimesFM model...")
+
+            # Try 2.5 first, then 2.0
+            model = None
+            for loader_name in ["TimesFM_2p5_200M_torch", "TimesFM_2_200M_torch"]:
+                loader = getattr(timesfm, loader_name, None)
+                if loader is not None:
+                    repo = ("google/timesfm-2.5-200m-pytorch" if "2p5" in loader_name
+                            else "google/timesfm-2.0-200m-pytorch")
+                    logger.info("Trying %s from %s", loader_name, repo)
+                    model = loader.from_pretrained(repo, **kwargs)
+                    break
+
+            if model is None:
+                logger.warning("No TimesFM loader found in timesfm package")
+                return None
+
+            # Compile with ForecastConfig if available (2.5+)
+            if hasattr(timesfm, "ForecastConfig"):
+                model.compile(
+                    timesfm.ForecastConfig(
+                        normalize_inputs=True,
+                        use_continuous_quantile_head=True,
+                        fix_quantile_crossing=True,
+                    )
                 )
-            )
+
             inst = cls(model, backend="timesfm")
-            inst.forecast([1.0] * 64, horizon=5)  # pre-warm
-            logger.info("TimesFM model loaded and pre-warmed")
+            # Pre-warm
+            inst.forecast([1.0] * 64, horizon=5)
+            logger.info("TimesFM model loaded and pre-warmed (backend: %s)", loader_name)
             return inst
         except Exception as exc:
             logger.warning("TimesFM load failed: %s — trying Chronos", exc)
@@ -104,7 +121,7 @@ class TimesFMModel:
                 torch_dtype=_torch.float32,
             )
             inst = cls(pipeline, backend="chronos")
-            inst.forecast([1.0] * 64, horizon=5)  # pre-warm
+            inst.forecast([1.0] * 64, horizon=5)
             logger.info("Chronos model loaded and pre-warmed")
             return inst
         except Exception as exc:
@@ -126,24 +143,53 @@ class TimesFMModel:
             return self._forecast_chronos(series, horizon)
 
     def _forecast_timesfm(self, series, horizon, freq):
-        result = self._model.forecast(
-            inputs=[np.array(series, dtype=np.float32)],
-            freq=[freq],
-            horizon=horizon,
-        )
+        import inspect
+
+        forecast_params = inspect.signature(self._model.forecast).parameters
+
+        call_kwargs = {
+            "inputs": [np.array(series, dtype=np.float32)],
+            "horizon": horizon,
+        }
+        # TimesFM 1.x has `freq`, 2.0+ removed it
+        if "freq" in forecast_params:
+            call_kwargs["freq"] = [freq]
+
+        result = self._model.forecast(**call_kwargs)
+
         point = result[0][0].tolist()
         quantile_matrix = result[1][0]
-        quantiles = {
-            "p10": quantile_matrix[:, 1].tolist(),
-            "p50": quantile_matrix[:, 5].tolist(),
-            "p90": quantile_matrix[:, 9].tolist(),
-        }
+
+        # Quantile indices vary by version — detect shape
+        n_quantiles = quantile_matrix.shape[1] if len(quantile_matrix.shape) > 1 else 0
+        if n_quantiles >= 10:
+            # 1.x style: 11 quantiles (0.0, 0.1, ..., 1.0)
+            quantiles = {
+                "p10": quantile_matrix[:, 1].tolist(),
+                "p50": quantile_matrix[:, 5].tolist(),
+                "p90": quantile_matrix[:, 9].tolist(),
+            }
+        elif n_quantiles >= 3:
+            # 2.x style: fewer quantiles
+            quantiles = {
+                "p10": quantile_matrix[:, 0].tolist(),
+                "p50": quantile_matrix[:, n_quantiles // 2].tolist(),
+                "p90": quantile_matrix[:, -1].tolist(),
+            }
+        else:
+            # Fallback: use point forecast for all
+            quantiles = {
+                "p10": point,
+                "p50": point,
+                "p90": point,
+            }
+
         return point, quantiles
 
     def _forecast_chronos(self, series, horizon):
         import torch
         context = torch.tensor(series, dtype=torch.float32)
-        samples = self._pipeline_predict(context, horizon)
+        samples = self._model.predict(context, horizon, num_samples=50)
         samples_np = samples[0].numpy()
 
         point = np.median(samples_np, axis=0).tolist()
@@ -153,6 +199,3 @@ class TimesFMModel:
             "p90": np.percentile(samples_np, 90, axis=0).tolist(),
         }
         return point, quantiles
-
-    def _pipeline_predict(self, context, horizon):
-        return self._model.predict(context, horizon, num_samples=50)
