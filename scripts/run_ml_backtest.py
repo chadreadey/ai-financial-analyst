@@ -320,10 +320,77 @@ def run_lstm_walk_forward(config: BacktestConfig) -> BacktestResult:
 
         progress(f"  Window return: {window_return_pct:+.2f}%, trades: {len(window_trades)}")
 
-    # Compute aggregate metrics
+    # Compute aggregate metrics inline
+    import math
+
     if len(all_daily_pnl) > 0:
-        from quant.backtest import compute_metrics
-        result = compute_metrics(all_daily_pnl, all_trades, config, benchmark_df)
+        cumulative = config.initial_capital + all_daily_pnl.cumsum()
+        final_equity = float(cumulative.iloc[-1])
+        result.total_return_pct = round((final_equity / config.initial_capital - 1) * 100, 2)
+
+        n_years = max((cumulative.index[-1] - cumulative.index[0]).days / 365.25, 0.1)
+        result.annual_return_pct = round(
+            ((final_equity / config.initial_capital) ** (1 / n_years) - 1) * 100, 2
+        )
+
+        daily_returns = all_daily_pnl / config.initial_capital
+        mean_daily = float(daily_returns.mean())
+        std_daily = float(daily_returns.std())
+
+        if std_daily > 0 and len(daily_returns) > 10:
+            result.sharpe = round(mean_daily / std_daily * math.sqrt(252), 2)
+            downside = daily_returns[daily_returns < 0]
+            if len(downside) > 1:
+                down_std = float(downside.std())
+                if down_std > 0:
+                    result.sortino = round(mean_daily / down_std * math.sqrt(252), 2)
+
+        running_max = cumulative.cummax()
+        drawdown = (cumulative - running_max) / running_max
+        result.max_drawdown_pct = round(abs(float(drawdown.min())) * 100, 2)
+
+        if result.max_drawdown_pct > 0:
+            result.calmar = round(result.annual_return_pct / result.max_drawdown_pct, 2)
+
+        # Benchmark
+        if benchmark_df is not None:
+            bench = benchmark_df[
+                (benchmark_df.index >= cumulative.index[0]) &
+                (benchmark_df.index <= cumulative.index[-1])
+            ]
+            if len(bench) > 10:
+                result.benchmark_return_pct = round(
+                    (float(bench.iloc[-1]["close"]) / float(bench.iloc[0]["close"]) - 1) * 100, 2
+                )
+                result.alpha_pct = round(result.total_return_pct - result.benchmark_return_pct, 2)
+
+        # Trade stats
+        result.total_trades = len(all_trades)
+        if all_trades:
+            winners = [t for t in all_trades if t.pnl_pct > 0]
+            result.win_rate_pct = round(len(winners) / len(all_trades) * 100, 1)
+            result.avg_holding_days = round(
+                sum(t.holding_days for t in all_trades) / len(all_trades), 1
+            )
+
+        # Equity curve
+        result.equity_curve = [
+            {"date": str(d.date()), "equity": round(float(v), 2)}
+            for d, v in cumulative.items()
+        ]
+
+        # Trade log
+        result.trade_log = [
+            {
+                "ticker": t.ticker, "direction": t.direction,
+                "entry_date": t.entry_date, "entry_price": t.entry_price,
+                "exit_date": t.exit_date, "exit_price": t.exit_price,
+                "pnl_pct": t.pnl_pct, "pnl_dollar": t.pnl_dollar,
+                "exit_reason": t.exit_reason, "composite_score": t.composite_score,
+                "holding_days": t.holding_days,
+            }
+            for t in all_trades
+        ]
 
     result.walk_forward = window_results
     result.status = "completed"
