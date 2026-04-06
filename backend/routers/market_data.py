@@ -18,23 +18,20 @@ PERIOD_DAYS = {
 }
 
 
-def _get_tiingo_history(ticker: str, days: int) -> list[dict]:
-    tiingo_key = os.getenv("TIINGO_API_KEY", "").strip()
-    if not tiingo_key:
-        return []
+def _get_price_history(ticker: str, days: int) -> list[dict]:
     try:
-        from tiingo_client import TiingoClient
-        client = TiingoClient(tiingo_key)
+        from price_provider import get_price_provider
+        provider = get_price_provider()
         start = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
-        return client.get_eod_history(ticker, start) or []
+        return provider.get_eod_history(ticker, start) or []
     except Exception as exc:
-        logger.warning("Tiingo history failed for %s: %s", ticker, exc)
+        logger.warning("Price history failed for %s: %s", ticker, exc)
         return []
 
 
 @router.get("/sparkline/{ticker}")
 async def get_sparkline(ticker: str):
-    data = _get_tiingo_history(ticker.upper(), 90)
+    data = _get_price_history(ticker.upper(), 90)
     if not data:
         return {"ticker": ticker.upper(), "closes": [], "dates": []}
 
@@ -47,7 +44,7 @@ async def get_sparkline(ticker: str):
 @router.get("/price-history/{ticker}")
 async def get_price_history(ticker: str, period: str = "1yr"):
     days = PERIOD_DAYS.get(period, 365)
-    data = _get_tiingo_history(ticker.upper(), days)
+    data = _get_price_history(ticker.upper(), days)
     if not data:
         return {"ticker": ticker.upper(), "bars": []}
 

@@ -68,6 +68,11 @@ class BacktestConfig:
     timesfm_weight: float = 0.15             # weight for 7th signal
     timesfm_horizon: int = 10                # forecast horizon in days
     timesfm_lookback: int = 512              # input context length
+    # News sentiment overlay (Finnhub)
+    enable_news_sentiment: bool = False
+    news_sentiment_weight: float = 0.10      # weight for sentiment in composite
+    news_sentiment_window_days: int = 30     # days of news before rebalance date
+    news_sentiment_min_articles: int = 3     # suppress signal if fewer articles
     # LSTM overlay
     enable_lstm: bool = False
     lstm_weight: float = 0.15                # weight for ML signal in composite
@@ -113,8 +118,8 @@ def _save_cache(ticker: str, df: pd.DataFrame) -> None:
     df.to_csv(cache_file)
 
 
-def _fetch_ohlcv(ticker: str, start_date: str, api_key: str) -> Optional[pd.DataFrame]:
-    """Fetch daily OHLCV from Tiingo (with local CSV cache), return DataFrame."""
+def _fetch_ohlcv(ticker: str, start_date: str, provider=None) -> Optional[pd.DataFrame]:
+    """Fetch daily OHLCV via price provider (with local CSV cache), return DataFrame."""
     # Try local cache first
     cached = _load_cached(ticker, start_date)
     if cached is not None:
@@ -122,17 +127,17 @@ def _fetch_ohlcv(ticker: str, start_date: str, api_key: str) -> Optional[pd.Data
         return cached
 
     try:
-        import time as _time
-        from tiingo_client import TiingoClient
-        client = TiingoClient(api_key)
-        _time.sleep(0.3)  # rate-limit courtesy
-        data = client.get_eod_history(ticker, start_date)
+        if provider is None:
+            from price_provider import get_price_provider
+            provider = get_price_provider()
+
+        data = provider.get_eod_history(ticker, start_date)
         if not data or len(data) < 60:
             logger.warning("Insufficient data for %s (%d rows)", ticker, len(data) if data else 0)
             return None
 
         df = pd.DataFrame(data)
-        df["date"] = pd.to_datetime(df["date"]).dt.tz_convert(None)
+        df["date"] = pd.to_datetime(df["date"], utc=True).dt.tz_convert(None)
         df = df.sort_values("date").set_index("date")
 
         # Prefer adjusted prices (split/dividend corrected) for backtesting
@@ -152,15 +157,32 @@ def _fetch_ohlcv(ticker: str, start_date: str, api_key: str) -> Optional[pd.Data
 
 
 def load_universe_data(
-    tickers: list[str], start_date: str, api_key: str,
-    progress_cb=None,
+    tickers: list[str], start_date: str, api_key: str = "",
+    progress_cb=None, provider=None,
 ) -> dict[str, pd.DataFrame]:
-    """Load OHLCV for all tickers. Returns {ticker: DataFrame}."""
+    """Load OHLCV for all tickers. Returns {ticker: DataFrame}.
+
+    Args:
+        api_key: Deprecated — kept for backward compat. Use provider or PRICE_PROVIDER env var.
+        provider: A PriceProvider instance. If None, built from env vars.
+    """
+    if provider is None:
+        from price_provider import get_price_provider
+        try:
+            provider = get_price_provider()
+        except EnvironmentError:
+            # Fallback: try legacy api_key param with Tiingo
+            if api_key:
+                from tiingo_client import TiingoClient, TiingoCache
+                provider = TiingoCache(TiingoClient(api_key))
+            else:
+                raise
+
     data = {}
     for i, ticker in enumerate(tickers):
         if progress_cb:
             progress_cb(f"Fetching {ticker} ({i+1}/{len(tickers)})")
-        df = _fetch_ohlcv(ticker, start_date, api_key)
+        df = _fetch_ohlcv(ticker, start_date, provider)
         if df is not None:
             data[ticker] = df
             logger.info("Loaded %s: %d rows (%s to %s)",
@@ -510,6 +532,8 @@ def count_bearish_signals(sv: SignalVector) -> int:
 
 _timesfm_model = None
 _lstm_forecaster = None  # Set externally by run_ml_backtest.py before each window
+_finnhub_client = None   # Set externally or auto-initialized from FINNHUB_API_KEY
+_sentiment_cache = None  # SentimentDiskCache — set externally or auto-initialized
 
 
 def _get_timesfm_model():
@@ -666,6 +690,143 @@ def blend_lstm_into_signals(
         else:
             sv.composite_direction = "HOLD"
         sv.actionable = abs(sv.composite_score) >= 0.40
+
+    return signals
+
+
+# ── News sentiment scoring at a point in time ────────────────────────
+
+def compute_sentiment_scores(
+    universe_data: dict[str, pd.DataFrame],
+    as_of_date: pd.Timestamp,
+    config: BacktestConfig,
+    client=None,
+    disk_cache=None,
+) -> dict[str, tuple[float, int]]:
+    """
+    Compute news sentiment score for each stock as of a date.
+    Returns {ticker: (score, n_articles)} where score is in [-1, +1].
+
+    n_articles is the raw news article count — used by blend_sentiment_into_signals
+    to scale effective weight by coverage density. Insider MSPR always counts as
+    full coverage (it's a clean signal, not sparse text).
+
+    Blends news sentiment (VADER on headlines) with insider MSPR if available.
+    """
+    from quant.sentiment import compute_news_sentiment_score, compute_insider_sentiment_score
+
+    scores = {}
+    for ticker in universe_data:
+        # News sentiment
+        news_result = compute_news_sentiment_score(
+            ticker, as_of_date,
+            news_window_days=config.news_sentiment_window_days,
+            client=client,
+            disk_cache=disk_cache,
+            min_articles=config.news_sentiment_min_articles,
+        )
+        n_articles: int = news_result.metadata.get("n_articles", 0)
+
+        # Insider sentiment (bonus signal — free and has 10yr history)
+        insider_result = compute_insider_sentiment_score(
+            ticker, as_of_date,
+            lookback_months=3,
+            client=client,
+            disk_cache=disk_cache,
+        )
+
+        # Combine: 70% news, 30% insider (if both available)
+        if news_result.score != 0.0 and insider_result.score != 0.0:
+            combined = news_result.score * 0.7 + insider_result.score * 0.3
+        elif news_result.score != 0.0:
+            combined = news_result.score
+        elif insider_result.score != 0.0:
+            # Insider-only: treat as sparse coverage (n_articles stays 0)
+            combined = insider_result.score
+        else:
+            continue  # no signal
+
+        scores[ticker] = (float(np.clip(combined, -1.0, 1.0)), n_articles)
+
+    return scores
+
+
+_SENTIMENT_COVERAGE_FULL = 20   # articles/month for full weight
+_SENTIMENT_HIGH_VOL_SCALE = 0.5  # halve weight during high-vol regime
+
+
+def blend_sentiment_into_signals(
+    signals: dict[str, SignalVector],
+    sentiment_scores: dict[str, tuple[float, int]],
+    sentiment_weight: float = 0.10,
+) -> dict[str, SignalVector]:
+    """
+    Blend news sentiment into each stock's composite with adaptive weighting.
+
+    Effective weight = base_weight
+                       × coverage_scale(n_articles)
+                       × regime_scale(atr_regime)
+
+    coverage_scale  = min(1.0, n_articles / COVERAGE_FULL)
+                      → full weight at 20+ articles, proportionally less below.
+                      → 0 articles (insider-only) → 0× news scale, but insider
+                         MSPR is still carried in the score itself.
+
+    regime_scale    = 0.5 if atr_regime == "high_vol" else 1.0
+                      → during high-vol periods news sentiment lags the move;
+                         halving weight prevents chasing panicked headlines.
+
+    Raw (score, n_articles) pairs are preserved in metadata so downstream
+    systems (e.g. GraphRAG, geopolitical NLP layer) can consume them directly
+    without re-running sentiment.
+
+    Order: IC weights → LSTM blend → sentiment blend (always last).
+    """
+    if not sentiment_scores:
+        return signals
+
+    for ticker, sv in signals.items():
+        entry = sentiment_scores.get(ticker)
+        if entry is None:
+            continue
+
+        score, n_articles = entry
+
+        # Coverage scaling: sparse news → reduced weight
+        coverage_scale = min(1.0, n_articles / _SENTIMENT_COVERAGE_FULL)
+
+        # Regime scaling: noisy in high-vol environments
+        vol_regime = sv.atr_regime.metadata.get("volatility_regime", "normal")
+        regime_scale = _SENTIMENT_HIGH_VOL_SCALE if vol_regime == "high_vol" else 1.0
+
+        effective_weight = sentiment_weight * coverage_scale * regime_scale
+
+        if effective_weight < 1e-6:
+            # No meaningful weight — skip blend but still log the raw signal
+            sv.flags.append(
+                f"sentiment_suppressed(articles={n_articles},regime={vol_regime})"
+            )
+            continue
+
+        quant_scale = 1.0 - effective_weight
+        blended = sv.composite_score * quant_scale + score * effective_weight
+        sv.composite_score = float(np.clip(blended, -1.0, 1.0))
+
+        if sv.composite_score >= 0.30:
+            sv.composite_direction = "BUY"
+        elif sv.composite_score <= -0.30:
+            sv.composite_direction = "SELL"
+        else:
+            sv.composite_direction = "HOLD"
+        sv.actionable = abs(sv.composite_score) >= 0.40
+
+        # Flag: log effective weight and extreme raw sentiment for audit trail
+        sv.flags.append(
+            f"sentiment_w={effective_weight:.3f}"
+            f"(cov={coverage_scale:.2f},regime={vol_regime})"
+        )
+        if abs(score) >= 0.7:
+            sv.flags.append(f"sentiment={'bullish' if score > 0 else 'bearish'}({score:.2f})")
 
     return signals
 
@@ -1063,13 +1224,29 @@ def run_backtest(
         "timesfm_weight": config.timesfm_weight if config.enable_timesfm else None,
         "enable_lstm": config.enable_lstm,
         "lstm_weight": config.lstm_weight if config.enable_lstm else None,
+        "enable_news_sentiment": config.enable_news_sentiment,
+        "news_sentiment_weight": config.news_sentiment_weight if config.enable_news_sentiment else None,
     }
 
-    api_key = os.getenv("TIINGO_API_KEY", "").strip()
-    if not api_key:
+    # Build price provider from env vars
+    try:
+        from price_provider import get_price_provider
+        provider = get_price_provider()
+    except EnvironmentError as exc:
         result.status = "error"
-        result.error = "TIINGO_API_KEY not set"
+        result.error = str(exc)
         return result
+
+    # Auto-init Finnhub client if sentiment is enabled
+    global _finnhub_client, _sentiment_cache
+    if config.enable_news_sentiment and _finnhub_client is None:
+        finnhub_key = os.getenv("FINNHUB_API_KEY", "").strip()
+        if finnhub_key:
+            from finnhub_client import FinnhubClient, SentimentDiskCache
+            _finnhub_client = FinnhubClient(finnhub_key)
+            _sentiment_cache = SentimentDiskCache()
+        else:
+            logger.warning("enable_news_sentiment=True but FINNHUB_API_KEY not set")
 
     # ── 1. Load data ──────────────────────────────────────────────
     if progress_cb:
@@ -1080,7 +1257,7 @@ def run_backtest(
                    - timedelta(days=config.lookback_days + 30)).strftime("%Y-%m-%d")
 
     all_tickers = list(set(config.tickers + [BENCHMARK]))
-    universe_data = load_universe_data(all_tickers, fetch_start, api_key, progress_cb)
+    universe_data = load_universe_data(all_tickers, fetch_start, progress_cb=progress_cb, provider=provider)
 
     if len(universe_data) < 3:
         result.status = "error"
@@ -1176,6 +1353,17 @@ def run_backtest(
             if lstm_scores:
                 signals = blend_lstm_into_signals(
                     signals, lstm_scores, config.lstm_weight,
+                )
+
+        # Sentiment overlay (after IC + LSTM blends)
+        if config.enable_news_sentiment and _finnhub_client is not None:
+            sent_scores = compute_sentiment_scores(
+                universe_data, reb_date, config,
+                client=_finnhub_client, disk_cache=_sentiment_cache,
+            )
+            if sent_scores:
+                signals = blend_sentiment_into_signals(
+                    signals, sent_scores, config.news_sentiment_weight,
                 )
 
         # Detect market regime for short filtering + position sizing
@@ -1337,11 +1525,25 @@ def run_walk_forward(
     """
     result = BacktestResult(status="running")
 
-    api_key = os.getenv("TIINGO_API_KEY", "").strip()
-    if not api_key:
+    # Build price provider from env vars
+    try:
+        from price_provider import get_price_provider
+        provider = get_price_provider()
+    except EnvironmentError as exc:
         result.status = "error"
-        result.error = "TIINGO_API_KEY not set"
+        result.error = str(exc)
         return result
+
+    # Auto-init Finnhub client if sentiment is enabled
+    global _finnhub_client, _sentiment_cache
+    if config.enable_news_sentiment and _finnhub_client is None:
+        finnhub_key = os.getenv("FINNHUB_API_KEY", "").strip()
+        if finnhub_key:
+            from finnhub_client import FinnhubClient, SentimentDiskCache
+            _finnhub_client = FinnhubClient(finnhub_key)
+            _sentiment_cache = SentimentDiskCache()
+        else:
+            logger.warning("enable_news_sentiment=True but FINNHUB_API_KEY not set")
 
     # Load all data once
     if progress_cb:
@@ -1351,7 +1553,7 @@ def run_walk_forward(
                    - timedelta(days=config.lookback_days + 30)).strftime("%Y-%m-%d")
 
     all_tickers = list(set(config.tickers + [BENCHMARK]))
-    universe_data = load_universe_data(all_tickers, fetch_start, api_key, progress_cb)
+    universe_data = load_universe_data(all_tickers, fetch_start, progress_cb=progress_cb, provider=provider)
 
     if len(universe_data) < 3:
         result.status = "error"
@@ -1491,6 +1693,17 @@ def run_walk_forward(
                 if lstm_scores:
                     signals = blend_lstm_into_signals(
                         signals, lstm_scores, config.lstm_weight,
+                    )
+
+            # Sentiment overlay (after IC + LSTM blends)
+            if config.enable_news_sentiment and _finnhub_client is not None:
+                sent_scores = compute_sentiment_scores(
+                    universe_data, reb_date, config,
+                    client=_finnhub_client, disk_cache=_sentiment_cache,
+                )
+                if sent_scores:
+                    signals = blend_sentiment_into_signals(
+                        signals, sent_scores, config.news_sentiment_weight,
                     )
 
             if config.enable_regime_filter:

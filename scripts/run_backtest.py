@@ -32,6 +32,9 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
 from quant.backtest import BacktestConfig, run_backtest, run_walk_forward
 from quant.universe import get_universe
 
@@ -130,6 +133,10 @@ def main():
                         help="Disable IC-based signal weight calibration (enabled by default)")
     parser.add_argument("--ic-shrinkage", type=float, default=0.90,
                         help="IC calibration shrinkage toward equal weights (default: 0.90)")
+    parser.add_argument("--enable-news-sentiment", action="store_true",
+                        help="Enable Finnhub news sentiment as an additional signal")
+    parser.add_argument("--sentiment-weight", type=float, default=0.10,
+                        help="Weight for news sentiment signal (default: 0.10)")
     parser.add_argument("--walk-forward", action="store_true",
                         help="Run walk-forward validation instead of single backtest")
     parser.add_argument("--train-months", type=int, default=24,
@@ -185,6 +192,8 @@ def main():
         ic_shrinkage=args.ic_shrinkage,
         max_long_positions=args.max_positions,
         max_short_positions=args.max_positions,
+        enable_news_sentiment=args.enable_news_sentiment,
+        news_sentiment_weight=args.sentiment_weight,
     )
     if args.walk_forward:
         config.train_months = args.train_months

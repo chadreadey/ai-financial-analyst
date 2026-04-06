@@ -19,6 +19,9 @@ scipy>=1.10
 # Market data
 tavily-python>=0.3.0
 
+# Sentiment analysis
+vaderSentiment>=3.3.2
+
 # PDF / reports
 fpdf2>=2.8.0
 

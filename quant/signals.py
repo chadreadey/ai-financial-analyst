@@ -393,22 +393,29 @@ def compute_signal_vector(close: pd.Series, volume: Optional[pd.Series] = None,
     return sv
 
 
-def compute_signal_vector_from_tiingo(ticker: str, tiingo_api_key: str) -> Optional[SignalVector]:
-    """Convenience: fetch 2-year data from Tiingo and compute signals."""
+def compute_signal_vector_from_provider(ticker: str, tiingo_api_key: str = "") -> Optional[SignalVector]:
+    """Convenience: fetch 2-year data via price provider and compute signals.
+
+    Args:
+        tiingo_api_key: Deprecated — kept for backward compat. Uses PRICE_PROVIDER env var.
+    """
     from datetime import datetime, timedelta
     try:
-        from tiingo_client import TiingoClient
-        client = TiingoClient(tiingo_api_key)
+        from price_provider import get_price_provider
+        provider = get_price_provider()
         start = (datetime.now() - timedelta(days=730)).strftime("%Y-%m-%d")
-        data = client.get_eod_history(ticker, start)
+        data = provider.get_eod_history(ticker, start)
         if not data or len(data) < 60:
             return None
 
         df = pd.DataFrame(data)
-        df["date"] = pd.to_datetime(df["date"]).dt.tz_convert(None)
+        if df["date"].dtype == "object":
+            df["date"] = pd.to_datetime(df["date"]).dt.tz_localize(None, ambiguous="NaT", nonexistent="NaT")
+        else:
+            df["date"] = pd.to_datetime(df["date"]).dt.tz_convert(None)
         df = df.sort_values("date").set_index("date")
 
-        close = df["adjClose"]
+        close = df["adjClose"] if "adjClose" in df.columns else df["close"]
         volume = df["volume"] if "volume" in df.columns else None
         high = df["adjHigh"] if "adjHigh" in df.columns else None
         low = df["adjLow"] if "adjLow" in df.columns else None
@@ -417,3 +424,7 @@ def compute_signal_vector_from_tiingo(ticker: str, tiingo_api_key: str) -> Optio
     except Exception:
         logger.debug("Failed to compute signal vector for %s", ticker, exc_info=True)
         return None
+
+
+# Backward compat alias
+compute_signal_vector_from_tiingo = compute_signal_vector_from_provider
