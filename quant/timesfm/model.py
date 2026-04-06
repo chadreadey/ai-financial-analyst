@@ -85,23 +85,19 @@ class TimesFMModel:
                 return None
 
             # Compile with ForecastConfig if available (2.0+)
-            # horizon must be set at compile time, not forecast time
             if hasattr(timesfm, "ForecastConfig"):
-                compile_kwargs = {"horizon": 128}
-                # 2.5 added these options
                 try:
                     model.compile(
                         timesfm.ForecastConfig(
+                            max_horizon=256,
                             normalize_inputs=True,
                             use_continuous_quantile_head=True,
                             fix_quantile_crossing=True,
-                            **compile_kwargs,
                         )
                     )
                 except TypeError:
-                    # Older ForecastConfig may not accept all kwargs
                     model.compile(
-                        timesfm.ForecastConfig(**compile_kwargs)
+                        timesfm.ForecastConfig(max_horizon=256)
                     )
 
             inst = cls(model, backend="timesfm")
