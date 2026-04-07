@@ -13,9 +13,14 @@ __pycache__/
 # Runtime artifacts
 .sec_cache.db
 .warehouse.db
+.fmp_cache.db
+.universe_cache.db
+.wrds_pit.db
+.sentiment_cache.tar.gz
+.DS_Store
 reports/
 .seeded_tickers.txt
-backtest_*.json
+backtests/
 reproducibility_*.json
 
 # Build artifacts

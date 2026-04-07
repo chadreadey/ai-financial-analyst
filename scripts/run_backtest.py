@@ -35,7 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-from quant.backtest import BacktestConfig, run_backtest, run_walk_forward
+from quant.backtest import BacktestConfig, run_backtest, run_walk_forward, run_cpcv
 from quant.universe import get_universe
 
 
@@ -104,7 +104,7 @@ def print_summary(result):
 def main():
     parser = argparse.ArgumentParser(description="Quant-only backtest engine")
     parser.add_argument("--universe", default="liquid_10",
-                        help="Universe name: liquid_10, liquid_20, liquid_50 (default: liquid_10)")
+                        help="Universe: liquid_10/20/50/100/200, sp500_top50/top100/top200, sp500 (default: liquid_10)")
     parser.add_argument("--tickers", default="",
                         help="Comma-separated tickers (overrides --universe)")
     parser.add_argument("--start", default="2020-01-01",
@@ -139,12 +139,48 @@ def main():
                         help="Enable Finnhub news sentiment as an additional signal")
     parser.add_argument("--sentiment-weight", type=float, default=0.10,
                         help="Weight for news sentiment signal (default: 0.10)")
+    parser.add_argument("--enable-fomc", action="store_true",
+                        help="Enable FOMC proximity risk premium (Lucca-Moench drift)")
+    parser.add_argument("--fomc-boost", type=float, default=0.15,
+                        help="FOMC proximity boost when VIX > 20 (default: 0.15)")
+    parser.add_argument("--max-per-sector", type=int, default=0,
+                        help="Max positions per GICS sector (0=disabled, 2-3 recommended for wide universe)")
+    parser.add_argument("--enable-fundamentals", action="store_true",
+                        help="Enable quality + earnings revision signals")
+    parser.add_argument("--fundamentals-weight", type=float, default=0.10,
+                        help="Weight for fundamental signal overlay (default: 0.10)")
+    parser.add_argument("--fundamental-provider", default="fmp", choices=["fmp", "wrds"],
+                        help="Fundamental data source: fmp (snapshot) or wrds (point-in-time)")
+    parser.add_argument("--enable-earnings-signals", action="store_true",
+                        help="Enable IBES earnings signals (ERM + SUE + Dispersion)")
+    parser.add_argument("--earnings-weight", type=float, default=0.30,
+                        help="Weight for earnings signal overlay (default: 0.30)")
+    parser.add_argument("--earnings-rank", action="store_true",
+                        help="Path A: rank positions by earnings score, technicals filter only")
+    parser.add_argument("--conviction-sizing", type=float, default=0.0,
+                        help="Conviction-weighted sizing: 0=equal, 1=fully score-proportional")
+    parser.add_argument("--enable-agent-veto", action="store_true",
+                        help="Path C: quantified agent veto on candidates")
+    parser.add_argument("--veto-min-flags", type=int, default=2,
+                        help="Minimum veto signals to remove candidate (default: 2 of 3)")
     parser.add_argument("--walk-forward", action="store_true",
                         help="Run walk-forward validation instead of single backtest")
     parser.add_argument("--train-months", type=int, default=24,
                         help="Walk-forward train window months (default: 24)")
     parser.add_argument("--test-months", type=int, default=6,
                         help="Walk-forward test window months (default: 6)")
+    parser.add_argument("--cpcv", action="store_true",
+                        help="Run CPCV validation (Lopez de Prado)")
+    parser.add_argument("--n-groups", type=int, default=10,
+                        help="CPCV: number of time groups (default: 10)")
+    parser.add_argument("--n-test-groups", type=int, default=0,
+                        help="CPCV: test groups per combo (default: n_groups // 2)")
+    parser.add_argument("--purge-months", type=int, default=1,
+                        help="CPCV: purge window in months (default: 1)")
+    parser.add_argument("--embargo-months", type=int, default=1,
+                        help="CPCV: embargo period in months (default: 1)")
+    parser.add_argument("--cpcv-max-combos", type=int, default=0,
+                        help="CPCV: max combinations (0=all, N=random sample with seed=42)")
     parser.add_argument("--output", default="",
                         help="Save full results to JSON file")
     parser.add_argument("--verbose", "-v", action="store_true",
@@ -196,6 +232,18 @@ def main():
         max_short_positions=args.max_positions,
         enable_news_sentiment=args.enable_news_sentiment,
         news_sentiment_weight=args.sentiment_weight,
+        enable_fomc_proximity=args.enable_fomc,
+        fomc_high_vix_boost=args.fomc_boost,
+        max_per_sector=args.max_per_sector,
+        enable_fundamentals=args.enable_fundamentals,
+        fundamentals_weight=args.fundamentals_weight,
+        fundamental_provider=args.fundamental_provider,
+        enable_earnings_signals=args.enable_earnings_signals,
+        earnings_signal_weight=args.earnings_weight,
+        earnings_rank_mode=args.earnings_rank,
+        conviction_sizing=args.conviction_sizing,
+        enable_agent_veto=args.enable_agent_veto,
+        agent_veto_min_flags=args.veto_min_flags,
     )
     if args.walk_forward:
         config.train_months = args.train_months
@@ -203,27 +251,51 @@ def main():
 
     t0 = time.time()
 
-    if args.walk_forward:
-        result = run_walk_forward(config, progress_cb=progress)
+    if args.cpcv:
+        max_combos = args.cpcv_max_combos if args.cpcv_max_combos > 0 else None
+        cpcv_result = run_cpcv(
+            config,
+            n_groups=args.n_groups,
+            n_test_groups=args.n_test_groups if args.n_test_groups > 0 else 0,
+            purge_months=args.purge_months,
+            embargo_months=args.embargo_months,
+            max_combinations=max_combos,
+            progress_cb=progress,
+        )
+        elapsed = time.time() - t0
+        print(f"\n  Completed in {elapsed:.1f}s")
+        print(cpcv_result.print_summary())
+
+        if args.output:
+            output_path = args.output
+        else:
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_path = f"backtest_cpcv_{ts}.json"
+
+        with open(output_path, "w") as f:
+            json.dump(cpcv_result.to_dict(), f, indent=2, default=str)
+        print(f"\n  Full results saved to: {output_path}")
     else:
-        result = run_backtest(config, progress_cb=progress)
+        if args.walk_forward:
+            result = run_walk_forward(config, progress_cb=progress)
+        else:
+            result = run_backtest(config, progress_cb=progress)
 
-    elapsed = time.time() - t0
-    print(f"\n  Completed in {elapsed:.1f}s")
+        elapsed = time.time() - t0
+        print(f"\n  Completed in {elapsed:.1f}s")
 
-    print_summary(result)
+        print_summary(result)
 
-    # Save to JSON
-    if args.output:
-        output_path = args.output
-    else:
-        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        mode = "wf" if args.walk_forward else "bt"
-        output_path = f"backtest_{mode}_{ts}.json"
+        if args.output:
+            output_path = args.output
+        else:
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            mode = "wf" if args.walk_forward else "bt"
+            output_path = f"backtest_{mode}_{ts}.json"
 
-    with open(output_path, "w") as f:
-        json.dump(result.to_dict(), f, indent=2, default=str)
-    print(f"\n  Full results saved to: {output_path}")
+        with open(output_path, "w") as f:
+            json.dump(result.to_dict(), f, indent=2, default=str)
+        print(f"\n  Full results saved to: {output_path}")
 
 
 if __name__ == "__main__":

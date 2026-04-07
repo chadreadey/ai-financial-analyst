@@ -69,6 +69,34 @@ class TiingoClient:
             logger.debug("tiingo %s failed: %s", endpoint, exc, exc_info=True)
             return {}
 
+    def get_fundamentals_statements(self, symbol: str, start_date: str = "2020-01-01") -> list[dict]:
+        endpoint = f"tiingo/fundamentals/{symbol}/statements"
+        try:
+            resp = self._session.get(
+                f"https://api.tiingo.com/{endpoint}",
+                params={"startDate": start_date},
+                timeout=(5, 30),
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as exc:
+            logger.debug("tiingo %s failed: %s", endpoint, exc)
+            return []
+
+    def get_fundamentals_daily(self, symbol: str, start_date: str = "2020-01-01") -> list[dict]:
+        endpoint = f"tiingo/fundamentals/{symbol}/daily"
+        try:
+            resp = self._session.get(
+                f"https://api.tiingo.com/{endpoint}",
+                params={"startDate": start_date},
+                timeout=(5, 30),
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as exc:
+            logger.debug("tiingo %s failed: %s", endpoint, exc)
+            return []
+
     def get_eod_history(self, symbol: str, start_date: str) -> list[dict]:
         endpoint = f"tiingo/daily/{symbol}/prices"
         try:

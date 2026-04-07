@@ -93,6 +93,47 @@ class FinnhubClient:
             logger.debug("finnhub insider-sentiment %s failed: %s", symbol, exc, exc_info=True)
             return []
 
+    def get_economic_calendar(
+        self, from_date: str, to_date: str,
+    ) -> list[dict]:
+        """
+        Fetch economic calendar events (FOMC, CPI, NFP, GDP, etc.).
+
+        Returns list of dicts with keys:
+            country, event, estimate, actual, prev, time, unit, impact
+        Impact: 'high', 'medium', 'low'.
+        Historical depth: several years back.
+        """
+        try:
+            data = self._get("calendar/economic", {
+                "from": from_date,
+                "to": to_date,
+            })
+            return data.get("economicCalendar", []) if isinstance(data, dict) else []
+        except Exception as exc:
+            logger.debug("finnhub economic-calendar failed: %s", exc, exc_info=True)
+            return []
+
+    def get_earnings_calendar(
+        self, from_date: str, to_date: str,
+    ) -> list[dict]:
+        """
+        Fetch earnings calendar (upcoming and past).
+
+        Returns list of dicts with keys:
+            date, epsActual, epsEstimate, hour, quarter, revenueActual,
+            revenueEstimate, symbol, year
+        """
+        try:
+            data = self._get("calendar/earnings", {
+                "from": from_date,
+                "to": to_date,
+            })
+            return data.get("earningsCalendar", []) if isinstance(data, dict) else []
+        except Exception as exc:
+            logger.debug("finnhub earnings-calendar failed: %s", exc, exc_info=True)
+            return []
+
     def get_earnings_surprises(self, symbol: str, limit: int = 40) -> list[dict]:
         """
         Fetch earnings surprise history (~10 years at limit=40).

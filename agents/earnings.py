@@ -99,5 +99,41 @@ Lead with conclusions, then support with data."""
         if data.quarterly_summary:
             parts.append(f"\n{data.quarterly_summary}")
 
+        # Cached fundamental signals (fresher than 10-K)
+        cf = data.cached_fundamentals
+        if cf:
+            rev = cf.get("earnings_revision")
+            if rev:
+                if rev.get("is_analyst_consensus"):
+                    parts.append("\n── Analyst Consensus EPS Revision (more recent than SEC filing) ──")
+                    parts.append(f"  Direction: {rev['direction']}")
+                    parts.append(f"  Current consensus EPS: ${rev['current_eps']:.3f} ({rev['current_date']}, {rev.get('num_analysts', '?')} analysts)")
+                    parts.append(f"  Prior consensus EPS: ${rev['prior_eps']:.3f} ({rev['prior_date']})")
+                    parts.append(f"  Revision: {rev['revision_pct']:+.1f}%")
+                    if rev["direction"] == "UP":
+                        parts.append("  NOTE: Positive analyst revisions are a leading bullish indicator (IC 0.04-0.10)")
+                    elif rev["direction"] == "DOWN":
+                        parts.append("  NOTE: Negative analyst revisions often precede earnings misses")
+                else:
+                    parts.append("\n── Sequential Quarterly EPS Trend ──")
+                    parts.append(f"  Latest EPS: ${rev['current_eps']:.3f} ({rev['current_date']})")
+                    parts.append(f"  Prior quarter EPS: ${rev['prior_eps']:.3f} ({rev['prior_date']})")
+                    parts.append(f"  Change: {rev['revision_pct']:+.1f}%")
+                    parts.append(f"  Direction: {rev['direction']}")
+
+            inc = cf.get("latest_income")
+            if inc:
+                parts.append(f"\n── Latest Quarterly Income (as of {inc['as_of_date']}) ──")
+                if inc.get("revenue"):
+                    parts.append(f"  Revenue: ${inc['revenue']:,.0f}")
+                if inc.get("net_income"):
+                    parts.append(f"  Net Income: ${inc['net_income']:,.0f}")
+                if inc.get("eps_diluted"):
+                    parts.append(f"  EPS (diluted): ${inc['eps_diluted']:.2f}")
+                if inc.get("revenue_qoq_pct") is not None:
+                    parts.append(f"  Revenue QoQ: {inc['revenue_qoq_pct']:+.1f}%")
+                if inc.get("net_income_qoq_pct") is not None:
+                    parts.append(f"  Net Income QoQ: {inc['net_income_qoq_pct']:+.1f}%")
+
         self.append_enrichment_sections(parts, data)
         return "\n".join(parts)

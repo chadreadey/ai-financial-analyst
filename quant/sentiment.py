@@ -1,7 +1,8 @@
 """
 News sentiment signal from Finnhub company news.
 
-Uses VADER sentiment on headlines (no GPU, deterministic, pure Python).
+Uses FinBERT (ProsusAI/finbert) for financial sentiment scoring.
+Falls back to VADER if transformers is not installed.
 Returns SignalResult in [-1, +1] — compatible with the quant signal framework.
 
 Point-in-time safety: only articles with datetime < as_of_date are scored.
@@ -19,19 +20,51 @@ from quant.signals import SignalResult
 
 logger = logging.getLogger(__name__)
 
+# ── Sentiment scorer: FinBERT (preferred) → VADER (fallback) ─────────
+
+_scorer_name = "none"
+_finbert_pipeline = None
+_vader = None
+
 try:
-    from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-    _vader = SentimentIntensityAnalyzer()
-except ImportError:
-    _vader = None
-    logger.debug("vaderSentiment not installed — news sentiment will return 0.0")
+    from transformers import pipeline as hf_pipeline
+    _finbert_pipeline = hf_pipeline(
+        "sentiment-analysis",
+        model="ProsusAI/finbert",
+        device=-1,  # CPU only — deterministic, no GPU required
+        top_k=None,  # return all class probabilities
+    )
+    _scorer_name = "finbert"
+    logger.info("FinBERT sentiment model loaded (ProsusAI/finbert)")
+except Exception as exc:
+    logger.debug("FinBERT not available (%s) — trying VADER fallback", exc)
+    try:
+        from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+        _vader = SentimentIntensityAnalyzer()
+        _scorer_name = "vader"
+        logger.info("Using VADER sentiment (FinBERT not available)")
+    except ImportError:
+        logger.debug("Neither FinBERT nor VADER available — sentiment will return 0.0")
 
 
 def _score_headline(text: str) -> float:
-    """VADER compound score for a single headline. Returns [-1, +1]."""
-    if _vader is None:
-        return 0.0
-    return _vader.polarity_scores(text)["compound"]
+    """
+    Score a single headline/text. Returns [-1, +1].
+
+    FinBERT returns {positive, negative, neutral} probabilities.
+    Score = P(positive) - P(negative), yielding [-1, +1].
+    """
+    if _finbert_pipeline is not None:
+        try:
+            results = _finbert_pipeline(text[:512], truncation=True)
+            # results is a list of lists: [[{label, score}, ...]]
+            probs = {r["label"]: r["score"] for r in results[0]}
+            return probs.get("positive", 0.0) - probs.get("negative", 0.0)
+        except Exception:
+            return 0.0
+    if _vader is not None:
+        return _vader.polarity_scores(text)["compound"]
+    return 0.0
 
 
 def compute_news_sentiment_score(
@@ -56,8 +89,8 @@ def compute_news_sentiment_score(
     Returns:
         SignalResult with score in [-1, +1]
     """
-    if _vader is None:
-        return SignalResult(0.0, "vaderSentiment not installed", {"n_articles": 0})
+    if _scorer_name == "none":
+        return SignalResult(0.0, "no sentiment scorer available", {"n_articles": 0})
 
     from_date = (as_of_date - timedelta(days=news_window_days)).strftime("%Y-%m-%d")
     to_date = as_of_date.strftime("%Y-%m-%d")
@@ -108,7 +141,7 @@ def compute_news_sentiment_score(
     # Clip to [-1, +1] (VADER compound is already in this range)
     score = max(-1.0, min(1.0, mean_score))
 
-    detail = f"{len(scores)} articles, mean VADER={score:.3f}"
+    detail = f"{len(scores)} articles, mean {_scorer_name}={score:.3f}"
     return SignalResult(
         score=round(score, 4),
         detail=detail,

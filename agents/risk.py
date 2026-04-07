@@ -100,5 +100,53 @@ but also acknowledge genuine strengths in the risk profile."""
         if data.quarterly_summary:
             parts.append(f"\n{data.quarterly_summary}")
 
+        # Cached quarterly balance sheet (fresher than annual 10-K)
+        cf = data.cached_fundamentals
+        if cf:
+            bs = cf.get("balance_sheet")
+            if bs:
+                parts.append(f"\n── Latest Quarterly Balance Sheet (as of {bs['as_of_date']}) ──")
+                parts.append("  NOTE: This is more recent than the annual 10-K data above.")
+                parts.append("  Flag any significant divergence from the annual filing.")
+                if bs.get("total_assets"):
+                    parts.append(f"  Total Assets: ${bs['total_assets']:,.0f}")
+                if bs.get("stockholders_equity"):
+                    parts.append(f"  Stockholders' Equity: ${bs['stockholders_equity']:,.0f}")
+                if bs.get("total_debt"):
+                    parts.append(f"  Total Debt: ${bs['total_debt']:,.0f}")
+                if bs.get("cash"):
+                    parts.append(f"  Cash: ${bs['cash']:,.0f}")
+                if bs.get("net_debt") is not None:
+                    parts.append(f"  Net Debt: ${bs['net_debt']:,.0f}")
+                if bs.get("equity_ratio_pct") is not None:
+                    parts.append(f"  Equity Ratio: {bs['equity_ratio_pct']:.1f}%")
+                if bs.get("current_ratio") is not None:
+                    parts.append(f"  Current Ratio: {bs['current_ratio']:.2f}")
+                if bs.get("debt_to_equity") is not None:
+                    parts.append(f"  Debt/Equity: {bs['debt_to_equity']:.2f}")
+
+            qoq = cf.get("balance_sheet_qoq")
+            if qoq:
+                parts.append("\n── Balance Sheet QoQ Changes ──")
+                if qoq.get("equity_change_pct") is not None:
+                    parts.append(f"  Equity: {qoq['equity_change_pct']:+.1f}%")
+                if qoq.get("debt_change_pct") is not None:
+                    parts.append(f"  Debt: {qoq['debt_change_pct']:+.1f}%")
+                if qoq.get("cash_change_pct") is not None:
+                    parts.append(f"  Cash: {qoq['cash_change_pct']:+.1f}%")
+                # Flag deterioration
+                debt_up = (qoq.get("debt_change_pct") or 0) > 10
+                equity_down = (qoq.get("equity_change_pct") or 0) < -5
+                cash_down = (qoq.get("cash_change_pct") or 0) < -15
+                if debt_up or equity_down or cash_down:
+                    flags = []
+                    if debt_up:
+                        flags.append("debt rising >10%")
+                    if equity_down:
+                        flags.append("equity declining")
+                    if cash_down:
+                        flags.append("cash burn >15%")
+                    parts.append(f"  ⚠ RISK FLAGS: {', '.join(flags)}")
+
         self.append_enrichment_sections(parts, data)
         return "\n".join(parts)

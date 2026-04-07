@@ -34,6 +34,7 @@ class AnalysisData(BaseModel):
     cash_flow_trends: list[Any] = Field(default_factory=list)
     quarterly_metrics: list[Any] = Field(default_factory=list)
     quarterly_summary: str = ""
+    cached_fundamentals: dict[str, Any] = Field(default_factory=dict)
     enrichment_sections: dict[str, str] = Field(default_factory=dict)
     enrichment_warnings: list[str] = Field(default_factory=list)
     enrichment_sources: list[str] = Field(default_factory=list)

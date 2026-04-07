@@ -342,6 +342,18 @@ class Orchestrator:
                     if raw_industry and raw_industry.lower() not in ("n/a", "none"):
                         data.industry = raw_industry
 
+                    # Load cached quarterly fundamentals for agent context
+                    try:
+                        from quant.fmp_cache import FMPFundamentalCache
+                        from quant.fundamentals import load_cached_fundamentals
+                        fund_cache = FMPFundamentalCache()
+                        if fund_cache.ticker_count() > 0:
+                            data.cached_fundamentals = load_cached_fundamentals(
+                                ticker.upper(), fmp_cache=fund_cache
+                            )
+                    except Exception:
+                        pass
+
                     emit("Data preparation complete", 22)
                     return data
             except Exception as exc:
@@ -479,6 +491,20 @@ class Orchestrator:
         if not raw_industry or raw_industry.lower() in ("n/a", "none"):
             raw_industry = ""
 
+        # Load cached quarterly fundamentals (Tiingo/FMP) for agent context
+        cached_fund = {}
+        try:
+            from quant.fmp_cache import FMPFundamentalCache
+            from quant.fundamentals import load_cached_fundamentals
+            fund_cache = FMPFundamentalCache()
+            if fund_cache.ticker_count() > 0:
+                cached_fund = load_cached_fundamentals(raw["ticker"], fmp_cache=fund_cache)
+                if cached_fund:
+                    logger.info("Loaded cached fundamentals for %s: %s",
+                                raw["ticker"], list(cached_fund.keys()))
+        except Exception as exc:
+            logger.debug("Cached fundamentals not available: %s", exc)
+
         emit("Data preparation complete", 25)
         return AnalysisData(
             ticker=raw["ticker"],
@@ -499,6 +525,7 @@ class Orchestrator:
             cash_flow_trends=cash_flow_trends,
             quarterly_metrics=quarterly_metrics,
             quarterly_summary=quarterly_summary,
+            cached_fundamentals=cached_fund,
             enrichment_sections=enrichment_sections,
             enrichment_warnings=enrichment.get("warnings", []),
             enrichment_sources=enrichment.get("sources", []),

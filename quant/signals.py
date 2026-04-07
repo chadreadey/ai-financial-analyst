@@ -31,18 +31,22 @@ class SignalVector:
     rsi: SignalResult
     obv_trend: SignalResult
     atr_regime: SignalResult
+    high_52w: SignalResult = field(default_factory=lambda: SignalResult(0.0, "not computed"))
     composite_score: float = 0.0
     composite_direction: str = "HOLD"
     actionable: bool = False
+    earnings_rank_score: float = 0.0   # Set by earnings signals for ranking (Path A)
     flags: list = field(default_factory=list)
 
-    # Weights — will be replaced with data-derived IC weights
+    # Weights — original validated weights preserved.
+    # 52-week high disabled (0.0) pending independent validation.
     WEIGHTS = {
         "sma_trend": 0.25,
         "mean_reversion_z": 0.20,
         "bollinger_pctb": 0.20,
         "rsi": 0.15,
         "obv_trend": 0.20,
+        "high_52w": 0.0,
     }
 
     def compute_composite(self) -> None:
@@ -52,6 +56,7 @@ class SignalVector:
             "bollinger_pctb": self.bollinger_pctb.score,
             "rsi": self.rsi.score,
             "obv_trend": self.obv_trend.score,
+            "high_52w": self.high_52w.score,
         }
         self.composite_score = sum(
             signals[k] * self.WEIGHTS[k] for k in signals
@@ -94,6 +99,7 @@ class SignalVector:
                 "bollinger_pctb": self._signal_dict(self.bollinger_pctb),
                 "rsi": self._signal_dict(self.rsi),
                 "obv_trend": self._signal_dict(self.obv_trend),
+                "high_52w": self._signal_dict(self.high_52w),
                 "atr_regime": self._signal_dict(self.atr_regime),
             },
             "composite_score": round(self.composite_score, 4),
@@ -351,6 +357,55 @@ def compute_atr_regime(close: pd.Series, high: Optional[pd.Series] = None,
                                       "stop_loss_atr2x": stop_2x})
 
 
+def compute_52w_high(close: pd.Series) -> SignalResult:
+    """
+    52-week high ratio: price / 52-week high.
+
+    George & Hwang (2004) showed this generates ~2x the returns of standard
+    12-1 month momentum with less crash exposure. Replicated through 2024.
+
+    Score mapping:
+      ratio >= 0.95 (within 5% of high) → +1.0 (strong momentum)
+      ratio >= 0.85 → proportional +0.3 to +0.9
+      ratio >= 0.70 → proportional -0.3 to +0.3
+      ratio < 0.70 (>30% off high) → -1.0 (deep drawdown)
+    """
+    if len(close) < 252:
+        if len(close) < 60:
+            return SignalResult(0.0, "insufficient data (<60 days)")
+        # Use available data for shorter histories
+        high = float(close.max())
+    else:
+        high = float(close.tail(252).max())
+
+    price = float(close.iloc[-1])
+    if high <= 0:
+        return SignalResult(0.0, "invalid high price")
+
+    ratio = price / high
+
+    # Map ratio to score: near high = bullish, far from high = bearish
+    if ratio >= 0.95:
+        score = 0.5 + (ratio - 0.95) / 0.05 * 0.5  # 0.95→+0.5, 1.0→+1.0
+        score = min(1.0, score)
+        detail = f"near 52w high ({ratio:.1%})"
+    elif ratio >= 0.85:
+        score = (ratio - 0.85) / 0.10 * 0.5  # 0.85→0.0, 0.95→+0.5
+        detail = f"moderate momentum ({ratio:.1%})"
+    elif ratio >= 0.70:
+        score = (ratio - 0.70) / 0.15 * 0.5 - 0.5  # 0.70→-0.5, 0.85→0.0
+        detail = f"pullback ({ratio:.1%})"
+    else:
+        score = -1.0
+        detail = f"deep drawdown ({ratio:.1%} of 52w high)"
+
+    return SignalResult(
+        round(float(score), 4),
+        detail,
+        {"ratio": round(ratio, 4), "high_52w": round(high, 2), "price": round(price, 2)},
+    )
+
+
 # ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
@@ -380,6 +435,7 @@ def compute_signal_vector(close: pd.Series, volume: Optional[pd.Series] = None,
         obv = SignalResult(0.0, "no volume data")
 
     atr = compute_atr_regime(close, high, low)
+    h52 = compute_52w_high(close)
 
     sv = SignalVector(
         sma_trend=sma,
@@ -388,6 +444,7 @@ def compute_signal_vector(close: pd.Series, volume: Optional[pd.Series] = None,
         rsi=rsi,
         obv_trend=obv,
         atr_regime=atr,
+        high_52w=h52,
     )
     sv.compute_composite()
     return sv
