@@ -19,6 +19,19 @@ import requests
 logger = logging.getLogger(__name__)
 
 
+# ── Schema Validation ────────────────────────────────────────────────
+
+_REQUIRED_ALPACA_BAR_FIELDS = ("t", "o", "h", "l", "c", "v")
+
+
+def _validate_alpaca_bar(bar: dict, symbol: str) -> dict:
+    """Log warning if required Alpaca bar fields are missing. Returns bar unchanged."""
+    missing = [k for k in _REQUIRED_ALPACA_BAR_FIELDS if k not in bar]
+    if missing:
+        logger.warning("schema: alpaca_bar response for %s missing fields: %s", symbol, ", ".join(missing))
+    return bar
+
+
 # ── Provider Protocol ─────────────────────────────────────────────────
 
 class PriceProvider(Protocol):
@@ -148,7 +161,7 @@ class AlpacaClient:
                 break
 
             bars = data.get("bars") or []
-            for bar in bars:
+            for bar in (_validate_alpaca_bar(b, symbol) for b in bars):
                 # Normalize timestamp: Alpaca returns "2024-01-18T05:00:00Z"
                 ts = bar.get("t", "")
                 all_bars.append({

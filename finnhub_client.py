@@ -20,6 +20,19 @@ import requests
 logger = logging.getLogger(__name__)
 
 
+# ── Schema Validation ────────────────────────────────────────────────
+
+_REQUIRED_NEWS_FIELDS = ("headline", "datetime", "source")
+
+
+def _validate_news_item(item: dict, symbol: str) -> dict:
+    """Log warning if required news fields are missing. Returns item unchanged."""
+    missing = [k for k in _REQUIRED_NEWS_FIELDS if k not in item]
+    if missing:
+        logger.warning("schema: news_item response for %s missing fields: %s", symbol, ", ".join(missing))
+    return item
+
+
 # ── REST Client ───────────────────────────────────────────────────────
 
 class FinnhubClient:
@@ -64,11 +77,12 @@ class FinnhubClient:
             id, category, datetime (unix), headline, summary, source, url, related
         """
         try:
-            return self._get("company-news", {
+            data = self._get("company-news", {
                 "symbol": symbol,
                 "from": from_date,
                 "to": to_date,
             })
+            return [_validate_news_item(item, symbol) for item in data]
         except Exception as exc:
             logger.debug("finnhub company-news %s failed: %s", symbol, exc, exc_info=True)
             return []

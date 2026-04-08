@@ -9,6 +9,17 @@ import requests
 logger = logging.getLogger(__name__)
 
 
+_REQUIRED_EOD_FIELDS = ("adjClose", "adjHigh", "adjLow", "adjOpen", "adjVolume", "close", "date")
+
+
+def _validate_eod_bar(bar: dict, symbol: str) -> dict:
+    """Log warning if required EOD fields are missing. Returns bar unchanged."""
+    missing = [k for k in _REQUIRED_EOD_FIELDS if k not in bar]
+    if missing:
+        logger.warning("schema: eod_bar response for %s missing fields: %s", symbol, ", ".join(missing))
+    return bar
+
+
 class TiingoClient:
 
     def __init__(self, api_key: str) -> None:
@@ -112,7 +123,8 @@ class TiingoClient:
                     timeout=(5, 15),
                 )
             resp.raise_for_status()
-            return resp.json()
+            bars = resp.json()
+            return [_validate_eod_bar(b, symbol) for b in bars]
         except requests.ConnectionError:
             try:
                 resp = self._session.get(
@@ -121,7 +133,8 @@ class TiingoClient:
                     timeout=(5, 15),
                 )
                 resp.raise_for_status()
-                return resp.json()
+                bars = resp.json()
+                return [_validate_eod_bar(b, symbol) for b in bars]
             except Exception as exc:
                 logger.debug("tiingo %s failed: %s", endpoint, exc, exc_info=True)
                 return []

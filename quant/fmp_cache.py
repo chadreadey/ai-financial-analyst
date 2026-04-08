@@ -180,6 +180,9 @@ class FMPFundamentalCache:
         Converts Tiingo statement format to FMP-compatible dicts so the
         backtest engine can use the same cache regardless of source.
         """
+        from fmp_client import (
+            _REQUIRED_INCOME_FIELDS, _REQUIRED_BALANCE_FIELDS, _validate_fmp_record,
+        )
         stats = {"api_calls": 0, "cached": 0, "errors": 0}
 
         for i, ticker in enumerate(tickers):
@@ -236,6 +239,12 @@ class FMPFundamentalCache:
                         "retainedEarnings": bs.get("retainedEarnings", 0),
                         "totalLiabilities": bs.get("totalLiabilities", 0),
                     })
+
+                # Validate translated records before caching
+                for rec in income_records:
+                    _validate_fmp_record(rec, _REQUIRED_INCOME_FIELDS, "tiingo_translated_income", sym)
+                for rec in balance_records:
+                    _validate_fmp_record(rec, _REQUIRED_BALANCE_FIELDS, "tiingo_translated_balance", sym)
 
                 self._set(sym, "income_q", income_records)
                 self._set(sym, "balance_q", balance_records)
