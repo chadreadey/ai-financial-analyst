@@ -305,14 +305,12 @@ def compute_sharpe_from_returns(
     daily_returns: pd.Series,
     annual_factor: float = 252.0,
 ) -> Optional[float]:
-    """Compute annualized Sharpe from a daily return series."""
-    if daily_returns is None or len(daily_returns) < 2:
-        return None
-    mean_ret = daily_returns.mean()
-    std_ret = daily_returns.std()
-    if std_ret == 0 or np.isnan(std_ret):
-        return None
-    return round(float(mean_ret / std_ret * math.sqrt(annual_factor)), 2)
+    """Compute annualized Sharpe from a daily return series.
+
+    Delegates to quant.metrics.compute_sharpe (canonical implementation).
+    """
+    from quant.metrics import compute_sharpe
+    return compute_sharpe(daily_returns, annual_factor, min_observations=2)
 
 
 @dataclass

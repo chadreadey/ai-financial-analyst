@@ -22,24 +22,20 @@ logger = logging.getLogger(__name__)
 def _format_risk_lines(returns, close) -> str:
     """Format risk metrics from a returns Series and close Series."""
     import numpy as np
+    from quant import metrics
 
     ann_factor = 252
-    mean_ret = float(returns.mean())
     std_ret = float(returns.std())
 
-    sharpe = (mean_ret * ann_factor) / (std_ret * np.sqrt(ann_factor)) if std_ret > 0 else 0.0
-
-    downside = returns[returns < 0]
-    downside_std = float(downside.std()) if len(downside) > 1 else std_ret
-    sortino = (mean_ret * ann_factor) / (downside_std * np.sqrt(ann_factor)) if downside_std > 0 else 0.0
+    sharpe = metrics.compute_sharpe(returns) or 0.0
+    sortino = metrics.compute_sortino(returns) or 0.0
 
     cumulative = (1 + returns).cumprod()
-    running_max = cumulative.cummax()
-    drawdowns = (cumulative - running_max) / running_max
-    max_dd = float(drawdowns.min())
+    max_dd_pct = metrics.compute_max_drawdown(cumulative)
+    max_dd = -max_dd_pct / 100  # convert back to negative fraction for display
 
     ann_ret = float((cumulative.iloc[-1]) ** (ann_factor / len(returns)) - 1)
-    calmar = ann_ret / abs(max_dd) if max_dd != 0 else 0.0
+    calmar = metrics.compute_calmar(ann_ret * 100, max_dd_pct) or 0.0
 
     var_95 = float(np.percentile(returns, 5))
     skew = float(returns.skew())

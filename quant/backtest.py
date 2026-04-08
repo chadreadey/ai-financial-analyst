@@ -25,6 +25,8 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
+from quant import metrics
+from quant.scoring import reclassify
 from quant.signals import compute_signal_vector, SignalVector
 from quant.universe import BENCHMARK
 
@@ -400,13 +402,7 @@ def apply_calibrated_weights(
         )
         sv.composite_score = float(np.clip(score, -1.0, 1.0))
 
-        if sv.composite_score >= 0.30:
-            sv.composite_direction = "BUY"
-        elif sv.composite_score <= -0.30:
-            sv.composite_direction = "SELL"
-        else:
-            sv.composite_direction = "HOLD"
-        sv.actionable = abs(sv.composite_score) >= 0.40
+        reclassify(sv)
 
     return signals
 
@@ -756,13 +752,7 @@ def apply_fomc_boost(
     for ticker, sv in signals.items():
         sv.composite_score = float(np.clip(sv.composite_score + boost, -1.0, 1.0))
         # Recompute direction after boost
-        if sv.composite_score >= 0.30:
-            sv.composite_direction = "BUY"
-        elif sv.composite_score <= -0.30:
-            sv.composite_direction = "SELL"
-        else:
-            sv.composite_direction = "HOLD"
-        sv.actionable = abs(sv.composite_score) >= 0.40
+        reclassify(sv)
         sv.flags.append(f"fomc_boost={boost:.3f}")
 
     return signals
@@ -873,13 +863,7 @@ def blend_timesfm_into_signals(
         sv.composite_score = float(np.clip(blended, -1.0, 1.0))
 
         # Re-derive direction from blended score
-        if sv.composite_score >= 0.30:
-            sv.composite_direction = "BUY"
-        elif sv.composite_score <= -0.30:
-            sv.composite_direction = "SELL"
-        else:
-            sv.composite_direction = "HOLD"
-        sv.actionable = abs(sv.composite_score) >= 0.40
+        reclassify(sv)
 
     return signals
 
@@ -942,13 +926,7 @@ def blend_lstm_into_signals(
         blended = sv.composite_score * quant_scale + score * lstm_weight
         sv.composite_score = float(np.clip(blended, -1.0, 1.0))
 
-        if sv.composite_score >= 0.30:
-            sv.composite_direction = "BUY"
-        elif sv.composite_score <= -0.30:
-            sv.composite_direction = "SELL"
-        else:
-            sv.composite_direction = "HOLD"
-        sv.actionable = abs(sv.composite_score) >= 0.40
+        reclassify(sv)
 
     return signals
 
@@ -1114,13 +1092,7 @@ def blend_sentiment_into_signals(
         blended = sv.composite_score * quant_scale + score * effective_weight
         sv.composite_score = float(np.clip(blended, -1.0, 1.0))
 
-        if sv.composite_score >= 0.30:
-            sv.composite_direction = "BUY"
-        elif sv.composite_score <= -0.30:
-            sv.composite_direction = "SELL"
-        else:
-            sv.composite_direction = "HOLD"
-        sv.actionable = abs(sv.composite_score) >= 0.40
+        reclassify(sv)
 
         # Flag: log effective weight and extreme raw sentiment for audit trail
         sv.flags.append(
@@ -1873,33 +1845,16 @@ def run_backtest(
         result.total_return_pct = round(
             (final_equity / config.initial_capital - 1) * 100, 2
         )
-        n_years = max((cumulative.index[-1] - cumulative.index[0]).days / 365.25, 0.1)
-        result.annual_return_pct = round(
-            ((final_equity / config.initial_capital) ** (1 / n_years) - 1) * 100, 2
-        )
+        result.annual_return_pct = metrics.compute_annual_return(cumulative, config.initial_capital)
 
         # Daily returns for Sharpe/Sortino
         daily_returns = all_daily_pnl / config.initial_capital  # approximate
-        mean_daily = float(daily_returns.mean())
-        std_daily = float(daily_returns.std())
+        result.sharpe = metrics.compute_sharpe(daily_returns)
+        result.sortino = metrics.compute_sortino(daily_returns)
 
-        if std_daily > 0 and len(daily_returns) > 10:
-            result.sharpe = round(mean_daily / std_daily * math.sqrt(252), 2)
-
-            downside = daily_returns[daily_returns < 0]
-            if len(downside) > 1:
-                down_std = float(downside.std())
-                if down_std > 0:
-                    result.sortino = round(mean_daily / down_std * math.sqrt(252), 2)
-
-        # Max drawdown
-        running_max = cumulative.cummax()
-        drawdown = (cumulative - running_max) / running_max
-        result.max_drawdown_pct = round(abs(float(drawdown.min())) * 100, 2)
-
-        # Calmar
-        if result.max_drawdown_pct > 0:
-            result.calmar = round(result.annual_return_pct / result.max_drawdown_pct, 2)
+        # Max drawdown & Calmar
+        result.max_drawdown_pct = metrics.compute_max_drawdown(cumulative)
+        result.calmar = metrics.compute_calmar(result.annual_return_pct, result.max_drawdown_pct)
 
     # ── 5. Benchmark comparison ───────────────────────────────────
     if benchmark_df is not None:
@@ -1916,13 +1871,7 @@ def run_backtest(
 
             # Benchmark Sharpe
             bench_returns = bench["close"].pct_change().dropna()
-            if len(bench_returns) > 10:
-                bench_mean = float(bench_returns.mean())
-                bench_std = float(bench_returns.std())
-                if bench_std > 0:
-                    result.benchmark_sharpe = round(
-                        bench_mean / bench_std * math.sqrt(252), 2
-                    )
+            result.benchmark_sharpe = metrics.compute_sharpe(bench_returns)
 
             # Benchmark equity curve
             result.benchmark_curve = [
@@ -2289,29 +2238,14 @@ def run_walk_forward(
         result.total_return_pct = round(
             (final_equity / config.initial_capital - 1) * 100, 2
         )
-        n_years = max((cumulative.index[-1] - cumulative.index[0]).days / 365.25, 0.1)
-        result.annual_return_pct = round(
-            ((final_equity / config.initial_capital) ** (1 / n_years) - 1) * 100, 2
-        )
+        result.annual_return_pct = metrics.compute_annual_return(cumulative, config.initial_capital)
 
         daily_returns = all_daily_pnl / config.initial_capital
-        mean_daily = float(daily_returns.mean())
-        std_daily = float(daily_returns.std())
+        result.sharpe = metrics.compute_sharpe(daily_returns)
+        result.sortino = metrics.compute_sortino(daily_returns)
 
-        if std_daily > 0 and len(daily_returns) > 10:
-            result.sharpe = round(mean_daily / std_daily * math.sqrt(252), 2)
-            downside = daily_returns[daily_returns < 0]
-            if len(downside) > 1:
-                down_std = float(downside.std())
-                if down_std > 0:
-                    result.sortino = round(mean_daily / down_std * math.sqrt(252), 2)
-
-        running_max = cumulative.cummax()
-        drawdown = (cumulative - running_max) / running_max
-        result.max_drawdown_pct = round(abs(float(drawdown.min())) * 100, 2)
-
-        if result.max_drawdown_pct > 0:
-            result.calmar = round(result.annual_return_pct / result.max_drawdown_pct, 2)
+        result.max_drawdown_pct = metrics.compute_max_drawdown(cumulative)
+        result.calmar = metrics.compute_calmar(result.annual_return_pct, result.max_drawdown_pct)
 
     # Benchmark
     if benchmark_df is not None:

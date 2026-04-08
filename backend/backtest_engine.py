@@ -79,14 +79,9 @@ def _fetch_prices(ticker: str, conn: sqlite3.Connection) -> dict[str, float]:
     if len(cached) > 100:
         return cached
 
-    import os
-    tiingo_key = os.getenv("TIINGO_API_KEY", "").strip()
-    if not tiingo_key:
-        return cached
-
     try:
-        from tiingo_client import TiingoClient
-        client = TiingoClient(tiingo_key)
+        from price_provider import get_price_provider
+        client = get_price_provider()
         start = (datetime.now() - timedelta(days=1825)).strftime("%Y-%m-%d")
         data = client.get_eod_history(ticker, start)
         if data:
@@ -256,19 +251,13 @@ class BacktestEngine:
             result.max_drawdown_pct = round(max_dd * 100, 2)
 
             if len(returns) > 1:
-                import statistics
-                mean_ret = statistics.mean(returns)
-                std_ret = statistics.stdev(returns)
-                if std_ret > 0:
-                    result.sharpe = round(mean_ret / std_ret * math.sqrt(252 / self.TIME_DECAY_DAYS), 2)
-                downside = [r for r in returns if r < 0]
-                if downside:
-                    down_std = statistics.stdev(downside) if len(downside) > 1 else abs(downside[0])
-                    if down_std > 0:
-                        result.sortino = round(mean_ret / down_std * math.sqrt(252 / self.TIME_DECAY_DAYS), 2)
+                import pandas as pd
+                from quant.metrics import compute_sharpe, compute_sortino, compute_calmar
+                returns_series = pd.Series(returns)
+                result.sharpe = compute_sharpe(returns_series, min_observations=2)
+                result.sortino = compute_sortino(returns_series, min_observations=2)
                 annual_return = (equity / 10000) ** (252 / (len(returns) * self.TIME_DECAY_DAYS)) - 1
-                if max_dd > 0:
-                    result.calmar = round(annual_return / max_dd, 2)
+                result.calmar = compute_calmar(annual_return * 100, result.max_drawdown_pct)
 
             result.status = "complete"
         except Exception as exc:

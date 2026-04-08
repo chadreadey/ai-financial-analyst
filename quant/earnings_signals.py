@@ -18,6 +18,8 @@ from typing import Optional
 
 import numpy as np
 
+from quant.scoring import reclassify
+
 logger = logging.getLogger(__name__)
 
 
@@ -336,13 +338,7 @@ def blend_earnings_signals(
         blended = sv.composite_score * quant_scale + score * effective_weight
         sv.composite_score = float(np.clip(blended, -1.0, 1.0))
 
-        if sv.composite_score >= 0.30:
-            sv.composite_direction = "BUY"
-        elif sv.composite_score <= -0.30:
-            sv.composite_direction = "SELL"
-        else:
-            sv.composite_direction = "HOLD"
-        sv.actionable = abs(sv.composite_score) >= 0.40
+        reclassify(sv)
 
         sv.flags.append(f"earnings_w={effective_weight:.3f}(n={n_signals},src=wrds_ibes)")
 

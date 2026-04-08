@@ -55,15 +55,32 @@ class FMPFundamentalCache:
         conn.commit()
         conn.close()
 
-    def _get(self, ticker: str, data_type: str) -> Optional[list[dict]]:
+    # Default TTL: 7 days for live analysis. Pass max_age_seconds=0 to disable (backtesting).
+    DEFAULT_MAX_AGE = 7 * 24 * 3600  # 604800 seconds
+
+    def _get(self, ticker: str, data_type: str, max_age_seconds: float = -1) -> Optional[list[dict]]:
+        """Fetch cached data. Returns None if missing or stale.
+
+        Args:
+            max_age_seconds: Maximum age in seconds. 0 disables TTL (for backtests).
+                             -1 (default) uses DEFAULT_MAX_AGE.
+        """
+        if max_age_seconds < 0:
+            max_age_seconds = self.DEFAULT_MAX_AGE
         conn = self._conn()
         row = conn.execute(
-            "SELECT data_json FROM fmp_fundamentals WHERE ticker = ? AND data_type = ?",
+            "SELECT data_json, updated_at FROM fmp_fundamentals WHERE ticker = ? AND data_type = ?",
             (ticker.upper(), data_type),
         ).fetchone()
         conn.close()
         if row is None:
             return None
+        if max_age_seconds > 0:
+            age = time.time() - row["updated_at"]
+            if age > max_age_seconds:
+                logger.info("FMP cache stale for %s/%s (age=%.0fs, max=%.0fs)",
+                            ticker, data_type, age, max_age_seconds)
+                return None
         try:
             return json.loads(row["data_json"])
         except (json.JSONDecodeError, TypeError):

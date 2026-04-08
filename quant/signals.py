@@ -63,14 +63,8 @@ class SignalVector:
         )
         self.composite_score = np.clip(self.composite_score, -1.0, 1.0)
 
-        if self.composite_score >= 0.30:
-            self.composite_direction = "BUY"
-        elif self.composite_score <= -0.30:
-            self.composite_direction = "SELL"
-        else:
-            self.composite_direction = "HOLD"
-
-        self.actionable = abs(self.composite_score) >= 0.40
+        from quant.scoring import reclassify
+        reclassify(self)
 
         # Gate: suppress long entries if SMA is bearish
         if self.sma_trend.score <= -0.5 and self.composite_direction == "BUY":

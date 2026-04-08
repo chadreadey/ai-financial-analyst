@@ -227,18 +227,11 @@ async def get_metrics():
         total_pnl *= (1 + r)
     total_pnl_pct = round((total_pnl - 1) * 100, 2)
 
-    sharpe = None
-    sortino = None
-    if len(returns) > 1:
-        mean_r = statistics.mean(returns)
-        std_r = statistics.stdev(returns)
-        if std_r > 0:
-            sharpe = round(mean_r / std_r * math.sqrt(len(returns)), 2)
-        downside = [r for r in returns if r < 0]
-        if len(downside) > 1:
-            down_std = statistics.stdev(downside)
-            if down_std > 0:
-                sortino = round(mean_r / down_std * math.sqrt(len(returns)), 2)
+    import pandas as pd
+    from quant.metrics import compute_sharpe, compute_sortino
+    returns_series = pd.Series(returns)
+    sharpe = compute_sharpe(returns_series, min_observations=2)
+    sortino = compute_sortino(returns_series, min_observations=2)
 
     return {
         "sharpe": sharpe,
