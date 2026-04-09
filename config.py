@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     enable_price_history: bool = True
     enable_macro: bool = True
     enable_fred: bool = True
-    enable_rag: bool = False
+    enable_rag: bool = True
     enable_wacc_helpers: bool = True
     enable_quantstats: bool = True
     enable_sector_specialists: bool = True
@@ -113,6 +113,9 @@ class Settings(BaseSettings):
     # ── RAG time-series namespaces ──────────────────────────────────
     pinecone_financial_ts_namespace: str = "financial_ts"
     pinecone_macro_ts_namespace: str = "macro_ts"
+    pinecone_research_namespace: str = "perplexity-research-2026-04"
+    rag_research_top_k: int = 5
+    rag_research_max_chars: int = 2000
     rag_financial_history_top_k: int = 6
     rag_macro_history_top_k: int = 3
     rag_financial_history_max_chars: int = 2000

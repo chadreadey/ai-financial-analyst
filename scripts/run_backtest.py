@@ -43,6 +43,19 @@ def progress(msg: str):
     print(f"  [{datetime.now().strftime('%H:%M:%S')}] {msg}")
 
 
+def print_pbo_verdict(pbo: float):
+    """Print PBO result prominently with warning if > 15%."""
+    print()
+    print("*" * 70)
+    print(f"  PROBABILITY OF BACKTEST OVERFITTING (PBO): {pbo:>8.2%}")
+    if pbo > 0.15:
+        print("  *** WARNING: PBO > 15% — HIGH RISK OF OVERFITTING ***")
+        print("  Strategy may not generalize to live trading.")
+    else:
+        print("  PBO is within acceptable range (<= 15%).")
+    print("*" * 70)
+
+
 def print_summary(result):
     """Print a formatted summary of backtest results."""
     print("\n" + "=" * 70)
@@ -171,8 +184,10 @@ def main():
                         help="Walk-forward test window months (default: 6)")
     parser.add_argument("--cpcv", action="store_true",
                         help="Run CPCV validation (Lopez de Prado)")
-    parser.add_argument("--n-groups", type=int, default=10,
-                        help="CPCV: number of time groups (default: 10)")
+    parser.add_argument("--no-cpcv", action="store_true",
+                        help="Disable automatic CPCV when using --walk-forward")
+    parser.add_argument("--n-groups", type=int, default=16,
+                        help="CPCV: number of time groups (default: 16)")
     parser.add_argument("--n-test-groups", type=int, default=0,
                         help="CPCV: test groups per combo (default: n_groups // 2)")
     parser.add_argument("--purge-months", type=int, default=1,
@@ -251,7 +266,11 @@ def main():
 
     t0 = time.time()
 
-    if args.cpcv:
+    # Determine whether to run CPCV: explicit --cpcv flag, or auto with --walk-forward
+    run_cpcv_flag = args.cpcv or (args.walk_forward and not args.no_cpcv)
+
+    if args.cpcv and not args.walk_forward:
+        # Standalone CPCV mode (no walk-forward)
         max_combos = args.cpcv_max_combos if args.cpcv_max_combos > 0 else None
         cpcv_result = run_cpcv(
             config,
@@ -265,6 +284,7 @@ def main():
         elapsed = time.time() - t0
         print(f"\n  Completed in {elapsed:.1f}s")
         print(cpcv_result.print_summary())
+        print_pbo_verdict(cpcv_result.pbo)
 
         if args.output:
             output_path = args.output
@@ -286,6 +306,24 @@ def main():
 
         print_summary(result)
 
+        # Auto-run CPCV after walk-forward (unless --no-cpcv)
+        cpcv_result = None
+        if run_cpcv_flag:
+            print("\n  Running CPCV validation automatically (use --no-cpcv to skip)...")
+            t1 = time.time()
+            max_combos = args.cpcv_max_combos if args.cpcv_max_combos > 0 else None
+            cpcv_result = run_cpcv(
+                config,
+                n_groups=args.n_groups,
+                n_test_groups=args.n_test_groups if args.n_test_groups > 0 else 0,
+                purge_months=args.purge_months,
+                embargo_months=args.embargo_months,
+                max_combinations=max_combos,
+                progress_cb=progress,
+            )
+            print(cpcv_result.print_summary())
+            print_pbo_verdict(cpcv_result.pbo)
+
         if args.output:
             output_path = args.output
         else:
@@ -293,8 +331,12 @@ def main():
             mode = "wf" if args.walk_forward else "bt"
             output_path = f"backtest_{mode}_{ts}.json"
 
+        save_data = result.to_dict()
+        if cpcv_result is not None:
+            save_data["cpcv"] = cpcv_result.to_dict()
+
         with open(output_path, "w") as f:
-            json.dump(result.to_dict(), f, indent=2, default=str)
+            json.dump(save_data, f, indent=2, default=str)
         print(f"\n  Full results saved to: {output_path}")
 
 

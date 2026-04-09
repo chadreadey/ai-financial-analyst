@@ -313,3 +313,133 @@ def fetch_timeseries_rag_section(ticker: str) -> str:
     financial_chunks = query_financial_history(ticker)
     macro_chunks = query_macro_history()
     return format_timeseries_rag_section(financial_chunks, macro_chunks)
+
+
+# ── research RAG (Perplexity research library) ──────────────────────────────
+
+def query_research_rag(
+    query: str,
+    top_k: int = 0,
+    category_filter: str = "",
+    ticker_filter: str = "",
+) -> List[Dict]:
+    """
+    Query the research namespace for sector landscapes, macro signals,
+    signal validation research, and portfolio construction guides.
+
+    Optionally filter by document_category and/or ticker tag.
+    When ticker_filter is set, returns only chunks that mention that ticker.
+    """
+    if not settings.enable_rag:
+        return []
+
+    if top_k <= 0:
+        top_k = settings.rag_research_top_k
+
+    index = _get_pinecone_index()
+    if index is None:
+        return []
+
+    try:
+        filters = {}
+        if category_filter:
+            filters["document_category"] = {"$eq": category_filter}
+        if ticker_filter:
+            filters["tickers"] = {"$in": [ticker_filter.upper()]}
+
+        search_params: dict = {
+            "inputs": {"text": query},
+            "top_k": top_k,
+        }
+        if filters:
+            search_params["filter"] = filters
+
+        namespace = settings.pinecone_research_namespace
+        results = index.search(
+            namespace=namespace,
+            query=search_params,
+            fields=["text", "source_file", "section_header",
+                    "document_category", "token_count", "tickers", "data_as_of"],
+        )
+
+        chunks = []
+        for hit in results.result.hits:
+            fields = hit.fields or {}
+            chunks.append({
+                "text": fields.get("text", ""),
+                "score": float(hit._score),
+                "source": fields.get("source_file", ""),
+                "section": fields.get("section_header", ""),
+                "category": fields.get("document_category", ""),
+            })
+        return chunks
+
+    except Exception:
+        logger.debug("Research RAG query failed", exc_info=True)
+        return []
+
+
+def format_research_rag_section(chunks: List[Dict]) -> str:
+    """Format research RAG chunks into an enrichment text block."""
+    if not chunks:
+        return ""
+
+    max_chars = settings.rag_research_max_chars
+    lines = ["=== Research Intelligence (RAG) ==="]
+    used = 0
+
+    for i, chunk in enumerate(chunks, 1):
+        text = chunk.get("text", "").strip()
+        if not text:
+            continue
+        source = chunk.get("source", "research")
+        section = chunk.get("section", "")
+        score = chunk.get("score", 0)
+        header = f"{i}. [{source}]"
+        if section:
+            header += f" > {section}"
+        header += f" (relevance: {score:.2f})"
+        entry = f"{header}\n   {text[:500]}"
+        if used + len(entry) > max_chars:
+            break
+        lines.append(entry)
+        used += len(entry)
+
+    return "\n".join(lines)
+
+
+def fetch_research_rag_section(ticker: str, sector: str = "") -> str:
+    """
+    Query research RAG with a ticker+sector context query.
+    Uses two parallel strategies and merges results:
+      1. Ticker-filtered: chunks that specifically mention this stock
+      2. Semantic (unfiltered): sector/macro context, competitor landscapes,
+         valuation frameworks — catches competitive analysis that doesn't
+         name this specific ticker but covers the sector dynamics
+    Deduplicates and returns the combined top-k.
+    """
+    if not settings.enable_rag:
+        return ""
+
+    top_k = settings.rag_research_top_k
+
+    # Strategy 1: ticker-specific chunks
+    ticker_query = f"{ticker} {sector} competitive positioning earnings valuation risks"
+    ticker_chunks = query_research_rag(ticker_query, ticker_filter=ticker, top_k=top_k)
+
+    # Strategy 2: broad semantic search (catches competitor/sector context)
+    sector_query = f"{ticker} {sector} competitive landscape macro risks tariffs industry valuation methodology"
+    semantic_chunks = query_research_rag(sector_query, top_k=top_k)
+
+    # Merge: ticker-specific first, then fill with semantic, deduplicated
+    seen = set()
+    merged = []
+    for chunk in ticker_chunks + semantic_chunks:
+        key = (chunk["source"], chunk["section"])
+        if key not in seen:
+            seen.add(key)
+            merged.append(chunk)
+        if len(merged) >= top_k:
+            break
+
+    return format_research_rag_section(merged)

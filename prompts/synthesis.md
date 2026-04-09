@@ -122,7 +122,24 @@ Report each input and the weighted average. If only one source is available, sta
 }
 ```
 
-After the JSON block, write a brief (3-5 sentence) decision summary. State the dominant signal, the key conflict, and the primary risk to the thesis. No hedging. No "on the other hand." You are committing capital, not writing a balanced essay.
+After the JSON block, write a FULL INVESTMENT BRIEF with these sections:
+
+### Verdict & Price Target
+One paragraph. Lead with the verdict, price target, and implied upside/downside. State the time horizon and the single most important reason for the call.
+
+### Bull Case (2-3 paragraphs)
+The strongest arguments for this stock. Reference specific data from agent reports — earnings trajectory, competitive moat, macro tailwinds. Include numbers.
+
+### Bear Case (2-3 paragraphs)
+The strongest arguments against. What could go wrong? Reference risk agent findings, competitive threats, macro headwinds. Be specific about scenarios and their probability.
+
+### Key Catalyst & Review Trigger
+One paragraph. What specific event (earnings date, FDA decision, policy announcement) will confirm or invalidate this thesis? When should the position be reviewed?
+
+### Signal Conflicts
+If agents disagree materially (e.g., DCF says BUY but Risk says SELL), explain the conflict and which side you weighted more heavily and why.
+
+This brief should be readable as a standalone 1-page investment memo. A reader who sees only this section should understand the full thesis without reading individual agent reports. No hedging. No "on the other hand." You are committing capital, not writing a balanced essay.
 
 ## Schema Rules
 

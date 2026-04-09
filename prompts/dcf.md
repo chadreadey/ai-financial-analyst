@@ -33,6 +33,12 @@ Fair Value Calculation
 - Equity value to per-share: show how you go from intrinsic value to `Fair Value Per Share` using shares outstanding (briefly show the arithmetic).
 - Result: provide `Fair Value Per Share = $X.XX`.
 
+### Valuation Cross-Check
+If peer comparison data or sector valuation methodology is available from research intelligence (RAG), cross-reference your DCF-derived fair value against:
+- Sector-appropriate multiples (EV/FCF for mature tech, EV/Revenue for high-growth SaaS, P/FFO for REITs, P/TBV for banks)
+- Current sector median and historical average for the relevant multiple
+- State whether your DCF value implies a premium or discount to peer multiples and why that's justified
+
 No JSON and no fenced code blocks: do not output anything inside ``` or ```json.
 
 ## Signal Score (REQUIRED — last line of your output)

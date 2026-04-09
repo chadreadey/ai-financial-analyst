@@ -1066,15 +1066,26 @@ def _task_macro(
         }
 
 
-def _task_rag(ticker: str) -> Dict[str, Any]:
+def _task_rag(ticker: str, sector: str = "") -> Dict[str, Any]:
     try:
-        from rag_enrichment import fetch_rag_section
+        from rag_enrichment import fetch_rag_section, fetch_research_rag_section
+
+        entries = []
+        sources = []
 
         rag_text = fetch_rag_section(ticker)
-        entries = [("rag_research", rag_text)] if rag_text else []
+        if rag_text:
+            entries.append(("rag_filings", rag_text))
+            sources.append("RAG Vector DB (SEC Filings)")
+
+        research_text = fetch_research_rag_section(ticker, sector)
+        if research_text:
+            entries.append(("rag_research", research_text))
+            sources.append("RAG Vector DB (Research Library)")
+
         return {
             "section_entries": entries,
-            "sources": ["RAG Vector DB"] if rag_text else [],
+            "sources": sources,
             "warnings": [],
             "filter_stats": {},
         }
@@ -1268,7 +1279,7 @@ def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object
                 _task_macro, ticker, cache, tiingo_cache, pre_sector
             )
         if settings.enable_rag:
-            futures["rag"] = pool.submit(_task_rag, ticker)
+            futures["rag"] = pool.submit(_task_rag, ticker, pre_sector)
         if fmp_cache:
             futures["fmp_extra"] = pool.submit(_task_fmp_extra, ticker, fmp_cache)
 

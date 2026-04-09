@@ -10,8 +10,8 @@ Generates multiple train/test paths from the same data to compute:
   - OOS Sharpe distribution across all combinatorial paths
 
 Usage:
-    groups = make_cpcv_groups("2020-01-01", "2026-01-01", n_groups=10, trading_dates=dates)
-    combos = generate_cpcv_combinations(n_groups=10, n_test_groups=5)
+    groups = make_cpcv_groups("2020-01-01", "2026-01-01", n_groups=16, trading_dates=dates)
+    combos = generate_cpcv_combinations(n_groups=16, n_test_groups=5)
     for train_idx, test_idx in combos:
         train_dates, test_dates = apply_purge_embargo(
             groups, train_idx, test_idx, purge_months=1, embargo_months=1, trading_dates=dates
@@ -84,8 +84,8 @@ def generate_cpcv_combinations(
 
     Returns:
         List of (train_indices, test_indices) tuples.
+        For n=16, k=8: 12870 combinations.
         For n=12, k=6: 924 combinations.
-        For n=10, k=5: 252 combinations.
     """
     if n_test_groups <= 0:
         n_test_groups = n_groups // 2

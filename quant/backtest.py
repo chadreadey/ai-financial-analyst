@@ -2279,7 +2279,7 @@ def run_walk_forward(
 
 def run_cpcv(
     config: BacktestConfig,
-    n_groups: int = 10,
+    n_groups: int = 16,
     n_test_groups: int = 0,
     purge_months: int = 1,
     embargo_months: int = 1,

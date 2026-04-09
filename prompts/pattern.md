@@ -84,7 +84,20 @@ Compute a weighted composite:
 }
 ```
 
-After the JSON, write 3-5 sentences of quantitative commentary. State the dominant signal, key conflicts between indicators, and what would change your composite score. No narrative filler. Numbers only.
+After the JSON, write TWO sections:
+
+### Quantitative Summary (3-5 sentences)
+State the dominant signal, key conflicts between indicators, and what would change your composite score. Numbers only. No narrative filler.
+
+### Technical Narrative (3-5 paragraphs)
+Explain what the signal constellation means for someone deciding whether to trade this stock. Cover:
+- What pattern is the stock in (trending, range-bound, breakout, reversal) and what does the price structure look like over the last 3-6 months?
+- Where are the key support and resistance levels, and how does current price relate to them?
+- What is volume telling you? Is the OBV signal confirmed by recent volume patterns, or is there divergence that suggests the trend is exhausting?
+- What would a regime change look like? What specific price/volume event would flip your signal from bullish to bearish (or vice versa)?
+- If fundamental patterns are available (revenue/earnings trends, estimate revisions), how do they align with or contradict the technical picture?
+
+This narrative is for the reader, not the machine. Write it as if you're explaining the chart to a portfolio manager who can't see it.
 
 ## Fundamental Pattern Analysis
 
