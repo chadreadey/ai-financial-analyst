@@ -38,14 +38,15 @@ class SignalVector:
     earnings_rank_score: float = 0.0   # Set by earnings signals for ranking (Path A)
     flags: list = field(default_factory=list)
 
-    # Weights — original validated weights preserved.
-    # 52-week high disabled (0.0) pending independent validation.
+    # Weights — Phase 0 (2026-04-09) showed zero IC for SMA, MR, BB, RSI, 52W.
+    # Only OBV had marginal independent signal (residual t=1.82 in redundancy).
+    # All other signals zeroed pending replacement with orthogonal signals.
     WEIGHTS = {
-        "sma_trend": 0.25,
-        "mean_reversion_z": 0.20,
-        "bollinger_pctb": 0.20,
-        "rsi": 0.15,
-        "obv_trend": 0.20,
+        "sma_trend": 0.0,
+        "mean_reversion_z": 0.0,
+        "bollinger_pctb": 0.0,
+        "rsi": 0.0,
+        "obv_trend": 1.0,
         "high_52w": 0.0,
     }
 
@@ -66,9 +67,9 @@ class SignalVector:
         from quant.scoring import reclassify
         reclassify(self)
 
-        # Gate: suppress long entries if SMA is bearish
-        if self.sma_trend.score <= -0.5 and self.composite_direction == "BUY":
-            self.flags.append("sma_gate_bearish")
+        # Gate: suppress long entries if SMA is bearish (disabled — SMA weight=0)
+        # if self.sma_trend.score <= -0.5 and self.composite_direction == "BUY":
+        #     self.flags.append("sma_gate_bearish")
 
     @staticmethod
     def _clean(val):

@@ -24,12 +24,7 @@ from quant.signals import compute_signal_vector
 logger = logging.getLogger(__name__)
 
 SIGNAL_NAMES = [
-    "sma_trend",
-    "mean_reversion_z",
-    "bollinger_pctb",
-    "rsi",
     "obv_trend",
-    "high_52w",
 ]
 
 

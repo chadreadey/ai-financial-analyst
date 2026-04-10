@@ -594,31 +594,19 @@ def _tiingo_index_section(tiingo_cache, sector: str = "") -> tuple[list[str], li
     return lines, sources
 
 
-def _fred_fetch_one(
-    fred: Any, series_id: str, label: str, unit: str, one_year_ago: str
-) -> Tuple[str, str, str, Optional[Any]]:
-    try:
-        data = fred.get_series(series_id, observation_start=one_year_ago)
-        data = data.dropna()
-        return series_id, label, unit, data
-    except Exception:
-        logger.debug("FRED series %s unavailable", series_id, exc_info=True)
-        return series_id, label, unit, None
-
-
 def _fred_macro_data() -> tuple[List[str], List[str]]:
     """Fetch authoritative macro indicators from FRED (Federal Reserve)."""
-    from fredapi import Fred
+    from fred_client import get_fred_client, MACRO_SERIES
 
-    api_key = settings.fred_api_key.strip()
-    if not api_key:
+    client = get_fred_client()
+    if client is None:
         return [], []
 
-    fred = Fred(api_key=api_key)
     lines: List[str] = []
     sources: List[str] = ["FRED (Federal Reserve Economic Data)"]
 
-    series_map = {
+    # Series to display (subset of MACRO_SERIES catalog)
+    display_series = {
         "DGS10": ("10-Year Treasury Yield", "%"),
         "DGS2": ("2-Year Treasury Yield", "%"),
         "FEDFUNDS": ("Fed Funds Rate", "%"),
@@ -628,52 +616,28 @@ def _fred_macro_data() -> tuple[List[str], List[str]]:
         "BAMLC0A0CM": ("IG Credit Spread", "%"),
         "UMCSENT": ("Consumer Sentiment (UMich)", ""),
         "VIXCLS": ("CBOE VIX", ""),
+        "T5YIE": ("5-Year Breakeven Inflation", "%"),
+        "T10YIE": ("10-Year Breakeven Inflation", "%"),
     }
 
-    one_year_ago = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
+    snapshot = client.get_macro_snapshot()
 
-    series_data: Dict[str, Any] = {}
-    max_w = max(1, settings.fred_max_workers)
-    with ThreadPoolExecutor(max_workers=max_w) as pool:
-        futs = {
-            pool.submit(_fred_fetch_one, fred, sid, lab, u, one_year_ago): sid
-            for sid, (lab, u) in series_map.items()
-        }
-        for fut in as_completed(futs):
-            series_id, label, unit, data = fut.result()
-            series_data[series_id] = (label, unit, data)
-
-    for series_id, (label, unit) in series_map.items():
-        tup = series_data.get(series_id)
-        if not tup:
+    for series_id, (label, unit) in display_series.items():
+        current, delta = snapshot.get(series_id, (None, None))
+        if current is None:
             continue
-        _, _, data = tup
-        if data is None or getattr(data, "empty", True):
-            continue
-        current = float(data.iloc[-1])
-        prior = float(data.iloc[0])
-        delta = current - prior
         if unit == "%":
             lines.append(f"  {label}: {current:.2f}% (1Y chg: {delta:+.2f}pp)")
         else:
             lines.append(f"  {label}: {current:,.1f} (1Y chg: {delta:+,.1f})")
 
-    dgs10_tup = series_data.get("DGS10")
-    dgs2_tup = series_data.get("DGS2")
-    try:
-        dgs10 = dgs10_tup[2] if dgs10_tup else None
-        dgs2 = dgs2_tup[2] if dgs2_tup else None
-        if (
-            dgs10 is not None
-            and dgs2 is not None
-            and not dgs10.empty
-            and not dgs2.empty
-        ):
-            spread = float(dgs10.iloc[-1]) - float(dgs2.iloc[-1])
-            state = "INVERTED" if spread < 0 else "NORMAL"
-            lines.append(f"  2s10s Spread: {spread:+.2f}pp ({state})")
-    except Exception:
-        logger.debug("Yield curve spread unavailable", exc_info=True)
+    # 2s10s spread
+    dgs10_cur, _ = snapshot.get("DGS10", (None, None))
+    dgs2_cur, _ = snapshot.get("DGS2", (None, None))
+    if dgs10_cur is not None and dgs2_cur is not None:
+        spread = dgs10_cur - dgs2_cur
+        state = "INVERTED" if spread < 0 else "NORMAL"
+        lines.append(f"  2s10s Spread: {spread:+.2f}pp ({state})")
 
     return lines, sources
 

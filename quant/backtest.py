@@ -284,8 +284,8 @@ def compute_signals_at_date(
 
 SIGNAL_NAMES = ["sma_trend", "mean_reversion_z", "bollinger_pctb", "rsi", "obv_trend"]
 DEFAULT_WEIGHTS = {
-    "sma_trend": 0.25, "mean_reversion_z": 0.20,
-    "bollinger_pctb": 0.20, "rsi": 0.15, "obv_trend": 0.20,
+    "sma_trend": 0.0, "mean_reversion_z": 0.0,
+    "bollinger_pctb": 0.0, "rsi": 0.0, "obv_trend": 1.0,
 }
 
 
@@ -355,9 +355,17 @@ def calibrate_weights_from_ic(
 
     Uses mean IC over trailing periods, applies shrinkage toward equal weights,
     and normalizes. Signals with negative IC get zero weight (don't bet against them).
+    Only calibrates signals that have non-zero DEFAULT_WEIGHTS (active signals).
     """
+    # Only calibrate active signals (non-zero default weight)
+    active_signals = [s for s in SIGNAL_NAMES if DEFAULT_WEIGHTS.get(s, 0) > 0]
+
+    if not active_signals:
+        return dict(DEFAULT_WEIGHTS)
+
     raw_ics = {}
-    for name, ics in ic_history.items():
+    for name in active_signals:
+        ics = ic_history.get(name, [])
         recent = ics[-trailing_periods:] if len(ics) >= trailing_periods else ics
         if recent:
             raw_ics[name] = float(np.mean(recent))
@@ -373,17 +381,22 @@ def calibrate_weights_from_ic(
     if total_ic <= 0:
         return dict(DEFAULT_WEIGHTS)
 
-    # IC-proportional weights
+    # IC-proportional weights (only for active signals)
     ic_weights = {name: ic / total_ic for name, ic in raw_ics.items()}
 
-    # Shrink toward equal weights for stability
-    equal_weight = 1.0 / len(SIGNAL_NAMES)
+    # Shrink toward equal weights among active signals
+    equal_weight = 1.0 / len(active_signals)
     blended = {}
     for name in SIGNAL_NAMES:
-        blended[name] = (1 - shrinkage) * ic_weights.get(name, 0) + shrinkage * equal_weight
+        if name in active_signals:
+            blended[name] = (1 - shrinkage) * ic_weights.get(name, 0) + shrinkage * equal_weight
+        else:
+            blended[name] = 0.0  # keep zeroed signals at zero
 
     # Normalize
     total = sum(blended.values())
+    if total <= 0:
+        return dict(DEFAULT_WEIGHTS)
     return {name: round(w / total, 4) for name, w in blended.items()}
 
 
@@ -394,11 +407,11 @@ def apply_calibrated_weights(
     """Recompute composite scores using calibrated weights instead of defaults."""
     for ticker, sv in signals.items():
         score = (
-            sv.sma_trend.score * weights.get("sma_trend", 0.2) +
-            sv.mean_reversion_z.score * weights.get("mean_reversion_z", 0.2) +
-            sv.bollinger_pctb.score * weights.get("bollinger_pctb", 0.2) +
-            sv.rsi.score * weights.get("rsi", 0.2) +
-            sv.obv_trend.score * weights.get("obv_trend", 0.2)
+            sv.sma_trend.score * weights.get("sma_trend", 0.0) +
+            sv.mean_reversion_z.score * weights.get("mean_reversion_z", 0.0) +
+            sv.bollinger_pctb.score * weights.get("bollinger_pctb", 0.0) +
+            sv.rsi.score * weights.get("rsi", 0.0) +
+            sv.obv_trend.score * weights.get("obv_trend", 1.0)
         )
         sv.composite_score = float(np.clip(score, -1.0, 1.0))
 
@@ -482,6 +495,7 @@ class RegimeState:
     spy_vs_sma200: Optional[str] = None  # "above" or "below"
     sizing_scalar: float = 1.0  # position sizing multiplier
     turbulence: Optional[float] = None  # Mahalanobis distance (sector decorrelation)
+    macro_signal: Optional[object] = None  # MacroRegimeSignal from quant/macro_signals.py
 
 
 # ── Turbulence Index ─────────────────────────────────────────────────
@@ -570,14 +584,17 @@ def detect_regime(
     vix_df: Optional[pd.DataFrame] = None,
     config: Optional[BacktestConfig] = None,
     sector_data: Optional[dict[str, pd.DataFrame]] = None,
+    hy_oas_series: Optional[pd.Series] = None,
+    t10y3m_series: Optional[pd.Series] = None,
 ) -> RegimeState:
     """
-    Multi-factor regime detection: VIX + SPY SMA + death/golden cross + turbulence.
+    Multi-factor regime detection: VIX + SPY SMA + death/golden cross + turbulence + macro.
 
     Regime hierarchy (strongest signal wins):
-      risk_off   — VIX > risk_off_threshold OR death cross + bearish SMA OR turbulence > 15
+      risk_off   — VIX > risk_off_threshold OR death cross + bearish SMA OR turbulence > 30
+                   OR macro recession_score >= 0.50
       bearish    — SPY below 200d SMA (or death cross active)
-      cautious   — VIX > caution_threshold OR turbulence > 8
+      cautious   — VIX > caution_threshold OR turbulence > 18 OR macro recession elevated
       bullish    — SPY above 200d SMA
       strong_bull — golden cross active + SPY above 200d SMA + low VIX + low turbulence
     """
@@ -664,6 +681,26 @@ def detect_regime(
         state.sizing_scalar = 1.0
     else:
         state.level = "unknown"
+
+    # Macro regime overlay (HY OAS + yield curve + recession score)
+    if hy_oas_series is not None or t10y3m_series is not None:
+        try:
+            from quant.macro_signals import compute_macro_regime
+            macro = compute_macro_regime(hy_oas_series, t10y3m_series, as_of_date, state.vix)
+            state.macro_signal = macro
+
+            # Macro can override to more cautious levels (never less cautious)
+            if macro.regime_multiplier < state.sizing_scalar:
+                logger.info("Macro override: %s → sizing %.2f (recession=%.0f%%, hy=%s)",
+                            macro.regime_label, macro.regime_multiplier,
+                            macro.recession_score * 100, macro.hy_oas_regime)
+                state.sizing_scalar = macro.regime_multiplier
+                if macro.regime_label == "risk_off" and state.level not in ("risk_off",):
+                    state.level = "risk_off"
+                elif macro.regime_label == "cautious" and state.level in ("bullish", "strong_bull"):
+                    state.level = "cautious"
+        except Exception as e:
+            logger.debug("Macro regime computation failed: %s", e)
 
     return state
 
@@ -1647,6 +1684,8 @@ def run_backtest(
 
     # Load VIX data for enhanced regime detection
     vix_df = None
+    hy_oas_series = None
+    t10y3m_series = None
     if config.enable_regime_filter:
         if progress_cb:
             progress_cb("Loading VIX data...")
@@ -1655,6 +1694,12 @@ def run_backtest(
         if progress_cb:
             progress_cb("Loading sector ETFs for turbulence index...")
         _load_sector_etf_data(fetch_start, provider)
+        # Load FRED macro data for credit spread + yield curve regime signals
+        try:
+            from quant.macro_signals import load_fred_macro_data
+            hy_oas_series, t10y3m_series = load_fred_macro_data(fetch_start)
+        except Exception as e:
+            logger.warning("FRED macro data load failed (continuing without): %s", e)
 
     # ── 2. Generate rebalance dates ───────────────────────────────
     # Use the union of all trading dates
@@ -1785,7 +1830,7 @@ def run_backtest(
 
         # Detect market regime for short filtering + position sizing
         if config.enable_regime_filter:
-            regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data)
+            regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data, hy_oas_series=hy_oas_series, t10y3m_series=t10y3m_series)
         else:
             regime = RegimeState(level="unknown")
 
@@ -1994,11 +2039,21 @@ def run_walk_forward(
 
     # Load VIX data and sector ETFs for enhanced regime detection
     vix_df = None
+    hy_oas_series = None
+    t10y3m_series = None
     if config.enable_regime_filter:
         vix_df = load_vix_data(fetch_start)
         if progress_cb:
             progress_cb("Loading sector ETFs for turbulence index...")
         _load_sector_etf_data(fetch_start, provider)
+        # Load FRED macro data for credit spread + yield curve regime signals
+        try:
+            from quant.macro_signals import load_fred_macro_data
+            hy_oas_series, t10y3m_series = load_fred_macro_data(fetch_start)
+            if hy_oas_series is not None and progress_cb:
+                progress_cb(f"FRED macro data loaded: HY OAS ({len(hy_oas_series)} obs), T10Y3M ({len(t10y3m_series) if t10y3m_series is not None else 0} obs)")
+        except Exception as e:
+            logger.warning("FRED macro data load failed (continuing without): %s", e)
 
     # Generate walk-forward windows
     start = datetime.strptime(config.start_date, "%Y-%m-%d")
@@ -2098,7 +2153,8 @@ def run_walk_forward(
                 calibrated_weights = calibrate_weights_from_ic(
                     ic_history, config.ic_trailing_periods, config.ic_shrinkage,
                 )
-                logger.info("WF window %d IC weights: %s", wi + 1, calibrated_weights)
+                active_w = {k: v for k, v in calibrated_weights.items() if v > 0}
+                logger.info("WF window %d IC weights: %s", wi + 1, active_w)
 
         window_trades = []
         window_pnl = pd.Series(dtype=float)
@@ -2180,7 +2236,7 @@ def run_walk_forward(
                     signals = apply_fomc_boost(signals, fomc_boost)
 
             if config.enable_regime_filter:
-                regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data)
+                regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data, hy_oas_series=hy_oas_series, t10y3m_series=t10y3m_series)
             else:
                 regime = RegimeState(level="unknown")
 
@@ -2363,11 +2419,18 @@ def run_cpcv(
     benchmark_df = universe_data.pop(BENCHMARK, None)
 
     vix_df = None
+    hy_oas_series = None
+    t10y3m_series = None
     if config.enable_regime_filter:
         vix_df = load_vix_data(fetch_start)
         if progress_cb:
             progress_cb("Loading sector ETFs for turbulence index...")
         _load_sector_etf_data(fetch_start, provider)
+        try:
+            from quant.macro_signals import load_fred_macro_data
+            hy_oas_series, t10y3m_series = load_fred_macro_data(fetch_start)
+        except Exception as e:
+            logger.warning("FRED macro data load failed (continuing without): %s", e)
 
     # ── 3. Build CPCV groups and combinations ──
     all_dates = sorted(set().union(*(df.index for df in universe_data.values())))
@@ -2485,7 +2548,7 @@ def run_cpcv(
                     signals = apply_fomc_boost(signals, fomc_boost)
 
             if config.enable_regime_filter:
-                regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data)
+                regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data, hy_oas_series=hy_oas_series, t10y3m_series=t10y3m_series)
             else:
                 regime = RegimeState(level="unknown")
 

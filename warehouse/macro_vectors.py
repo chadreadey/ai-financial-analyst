@@ -1,22 +1,15 @@
 """
 Pinecone time-series vectors for quarterly macroeconomic snapshots.
 
-Fetches FRED series, resamples to quarterly (last observation per quarter),
-builds a structured narrative snapshot for each quarter, and upserts to
-the `macro_ts` namespace.
+Fetches FRED series via fred_client, resamples to quarterly (last observation
+per quarter), builds a structured narrative snapshot for each quarter, and
+upserts to the `macro_ts` namespace.
 
 Vector ID format: macro_fts_{YYYYQQ}  e.g. macro_fts_2024Q1
 
-FRED series used:
-  FEDFUNDS     — Fed Funds rate (monthly)
-  DGS10        — 10-year Treasury yield (daily)
-  DGS2         — 2-year Treasury yield (daily)
-  T10Y2Y       — 10-2 year spread (daily, recession signal)
-  CPIAUCSL     — CPI all-items (monthly, YoY calculated)
-  CPILFESL     — Core CPI (monthly, YoY calculated)
-  A191RL1Q225SBEA — Real GDP growth (quarterly)
-  UNRATE       — Unemployment rate (monthly)
-  BAMLH0A0HYM2 — HY credit spread OAS (daily)
+FRED series used (via fred_client.QUARTERLY_SERIES):
+  FEDFUNDS, DGS10, DGS2, T10Y2Y, CPIAUCSL, CPILFESL,
+  A191RL1Q225SBEA, UNRATE, BAMLH0A0HYM2, BAMLC0A0CM, T5YIE, T10YIE
 """
 
 import logging
@@ -25,21 +18,12 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 
+from fred_client import QUARTERLY_SERIES, get_fred_client
+
 logger = logging.getLogger(__name__)
 
-# ── FRED series ─────────────────────────────────────────────────────────────
-
-FRED_SERIES: Dict[str, str] = {
-    "fed_funds": "FEDFUNDS",
-    "dgs10": "DGS10",
-    "dgs2": "DGS2",
-    "t10y2y": "T10Y2Y",
-    "cpi": "CPIAUCSL",
-    "core_cpi": "CPILFESL",
-    "real_gdp_growth": "A191RL1Q225SBEA",
-    "unrate": "UNRATE",
-    "hy_spread": "BAMLH0A0HYM2",
-}
+# Re-export for any code that referenced FRED_SERIES from this module
+FRED_SERIES = QUARTERLY_SERIES
 
 
 # ── regime labellers ─────────────────────────────────────────────────────────
@@ -118,6 +102,9 @@ def _build_macro_text(ql: str, period: str, row: Dict[str, Optional[float]], cpi
     gdp = row.get("real_gdp_growth")
     unrate = row.get("unrate")
     hy = row.get("hy_spread")
+    ig = row.get("ig_spread")
+    be5 = row.get("breakeven_5y")
+    be10 = row.get("breakeven_10y")
 
     lines = [
         f"Macroeconomic Snapshot — {ql} (quarter ending {period})",
@@ -130,6 +117,8 @@ def _build_macro_text(ql: str, period: str, row: Dict[str, Optional[float]], cpi
         "=== Inflation ===",
         f"CPI YoY: {_fmt(cpi_yoy)}%  Regime: {_inflation_regime(cpi_yoy)}",
         f"Core CPI YoY: {_fmt(core_cpi_yoy)}%",
+        f"5-Year Breakeven Inflation: {_fmt(be5)}%",
+        f"10-Year Breakeven Inflation: {_fmt(be10)}%",
         "",
         "=== Economic Growth ===",
         f"Real GDP Growth (annualized): {_fmt(gdp)}%  Regime: {_growth_regime(gdp)}",
@@ -137,6 +126,7 @@ def _build_macro_text(ql: str, period: str, row: Dict[str, Optional[float]], cpi
         "",
         "=== Credit / Risk ===",
         f"HY Credit Spread OAS: {_fmt(hy, 0, ' bps')}  Credit: {_credit_regime(hy)}",
+        f"IG Credit Spread OAS: {_fmt(ig, 0, ' bps')}",
         "",
         "=== Macro Regime Summary ===",
         f"This quarter saw {_rate_regime(fed)} monetary policy, "
@@ -156,29 +146,13 @@ def fetch_fred_quarterly(
     """
     Fetch all FRED series and resample to quarterly (last obs per quarter).
     Returns a DataFrame indexed by quarter-end date with one column per series key.
-    Raises if fredapi is not installed or API key is invalid.
+    Uses the centralized CachedFREDClient for caching and rate limiting.
     """
-    from fredapi import Fred
-
-    fred = Fred(api_key=fred_api_key)
-    start = f"{start_year}-01-01"
-
-    frames: Dict[str, pd.Series] = {}
-    for key, series_id in FRED_SERIES.items():
-        try:
-            s = fred.get_series(series_id, observation_start=start)
-            frames[key] = s.dropna()
-            logger.info("FRED %s: %d observations", series_id, len(frames[key]))
-        except Exception as exc:
-            logger.warning("FRED %s failed: %s", series_id, exc)
-            frames[key] = pd.Series(dtype=float)
-
-    df = pd.DataFrame(frames)
-    # Ensure DatetimeIndex before resampling
-    df.index = pd.to_datetime(df.index)
-    # Resample all series to quarterly (last observation per quarter)
-    df = df.resample("QE").last()
-    return df
+    client = get_fred_client(fred_api_key)
+    if client is None:
+        logger.warning("No FRED client available — skipping quarterly fetch")
+        return pd.DataFrame()
+    return client.get_quarterly_dataframe(start_year=start_year)
 
 
 # ── public API ────────────────────────────────────────────────────────────────
@@ -203,7 +177,7 @@ def build_macro_records(df: pd.DataFrame) -> List[Dict]:
         ql = f"{year}Q{q}"
 
         data: Dict[str, Optional[float]] = {}
-        for key in FRED_SERIES:
+        for key in QUARTERLY_SERIES:
             val = row.get(key)
             data[key] = float(val) if pd.notna(val) else None
 

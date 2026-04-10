@@ -12,22 +12,9 @@ from typing import Dict, Optional, Tuple
 import numpy as np
 
 from config import settings
+from fred_client import TREASURY_SERIES, get_fred_client
 
 logger = logging.getLogger(__name__)
-
-
-# Standard Treasury maturities (years) mapped to FRED series IDs
-TREASURY_SERIES = {
-    0.25: "DGS3MO",
-    0.5: "DGS6MO",
-    1.0: "DGS1",
-    2.0: "DGS2",
-    5.0: "DGS5",
-    7.0: "DGS7",
-    10.0: "DGS10",
-    20.0: "DGS20",
-    30.0: "DGS30",
-}
 
 
 def get_risk_free_rate(
@@ -40,31 +27,19 @@ def get_risk_free_rate(
     Returns the annualized yield as a decimal (e.g. 0.045 for 4.5%),
     or None if data is unavailable.
     """
-    api_key = fred_api_key or settings.fred_api_key.strip()
-    if not api_key:
+    client = get_fred_client(fred_api_key)
+    if client is None:
         return None
 
     try:
-        from fredapi import Fred
         from scipy.interpolate import interp1d
 
-        fred = Fred(api_key=api_key)
-
-        maturities = []
-        yields_pct = []
-
-        for mat, series_id in TREASURY_SERIES.items():
-            try:
-                data = fred.get_series(series_id).dropna()
-                if not data.empty:
-                    maturities.append(mat)
-                    yields_pct.append(float(data.iloc[-1]))
-            except Exception:
-                logger.debug("FRED series %s unavailable", series_id, exc_info=True)
-                continue
-
-        if len(maturities) < 3:
+        curve = client.get_yield_curve()
+        if curve is None or len(curve) < 3:
             return None
+
+        maturities = sorted(curve.keys())
+        yields_pct = [curve[m] for m in maturities]
 
         maturities_arr = np.array(maturities)
         yields_arr = np.array(yields_pct)
@@ -92,25 +67,12 @@ def get_yield_curve_snapshot(
     Return the full yield curve as {maturity_years: yield_pct}.
     Useful for DCF agent context injection.
     """
-    api_key = fred_api_key or settings.fred_api_key.strip()
-    if not api_key:
+    client = get_fred_client(fred_api_key)
+    if client is None:
         return None
 
     try:
-        from fredapi import Fred
-
-        fred = Fred(api_key=api_key)
-        curve = {}
-        for mat, series_id in TREASURY_SERIES.items():
-            try:
-                data = fred.get_series(series_id).dropna()
-                if not data.empty:
-                    curve[mat] = float(data.iloc[-1])
-            except Exception:
-                logger.debug("FRED series %s unavailable", series_id, exc_info=True)
-                continue
-
-        return curve if len(curve) >= 3 else None
+        return client.get_yield_curve()
     except (ImportError, ValueError) as exc:
         logger.debug("Yield curve snapshot failed: %s", exc)
         return None
