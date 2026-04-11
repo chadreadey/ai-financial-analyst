@@ -164,6 +164,24 @@ class FinnhubClient:
             logger.debug("finnhub earnings %s failed: %s", symbol, exc, exc_info=True)
             return []
 
+    def get_institutional_ownership(self, symbol: str) -> list[dict]:
+        """
+        Fetch institutional ownership data from Finnhub.
+
+        Endpoint: /institutional-ownership
+        Returns list of dicts with keys:
+            name, share, change, filingDate, ownership
+        """
+        try:
+            data = self._get(
+                "institutional-ownership",
+                {"symbol": symbol.upper()},
+            )
+            return data.get("data", []) if isinstance(data, dict) else []
+        except Exception as exc:
+            logger.debug("finnhub institutional-ownership/%s failed: %s", symbol, exc)
+            return []
+
 
 # ── In-Memory Cache ───────────────────────────────────────────────────
 
@@ -308,6 +326,22 @@ class SentimentDiskCache:
         path = os.path.join(self._dir, f"earnings_{ticker}.json")
         with open(path, "w") as f:
             json.dump(records, f)
+
+    # ── Institutional Ownership ──
+
+    def get_institutional(self, ticker: str, quarter: str) -> list[dict] | None:
+        """Load cached institutional ownership for a ticker+quarter."""
+        path = os.path.join(self._dir, f"inst_{ticker}_{quarter}.json")
+        if os.path.exists(path):
+            with open(path) as f:
+                return json.load(f)
+        return None
+
+    def set_institutional(self, ticker: str, quarter: str, data: list[dict]) -> None:
+        """Cache institutional ownership for a ticker+quarter."""
+        path = os.path.join(self._dir, f"inst_{ticker}_{quarter}.json")
+        with open(path, "w") as f:
+            json.dump(data, f)
 
 
 # ── Pre-fetch Helper ──────────────────────────────────────────────────
