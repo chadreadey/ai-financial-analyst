@@ -98,6 +98,9 @@ class BacktestConfig:
     enable_earnings_signals: bool = False
     earnings_signal_weight: float = 0.30  # total weight for combined earnings signal
     earnings_rank_mode: bool = False      # Path A: rank by earnings score, technicals filter only
+    # Institutional flow signal (FMP + Finnhub 13F ownership data)
+    enable_institutional_flow: bool = False
+    institutional_flow_weight: float = 0.15  # weight in composite
     conviction_sizing: float = 0.0        # 0=equal weight, 1=fully score-proportional sizing
     enable_agent_veto: bool = False       # Path C: quantified agent veto on candidates
     agent_veto_min_flags: int = 2         # minimum veto signals to remove a candidate (2 of 3)
@@ -820,6 +823,7 @@ _sentiment_cache = None  # SentimentDiskCache — set externally or auto-initial
 _fmp_client = None       # FMPClient — auto-initialized from FMP_API_KEY
 _fmp_cache = None        # FMPFundamentalCache — SQLite cache for fundamentals
 _wrds_provider = None    # WRDSFundamentalProvider — auto-initialized from .wrds_pit.db
+_inst_fmp_cache = None  # FMPFundamentalCache for institutional data
 
 
 def _get_timesfm_model():
@@ -1815,6 +1819,20 @@ def run_backtest(
             if earn_scores:
                 signals = blend_earnings_signals(signals, earn_scores, config.earnings_signal_weight)
 
+        # Institutional flow overlay (FMP + Finnhub 13F ownership)
+        if config.enable_institutional_flow:
+            from quant.institutional_flow import compute_institutional_flow_scores, blend_institutional_flow
+            inst_scores = compute_institutional_flow_scores(
+                list(signals.keys()),
+                as_of_date=reb_date.date(),
+                fmp_client=_fmp_client,
+                fmp_cache=_inst_fmp_cache,
+                finnhub_client=_finnhub_client,
+                finnhub_disk_cache=_sentiment_cache,
+            )
+            if inst_scores:
+                signals = blend_institutional_flow(signals, inst_scores, config.institutional_flow_weight)
+
         # FOMC proximity risk premium (after all signal blends, before regime)
         if config.enable_fomc_proximity:
             all_dates_flat = sorted(set().union(*(df.index for df in universe_data.values())))
@@ -2020,6 +2038,18 @@ def run_walk_forward(
                 elif _fmp_cache.ticker_count() == 0:
                     logger.info("FMP_API_KEY not set and cache empty — fundamentals disabled")
 
+    # Auto-init institutional flow data sources
+    if config.enable_institutional_flow:
+        global _inst_fmp_cache
+        if _inst_fmp_cache is None:
+            from quant.fmp_cache import FMPFundamentalCache
+            _inst_fmp_cache = FMPFundamentalCache()
+        if _fmp_client is None:
+            fmp_key = os.getenv("FMP_API_KEY", "").strip()
+            if fmp_key:
+                from fmp_client import FMPClient
+                _fmp_client = FMPClient(fmp_key)
+
     # Load all data once
     if progress_cb:
         progress_cb("Loading price data for walk-forward...")
@@ -2223,6 +2253,20 @@ def run_walk_forward(
                 )
                 if earn_scores:
                     signals = blend_earnings_signals(signals, earn_scores, config.earnings_signal_weight)
+
+            # Institutional flow overlay (FMP + Finnhub 13F ownership)
+            if config.enable_institutional_flow:
+                from quant.institutional_flow import compute_institutional_flow_scores, blend_institutional_flow
+                inst_scores = compute_institutional_flow_scores(
+                    list(signals.keys()),
+                    as_of_date=reb_date.date(),
+                    fmp_client=_fmp_client,
+                    fmp_cache=_inst_fmp_cache,
+                    finnhub_client=_finnhub_client,
+                    finnhub_disk_cache=_sentiment_cache,
+                )
+                if inst_scores:
+                    signals = blend_institutional_flow(signals, inst_scores, config.institutional_flow_weight)
 
             # FOMC proximity risk premium
             if config.enable_fomc_proximity:
@@ -2536,6 +2580,20 @@ def run_cpcv(
                 )
                 if earn_scores:
                     signals = blend_earnings_signals(signals, earn_scores, config.earnings_signal_weight)
+
+            # Institutional flow overlay (FMP + Finnhub 13F ownership)
+            if config.enable_institutional_flow:
+                from quant.institutional_flow import compute_institutional_flow_scores, blend_institutional_flow
+                inst_scores = compute_institutional_flow_scores(
+                    list(signals.keys()),
+                    as_of_date=reb_date.date(),
+                    fmp_client=_fmp_client,
+                    fmp_cache=_inst_fmp_cache,
+                    finnhub_client=_finnhub_client,
+                    finnhub_disk_cache=_sentiment_cache,
+                )
+                if inst_scores:
+                    signals = blend_institutional_flow(signals, inst_scores, config.institutional_flow_weight)
 
             if config.enable_fomc_proximity:
                 vix_now = None
