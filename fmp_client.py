@@ -167,6 +167,25 @@ class FMPClient:
         """Not available on free/starter FMP plans — returns [] gracefully."""
         return []
 
+    def get_institutional_ownership_history(self, symbol: str) -> list[dict]:
+        """
+        Fetch institutional ownership snapshots from FMP.
+
+        FMP endpoint: /stable/institutional-ownership/symbol-ownership
+        Returns list of dicts with keys:
+            date, investorName, sharesNumber, sharesNumberChange,
+            ownershipPercent, typeOfOwner
+        """
+        try:
+            data = self._get(
+                "/stable/institutional-ownership/symbol-ownership",
+                {"symbol": symbol},
+            )
+            return data if isinstance(data, list) else []
+        except Exception as exc:
+            logger.debug("fmp institutional-ownership/%s failed: %s", symbol, exc, exc_info=True)
+            return []
+
 
 class FMPCache:
     """Per-run cache for FMP responses. Two-lock pattern like YahooLookupCache."""
@@ -186,6 +205,7 @@ class FMPCache:
         self._news_cache: Dict[str, list] = {}
         self._dcf_cache: Dict[str, dict] = {}
         self._holders_cache: Dict[str, list] = {}
+        self._inst_ownership_cache: Dict[str, list] = {}
 
     @property
     def call_count(self) -> int:
@@ -344,3 +364,13 @@ class FMPCache:
         with self._lock:
             self._holders_cache[sym] = result
             return list(result)
+
+    def get_institutional_ownership_history(self, symbol: str) -> list[dict]:
+        sym = symbol.upper()
+        with self._lock:
+            if sym in self._inst_ownership_cache:
+                return self._inst_ownership_cache[sym]
+        result = self._client.get_institutional_ownership_history(sym)
+        with self._lock:
+            self._inst_ownership_cache[sym] = result
+        return result
