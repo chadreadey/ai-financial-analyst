@@ -72,6 +72,10 @@ def main():
                         help="Walk-forward train window (default: 24)")
     parser.add_argument("--test-months", type=int, default=6,
                         help="Walk-forward test window (default: 6)")
+    parser.add_argument("--enable-institutional-flow", action="store_true",
+                        help="Enable institutional flow signal (FMP + Finnhub)")
+    parser.add_argument("--institutional-flow-weight", type=float, default=0.15,
+                        help="Institutional flow signal weight (default: 0.15)")
     parser.add_argument("--output", default="",
                         help="Save results to JSON")
     parser.add_argument("--verbose", "-v", action="store_true")
@@ -96,6 +100,8 @@ def main():
     print(f"  Universe: {len(tickers)} tickers")
     print(f"  Period: {args.start} to {end_date}")
     print(f"  CPCV groups: {args.n_groups}")
+    if args.enable_institutional_flow:
+        print(f"  Institutional flow: ENABLED (weight={args.institutional_flow_weight})")
     print("*" * 70)
 
     results = {"timestamp": datetime.now().isoformat(), "universe_size": len(tickers)}
@@ -120,6 +126,8 @@ def main():
         earnings_signal_weight=0.30,
         enable_news_sentiment=True,
         news_sentiment_weight=0.10,
+        enable_institutional_flow=args.enable_institutional_flow,
+        institutional_flow_weight=args.institutional_flow_weight,
     )
 
     # ── Phase 0: Walk-Forward (always runs — needed for 0b and 0c) ────
