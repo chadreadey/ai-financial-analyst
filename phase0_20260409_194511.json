@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-04-09T19:44:50.372161",
+  "universe_size": 20,
+  "walk_forward": {
+    "total_return_pct": -0.6,
+    "annual_return_pct": -0.1,
+    "sharpe": -0.02,
+    "max_drawdown_pct": 16.62,
+    "alpha_pct": -178.04,
+    "win_rate_pct": 45.1,
+    "total_trades": 275
+  },
+  "factor_attribution": {
+    "alpha_annual": -5.6752,
+    "alpha_t": -1.1443,
+    "alpha_p": 0.252485,
+    "alpha_significant": "False",
+    "alpha_ci_annual": [
+      -15.4,
+      4.04
+    ],
+    "r_squared": 0.2458,
+    "factor_betas": {
+      "Mkt-RF": 0.2992,
+      "SMB": -0.0937,
+      "HML": 0.0808,
+      "RMW": -0.0023,
+      "CMA": -0.0624,
+      "UMD": 0.1042
+    },
+    "factor_t_stats": {
+      "Mkt-RF": 5.4832,
+      "SMB": -2.3481,
+      "HML": 2.4821,
+      "RMW": -0.0489,
+      "CMA": -0.9159,
+      "UMD": 4.0511
+    }
+  }
+}

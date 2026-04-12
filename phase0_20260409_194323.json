@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-04-09T19:43:02.164422",
+  "universe_size": 20,
+  "walk_forward": {
+    "total_return_pct": -0.6,
+    "annual_return_pct": -0.1,
+    "sharpe": -0.02,
+    "max_drawdown_pct": 16.62,
+    "alpha_pct": -178.04,
+    "win_rate_pct": 45.1,
+    "total_trades": 275
+  }
+}
