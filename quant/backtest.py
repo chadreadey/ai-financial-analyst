@@ -1809,6 +1809,15 @@ def run_backtest(
             if inst_scores:
                 signals = blend_institutional_flow(signals, inst_scores, config.institutional_flow_weight)
 
+        # ── Cross-sectional normalization barrier ──
+        from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite
+        from quant.universe import get_sector
+        from quant.scoring import reclassify
+        signals = normalize_signals_cross_sectionally(signals, get_sector)
+        for sv in signals.values():
+            sv.composite_score = compute_normalized_composite(sv)
+            reclassify(sv)
+
         # FOMC proximity risk premium (after all signal blends, before regime)
         if config.enable_fomc_proximity:
             all_dates_flat = sorted(set().union(*(df.index for df in universe_data.values())))
@@ -2271,6 +2280,15 @@ def run_walk_forward(
                 if inst_scores:
                     signals = blend_institutional_flow(signals, inst_scores, config.institutional_flow_weight)
 
+            # ── Cross-sectional normalization barrier ──
+            from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite
+            from quant.universe import get_sector
+            from quant.scoring import reclassify
+            signals = normalize_signals_cross_sectionally(signals, get_sector)
+            for sv in signals.values():
+                sv.composite_score = compute_normalized_composite(sv)
+                reclassify(sv)
+
             # FOMC proximity risk premium
             if config.enable_fomc_proximity:
                 vix_now = None
@@ -2597,6 +2615,15 @@ def run_cpcv(
                 )
                 if inst_scores:
                     signals = blend_institutional_flow(signals, inst_scores, config.institutional_flow_weight)
+
+            # ── Cross-sectional normalization barrier ──
+            from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite
+            from quant.universe import get_sector
+            from quant.scoring import reclassify
+            signals = normalize_signals_cross_sectionally(signals, get_sector)
+            for sv in signals.values():
+                sv.composite_score = compute_normalized_composite(sv)
+                reclassify(sv)
 
             if config.enable_fomc_proximity:
                 vix_now = None
