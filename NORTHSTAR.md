@@ -197,7 +197,26 @@ Post-Trade (captured at exit):
 - News and Industry pages (basic)
 - No auth, no persistent user state, no real-time updates
 
+### Design Decisions (Confirmed 2026-04-12)
+
+- **Default view: control room.** Dense, scannable in 10 seconds. Narrative drill-down available per stock/trade.
+- **Desktop only.** No mobile for now. Optimize for wide screens with dense data.
+- **Trade review: exception-based.** System auto-grades all trades passively (return vs prediction, agent accuracy). Only losses >5% and challenger-was-right cases get surfaced for full human attention.
+- **Transition path:** Single-stock analysis stays as the entry point today. Portfolio manager's control room is the end state. Build toward it incrementally.
+
+### Design Standards
+
+The current frontend looks vibecoded. The rebuild must meet these standards:
+
+- **No placeholder pages.** If a page isn't built properly, it doesn't ship. Remove Watchlist, News, and Industry pages until they have real functionality.
+- **Cohesive design system.** Pick a professional palette and component library before adding features. Current colors are ugly — start with a proper dark theme suited for financial data density.
+- **Kill the natural language backtest.** It doesn't work. Replace with a structured backtest explorer: browse past runs, drill into specific trades, inspect regime decisions, understand why the system made each choice. The backtest page is an investigation tool, not a chat interface.
+- **Attention to detail.** Typography, spacing, data alignment, loading states, empty states — all matter. If it doesn't look like something a portfolio manager would trust, it's not done.
+
 ### What's Missing (The Dashboard Vision)
+
+> NOTE: Dashboard design is still being honed. The sections below are a starting
+> framework — expect this to evolve through discussion and iteration.
 
 The current frontend is built for *manual analysis* — you type a ticker and wait. The autonomous system needs a dashboard built for *monitoring and intervention*.
 
@@ -208,9 +227,6 @@ The current frontend is built for *manual analysis* — you type a ticker and wa
 3. **Is it healthy?** (Agent accuracy trends, model drift, API status, error rates)
 4. **Where should I intervene?** (Challenger alerts, low-confidence positions, regime warnings)
 5. **Is it getting better?** (Rolling Sharpe, agent accuracy curves, prediction error trends)
-
-> NOTE: Dashboard design is still being honed. The sections below are a starting
-> framework — expect this to evolve through discussion and iteration.
 
 **Proposed Pages:**
 
@@ -255,21 +271,25 @@ The current frontend is built for *manual analysis* — you type a ticker and wa
 
 ┌─ Trade Review (feedback loop) ──────────────────────────────────┐
 │                                                                  │
-│  Recent closed trades with thesis comparison:                    │
+│  Default: exception view (losses >5%, challenger-was-right)      │
+│  Toggle: all closed trades with passive auto-grade               │
 │                                                                  │
-│  MSFT  +4.2%  Held 28d  Thesis: "ERM +0.7, strong revision"    │
-│    ✅ Earnings agent correct (predicted beat, beat by 8%)        │
-│    ❌ DCF agent wrong (said overvalued, rallied 6%)              │
-│    Challenger said: "cloud growth deceleration" — didn't happen  │
-│    [Mark as: learned / noise / unlucky]                          │
+│  PARA  -8.1%  Held 14d  [EXCEPTION: loss >5%]                   │
+│    Auto-grade: FAILED (predicted top-decile, actual bottom)      │
+│    Failure analysis (auto-generated):                            │
+│      "Competitive agent overestimated moat durability.           │
+│       Challenger correctly flagged streaming loss acceleration.   │
+│       Risk agent's stop loss triggered correctly at 2x ATR.      │
+│       Root cause: thesis depended on activist catalyst that       │
+│       did not materialize within holding period."                │
+│    ❌ Competitive agent: -1 accuracy                              │
+│    ✅ Challenger agent: +1 accuracy                               │
+│    ✅ Risk agent: +1 accuracy                                     │
+│    [Override: agree / disagree / reclassify]                     │
 │                                                                  │
-│  PARA  -8.1%  Held 14d  Thesis: "Activist entry, value unlock"  │
-│    ❌ Competitive agent wrong (moat weaker than assessed)         │
-│    ✅ Challenger correct (said "streaming losses accelerating")   │
-│    ✅ Risk agent correct (flagged high vol, stop triggered)       │
-│    [Mark as: learned / noise / unlucky]                          │
-│                                                                  │
-│  Human labels feed back into agent accuracy tracker              │
+│  Passive auto-grades (expandable):                               │
+│  MSFT  +4.2%  ● CORRECT   NVDA  +6.8%  ● CORRECT               │
+│  JNJ   +0.3%  ○ MARGINAL  AVGO  +3.1%  ● CORRECT               │
 └──────────────────────────────────────────────────────────────────┘
 
 ┌─ Opportunity Radar ─────────────────────────────────────────────┐
@@ -285,22 +305,67 @@ The current frontend is built for *manual analysis* — you type a ticker and wa
 │  Click any row → full agent analysis + challenger output         │
 └──────────────────────────────────────────────────────────────────┘
 
-┌─ Deep Dive (existing, enhanced) ────────────────────────────────┐
-│  /stock/:ticker — add:                                           │
+┌─ Stock Deep Dive (existing, enhanced) ──────────────────────────┐
+│  /stock/:ticker                                                  │
+│  Current: price chart, performance metrics, past analyses        │
+│  Add:                                                            │
 │  - Agent verdict history (how each agent scored over time)        │
 │  - Catalyst timeline (upcoming + past events)                    │
 │  - Trade history for this ticker (entries, exits, P&L)           │
 │  - Challenger history (what was challenged, was it right?)        │
+│  Still the "cool thing" — the single-stock analysis experience   │
+│  should remain polished and be the entry point for new users     │
 └──────────────────────────────────────────────────────────────────┘
 
-┌─ Backtest Lab (existing, enhanced) ─────────────────────────────┐
-│  Add:                                                            │
-│  - XGBoost vs linear blend comparison mode                       │
-│  - CPCV results visualization (OOS Sharpe distribution)          │
-│  - Feature importance over time chart                            │
-│  - Agent accuracy backtesting (if we'd used earned weights)      │
+┌─ Backtest Explorer (REPLACES current broken backtest page) ─────┐
+│                                                                  │
+│  NOT a chat interface. A structured investigation tool.          │
+│                                                                  │
+│  Left panel: list of past backtest runs with config summary      │
+│    "50 tickers, 2020-2026, monthly, VIX 30/40, OBV+ERM"        │
+│    "50 tickers, 2020-2026, monthly, VIX 30/40, all signals"     │
+│                                                                  │
+│  Main view (for selected run):                                   │
+│  ┌─ Performance ──────────────────────────────────────────────┐ │
+│  │  Equity curve vs benchmark                                 │ │
+│  │  Sharpe: 1.04  Alpha: -4.4%  PBO: 0%  Max DD: -12.3%     │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│  ┌─ Trade Log ────────────────────────────────────────────────┐ │
+│  │  Sortable, filterable table of every trade                 │ │
+│  │  Date | Ticker | Direction | Entry | Exit | Return |       │ │
+│  │  Score | Regime | Signals | Why Entered | Why Exited       │ │
+│  │                                                            │ │
+│  │  Click any trade → drill into:                             │ │
+│  │    - Signal scores at entry (OBV, ERM, SUE, etc.)          │ │
+│  │    - Regime state (VIX level, SPY SMA, turbulence)         │ │
+│  │    - Why this stock ranked high enough to enter             │ │
+│  │    - What triggered the exit (stop loss? rebalance? signal │ │
+│  │      degradation?)                                         │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│  ┌─ Regime Timeline ──────────────────────────────────────────┐ │
+│  │  Visual timeline: regime state over backtest period         │ │
+│  │  Color-coded: green=bullish, yellow=cautious, red=risk-off │ │
+│  │  Overlay: trade entries/exits on the timeline               │ │
+│  │  "Why did the system go to cash in March 2022?"             │ │
+│  │  → Click regime transition → see VIX, turbulence, macro    │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│  ┌─ CPCV Results ─────────────────────────────────────────────┐ │
+│  │  OOS Sharpe distribution histogram                         │ │
+│  │  PBO badge, DSR badge                                      │ │
+│  │  Per-combination scatter (IS Sharpe vs OOS Sharpe)          │ │
+│  └────────────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────────┘
 ```
+
+### Pages to Remove (Until Properly Built)
+
+These currently exist as ugly, clunky placeholders. Remove them from the nav:
+
+- **Watchlist** — will be replaced by the Opportunity Radar when it's built properly
+- **News** — will be integrated into Deep Dive and Dashboard alerts, not a standalone page
+- **Industry** — will be part of Opportunity Radar's sector view
+
+Don't ship half-done pages. They undermine trust in the system.
 
 ---
 
@@ -353,18 +418,34 @@ Discipline is knowing what to skip:
 
 ## Implementation Roadmap
 
-### Phase A: Reasoning Quality (Current Focus)
-*Your stated edge. Make the agents better before making the system faster.*
+Frontend work is interleaved, not saved for last. The system is only as good as your ability to inspect and understand its decisions.
 
+### Phase A: Foundation Cleanup + Reasoning Quality
+*Fix what's broken, then make the agents better.*
+
+**Frontend (do first — removes broken/ugly stuff, establishes design system):**
+- [ ] Design system: dark theme palette, typography, component library (before any new pages)
+- [ ] Remove placeholder pages (Watchlist, News, Industry) from nav
+- [ ] Kill natural language backtest — replace with Backtest Explorer (browse runs, drill into trades, inspect regime decisions)
+- [ ] Polish single-stock analysis page (this stays as the flagship)
+
+**Backend (reasoning quality — your stated edge):**
 - [ ] Challenger Agent — contrarian analysis on synthesis consensus
 - [ ] Catalyst Agent — temporal awareness using existing Finnhub/FMP APIs
 - [ ] XGBoost meta-model — learned signal combination (Phases 1-3 of plan)
 - [ ] Adaptive universe — dynamic filter replacing static LIQUID_* lists
 
-### Phase B: Feedback Loop
-*Self-improving requires memory. Close the loop between decisions and outcomes.*
+### Phase B: Feedback Loop + Trade Review
+*Self-improving requires memory. Build the memory and the interface to inspect it together.*
 
+**Frontend:**
+- [ ] Trade Review page — exception-based with auto-generated failure analysis
+- [ ] Agent accuracy visualization (rolling accuracy bars per agent)
+- [ ] Dashboard home (control room: status bar, today's actions, portfolio, alerts)
+
+**Backend:**
 - [ ] Trade Memory Store — pre-trade thesis + post-trade outcomes
+- [ ] Auto-grade engine — passive performance grading with failure/success analysis
 - [ ] Agent Accuracy Tracker — per-agent rolling directional accuracy
 - [ ] Earned synthesis weights — agent weights from track record, not hand-tuning
 - [ ] Model Interpreter Agent — XGB reasoning → prose for agents
@@ -373,33 +454,40 @@ Discipline is knowing what to skip:
 ### Phase C: Autonomy
 *Event-driven execution. The system runs without you.*
 
+**Frontend:**
+- [ ] Opportunity Radar — ranked candidates with catalyst overlay (replaces old Watchlist)
+- [ ] Kill switch UI + position override controls
+- [ ] Alert feed (regime changes, system errors, trade notifications)
+
+**Backend:**
 - [ ] Live Execution Bridge — Alpaca API orders, fill tracking
 - [ ] Trigger Engine — event listener for price/volume/news/filing events
 - [ ] Sourcing Agent — dynamic universe expansion + thematic discovery
 - [ ] Kill switch + failsafes — max daily loss, position limits, circuit breakers
 - [ ] Alerting — notifications for trades, regime changes, system errors
 
-### Phase D: Dashboard
-*The interface for monitoring, not operating.*
-
-- [ ] Dashboard home — system status, today's actions, portfolio, health
-- [ ] Trade Review page — thesis vs outcome comparison, human labeling
-- [ ] Opportunity Radar — ranked candidates with catalyst overlay
-- [ ] Enhanced Deep Dive — agent history, catalyst timeline, trade log per ticker
-- [ ] Enhanced Backtest Lab — XGB vs linear, CPCV visualization, feature importance
-
 ---
+
+## Answered Questions
+
+- **Default dashboard mode:** Control room (dense, scannable). Narrative drill-down available per stock/trade. (2026-04-12)
+- **Trade review mode:** Exception-based default. Auto-grade passively, surface losses >5% and challenger-was-right for full attention. (2026-04-12)
+- **Mobile:** No. Desktop only for now. (2026-04-12)
+- **Frontend quality bar:** High. Current frontend is unacceptable — "vibecoded." No placeholder pages, cohesive design system required, attention to detail matters. (2026-04-12)
+- **Analysis entry point:** Single-stock query is still the "cool thing" and flagship. Control room is the end state. (2026-04-12)
 
 ## Open Questions
 
 Things still being figured out. Update this section as answers emerge.
 
-- **Dashboard tech stack:** Keep React + Vite or move to Next.js for SSR + API routes? Current FastAPI backend works, but real-time updates (WebSocket for trade alerts, live P&L) may benefit from a unified framework.
+- ~~**Design system specifics:**~~ **ANSWERED:** Koyfin is the design reference. Dark theme, equity research density, modern Bloomberg alternative aesthetic. (2026-04-12)
+- **Dashboard tech stack:** Keep React + Vite + FastAPI, or consolidate? Current stack works, but WebSocket support for real-time updates (trade alerts, live P&L) may need consideration. React + Vite is fine for now.
 - **Event trigger implementation:** Start with polling (cron checks Finnhub every N minutes) or invest in webhooks/streaming upfront?
 - **Agent accuracy minimum sample size:** How many trades before earned weights are statistically meaningful? (Probably 30+ per agent, which means ~6 months of live trading before the feedback loop has teeth.)
 - **Challenger agent scope:** Should it challenge every trade, or only high-conviction ones? Challenging every trade may dilute conviction systematically.
 - **Multi-account support:** Is this ever multi-user, or always single-operator? Affects auth, state management, and dashboard design.
 - **Bloomberg data integration:** What downloaded data gets permanent slots in the feature pipeline vs one-time enrichment?
+- **Backtest Explorer data model:** How much per-trade metadata does the backtest engine currently persist? Need to audit what's saved vs what's computed and discarded. The explorer can only show what's stored.
 
 ---
 
