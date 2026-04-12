@@ -39,6 +39,9 @@ class SignalVector:
     institutional_flow_score: float = 0.0  # Set by institutional flow signal
     sentiment_score: float = 0.0  # Set by sentiment blend for cross-sectional normalization
     sector_momentum_score: float = 0.0  # Set by sector ETF momentum signal
+    quality_score: float = 0.0  # Set by quality/profitability signal (WRDS Compustat)
+    price_momentum_score: float = 0.0  # Set by 12-1M price momentum
+    insider_score: float = 0.0  # Set by standalone insider MSPR signal
     flags: list = field(default_factory=list)
 
     # Weights — Phase 0 (2026-04-09) showed zero IC for SMA, MR, BB, RSI, 52W.

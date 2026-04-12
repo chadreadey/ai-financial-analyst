@@ -80,14 +80,24 @@ SIGNAL_FIELDS = [
     ("institutional_flow_score", None),
     ("sentiment_score", None),
     ("sector_momentum_score", None),
+    ("quality_score", None),
+    ("price_momentum_score", None),
+    ("insider_score", None),
 ]
 
+# 7 active signals. Weights reflect expected IC and orthogonality.
+# Earnings-related (ERM+SUE+dispersion) and quality are strongest per literature.
+# Price momentum is strong but overlaps with UMD factor — moderate weight.
+# Insider is sparse but high-conviction when present.
 DEFAULT_COMPOSITE_WEIGHTS = {
-    "obv_trend": 0.40,
-    "earnings_rank_score": 0.30,
-    "institutional_flow_score": 0.15,
-    "sentiment_score": 0.10,
-    "sector_momentum_score": 0.00,  # infrastructure ready, needs orthogonal construction (e.g. sector-relative vs absolute)
+    "obv_trend": 0.15,
+    "earnings_rank_score": 0.20,
+    "institutional_flow_score": 0.10,
+    "sentiment_score": 0.05,
+    "sector_momentum_score": 0.00,  # zeroed — overlaps with UMD factor
+    "quality_score": 0.20,
+    "price_momentum_score": 0.15,
+    "insider_score": 0.10,
 }
 
 

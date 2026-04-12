@@ -1820,6 +1820,35 @@ def run_backtest(
                 if ticker in signals:
                     signals[ticker].sector_momentum_score = mom_score
 
+        # Quality / Profitability (sets quality_score from WRDS Compustat)
+        if _wrds_provider is not None:
+            from quant.additional_signals import compute_quality_scores
+            quality_scores = compute_quality_scores(
+                list(signals.keys()), _wrds_provider, as_of_date=reb_date.date(),
+            )
+            for ticker, qscore in quality_scores.items():
+                if ticker in signals:
+                    signals[ticker].quality_score = qscore
+
+        # Price Momentum 12-1M (sets price_momentum_score from price cache)
+        from quant.additional_signals import compute_price_momentum_scores
+        mom_scores = compute_price_momentum_scores(universe_data, reb_date)
+        for ticker, mscore in mom_scores.items():
+            if ticker in signals:
+                signals[ticker].price_momentum_score = mscore
+
+        # Insider Activity (sets insider_score from Finnhub MSPR)
+        if _finnhub_client is not None or _sentiment_cache is not None:
+            from quant.additional_signals import compute_insider_scores
+            insider_scores = compute_insider_scores(
+                list(signals.keys()), reb_date,
+                finnhub_client=_finnhub_client,
+                sentiment_cache=_sentiment_cache,
+            )
+            for ticker, iscore in insider_scores.items():
+                if ticker in signals:
+                    signals[ticker].insider_score = iscore
+
         # ── Cross-sectional normalization barrier ──
         # Group by volatility tier (not sector) to preserve sector momentum
         from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
@@ -2302,6 +2331,35 @@ def run_walk_forward(
                     if ticker in signals:
                         signals[ticker].sector_momentum_score = mom_score
 
+            # Quality / Profitability
+            if _wrds_provider is not None:
+                from quant.additional_signals import compute_quality_scores
+                quality_scores = compute_quality_scores(
+                    list(signals.keys()), _wrds_provider, as_of_date=reb_date.date(),
+                )
+                for ticker, qscore in quality_scores.items():
+                    if ticker in signals:
+                        signals[ticker].quality_score = qscore
+
+            # Price Momentum 12-1M
+            from quant.additional_signals import compute_price_momentum_scores
+            mom_scores = compute_price_momentum_scores(universe_data, reb_date)
+            for ticker, mscore in mom_scores.items():
+                if ticker in signals:
+                    signals[ticker].price_momentum_score = mscore
+
+            # Insider Activity
+            if _finnhub_client is not None or _sentiment_cache is not None:
+                from quant.additional_signals import compute_insider_scores
+                insider_scores = compute_insider_scores(
+                    list(signals.keys()), reb_date,
+                    finnhub_client=_finnhub_client,
+                    sentiment_cache=_sentiment_cache,
+                )
+                for ticker, iscore in insider_scores.items():
+                    if ticker in signals:
+                        signals[ticker].insider_score = iscore
+
             # ── Cross-sectional normalization barrier ──
             from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
             from quant.scoring import reclassify
@@ -2647,6 +2705,35 @@ def run_cpcv(
                 for ticker, mom_score in sec_mom_scores.items():
                     if ticker in signals:
                         signals[ticker].sector_momentum_score = mom_score
+
+            # Quality / Profitability
+            if _wrds_provider is not None:
+                from quant.additional_signals import compute_quality_scores
+                quality_scores = compute_quality_scores(
+                    list(signals.keys()), _wrds_provider, as_of_date=reb_date.date(),
+                )
+                for ticker, qscore in quality_scores.items():
+                    if ticker in signals:
+                        signals[ticker].quality_score = qscore
+
+            # Price Momentum 12-1M
+            from quant.additional_signals import compute_price_momentum_scores
+            mom_scores = compute_price_momentum_scores(universe_data, reb_date)
+            for ticker, mscore in mom_scores.items():
+                if ticker in signals:
+                    signals[ticker].price_momentum_score = mscore
+
+            # Insider Activity
+            if _finnhub_client is not None or _sentiment_cache is not None:
+                from quant.additional_signals import compute_insider_scores
+                insider_scores = compute_insider_scores(
+                    list(signals.keys()), reb_date,
+                    finnhub_client=_finnhub_client,
+                    sentiment_cache=_sentiment_cache,
+                )
+                for ticker, iscore in insider_scores.items():
+                    if ticker in signals:
+                        signals[ticker].insider_score = iscore
 
             # ── Cross-sectional normalization barrier ──
             from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
