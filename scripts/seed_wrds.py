@@ -186,6 +186,37 @@ def pull_ibes_actuals(db, ibes_tickers, start_year):
     return df
 
 
+def pull_13f_holdings(db, tickers, start_year):
+    """
+    Pull aggregated 13F institutional holdings per ticker per quarter.
+
+    Uses tr_13f.s34 — Thomson Reuters 13F dataset. Aggregates position-level
+    data into per-ticker quarterly summaries: holder count, total shares,
+    buyers/sellers.
+    """
+    tic_list = ",".join(f"'{t}'" for t in tickers)
+    progress(f"Pulling 13F institutional holdings for {len(tickers)} tickers from {start_year}...")
+
+    df = db.raw_sql(f"""
+        SELECT ticker, rdate,
+               COUNT(DISTINCT mgrno) AS n_holders,
+               SUM(shares) AS total_shares,
+               SUM(CASE WHEN change > 0 THEN 1 ELSE 0 END) AS n_buying,
+               SUM(CASE WHEN change < 0 THEN 1 ELSE 0 END) AS n_selling,
+               SUM(CASE WHEN change = 0 OR change IS NULL THEN 1 ELSE 0 END) AS n_unchanged
+        FROM tr_13f.s34
+        WHERE ticker IN ({tic_list})
+          AND rdate >= '{start_year}-01-01'
+        GROUP BY ticker, rdate
+        ORDER BY ticker, rdate
+    """)
+
+    progress(f"  Pulled {len(df)} ticker-quarter rows "
+             f"({df['ticker'].nunique()} tickers, "
+             f"{df['rdate'].nunique()} quarters)")
+    return df
+
+
 def main():
     parser = argparse.ArgumentParser(description="Seed WRDS point-in-time store")
     parser.add_argument("--universe", default="",
@@ -245,7 +276,12 @@ def main():
     n_actuals = store.ingest_ibes_actuals(actuals_df)
     progress(f"Ingested {n_actuals} IBES actuals rows")
 
-    # Step 5: Save commercial tags
+    # Step 5: Pull 13F institutional holdings
+    inst_df = pull_13f_holdings(db, tickers, args.start_year)
+    n_inst = store.ingest_inst_holdings(inst_df)
+    progress(f"Ingested {n_inst} institutional holdings rows")
+
+    # Step 6: Save commercial tags
     store.save_commercial_tags()
 
     db.close()

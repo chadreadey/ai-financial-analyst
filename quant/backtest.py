@@ -824,6 +824,7 @@ _fmp_client = None       # FMPClient — auto-initialized from FMP_API_KEY
 _fmp_cache = None        # FMPFundamentalCache — SQLite cache for fundamentals
 _wrds_provider = None    # WRDSFundamentalProvider — auto-initialized from .wrds_pit.db
 _inst_fmp_cache = None  # FMPFundamentalCache for institutional data
+_inst_wrds_store = None  # WRDSPointInTimeStore for 13F holdings
 
 
 def _get_timesfm_model():
@@ -1825,6 +1826,7 @@ def run_backtest(
             inst_scores = compute_institutional_flow_scores(
                 list(signals.keys()),
                 as_of_date=reb_date.date(),
+                wrds_store=_inst_wrds_store,
                 fmp_client=_fmp_client,
                 fmp_cache=_inst_fmp_cache,
                 finnhub_client=_finnhub_client,
@@ -2040,7 +2042,7 @@ def run_walk_forward(
 
     # Auto-init institutional flow data sources + prefetch
     if config.enable_institutional_flow:
-        global _inst_fmp_cache
+        global _inst_fmp_cache, _inst_wrds_store
         if _inst_fmp_cache is None:
             from quant.fmp_cache import FMPFundamentalCache
             _inst_fmp_cache = FMPFundamentalCache()
@@ -2049,10 +2051,26 @@ def run_walk_forward(
             if fmp_key:
                 from fmp_client import FMPClient
                 _fmp_client = FMPClient(fmp_key)
+        # Use WRDS 13F store as primary source (if seeded)
+        if _inst_wrds_store is None and _wrds_provider is not None:
+            try:
+                from quant.wrds_store import WRDSPointInTimeStore
+                _inst_wrds_store = WRDSPointInTimeStore()
+                # Quick check if 13F data is seeded
+                test = _inst_wrds_store.get_inst_holdings_as_of(config.tickers[0], "2099-12-31", n_quarters=1)
+                if test:
+                    logger.info("WRDS 13F store available (%d test rows for %s)", len(test), config.tickers[0])
+                else:
+                    logger.info("WRDS 13F store empty — run: python scripts/seed_wrds.py --universe liquid_50")
+                    _inst_wrds_store = None
+            except Exception as exc:
+                logger.debug("WRDS 13F store init failed: %s", exc)
+                _inst_wrds_store = None
         # Prefetch all institutional data once before the backtest loop
         from quant.institutional_flow import prefetch_institutional_data
         prefetch_stats = prefetch_institutional_data(
             config.tickers,
+            wrds_store=_inst_wrds_store,
             fmp_client=_fmp_client,
             fmp_cache=_inst_fmp_cache,
             finnhub_client=_finnhub_client,

@@ -128,11 +128,44 @@ def _pit_safe_date(report_date: date, filing_lag_days: int = 45) -> date:
 
 # ── Caches ────────────────────────────────────────────────────────────
 # _raw_cache: ticker → full FMP/Finnhub data blob (fetched once per ticker)
+# _wrds_cache: ticker → list of WRDS 13F quarterly rows (fetched once per ticker)
 # _score_cache: (ticker, quarter_key) → (score, metadata) (computed once per quarter)
-# Both are module-level so they persist across rebalance dates and CPCV combos.
+# All module-level so they persist across rebalance dates and CPCV combos.
 _raw_cache: dict[str, list[dict] | None] = {}
 _finnhub_raw_cache: dict[str, list[dict] | None] = {}
+_wrds_cache: dict[str, list[dict] | None] = {}
 _score_cache: dict[tuple[str, str], tuple[float, dict]] = {}
+
+
+def _fetch_wrds_data(
+    ticker: str,
+    wrds_store=None,
+) -> list[dict]:
+    """
+    Fetch pre-aggregated 13F holdings from WRDS store (tr_13f.s34).
+
+    This is the PRIMARY data source — academic-grade, free via university,
+    covers 2014-present with full position-level aggregation.
+
+    Returns list of quarterly dicts with: ticker, rdate, n_holders,
+    total_shares, n_buying, n_selling, n_unchanged.
+    """
+    if ticker in _wrds_cache:
+        return _wrds_cache[ticker] or []
+
+    if wrds_store is None:
+        _wrds_cache[ticker] = None
+        return []
+
+    try:
+        # Pull all available quarters (large as_of_date, many quarters)
+        rows = wrds_store.get_inst_holdings_as_of(ticker, "2099-12-31", n_quarters=100)
+        _wrds_cache[ticker] = rows
+        return rows
+    except Exception as exc:
+        logger.debug("WRDS 13F fetch failed for %s: %s", ticker, exc)
+        _wrds_cache[ticker] = None
+        return []
 
 
 def _fetch_fmp_data(
@@ -227,9 +260,83 @@ def _pit_quarter_key(as_of_date: date, filing_lag_days: int = 45) -> str:
     return ""
 
 
+def _score_from_wrds_rows(
+    rows: list[dict],
+    as_of_date: date,
+    filing_lag_days: int = 45,
+) -> tuple[float, dict] | None:
+    """
+    Compute institutional flow score from pre-aggregated WRDS 13F rows.
+
+    Each row has: ticker, rdate, n_holders, total_shares, n_buying, n_selling, n_unchanged.
+    Returns (score, metadata) or None if insufficient data.
+    """
+    # Filter by point-in-time: only use quarters whose filings are public
+    pit_rows = []
+    for r in rows:
+        rdate = date.fromisoformat(str(r["rdate"])[:10])
+        if _pit_safe_date(rdate, filing_lag_days) <= as_of_date:
+            pit_rows.append(r)
+
+    if not pit_rows:
+        return None
+
+    # Sort descending by rdate
+    pit_rows.sort(key=lambda r: r["rdate"], reverse=True)
+    current = pit_rows[0]
+    prior = pit_rows[1] if len(pit_rows) >= 2 else None
+
+    n_current = current.get("n_holders", 0) or 0
+    if n_current < MIN_INSTITUTIONS:
+        return None
+
+    # Sub-signal 1: Holder count change
+    n_prior = (prior.get("n_holders", 0) or 0) if prior else n_current
+    holder_change_pct = (n_current - n_prior) / n_prior if n_prior > 0 else 0.0
+    holder_score = float(np.clip(holder_change_pct / 0.50, -1.0, 1.0))
+
+    # Sub-signal 2: Shares flow
+    current_shares = current.get("total_shares", 0) or 0
+    prior_shares = (prior.get("total_shares", 0) or 0) if prior else current_shares
+    shares_flow_pct = (current_shares - prior_shares) / prior_shares if prior_shares > 0 else 0.0
+    shares_score = float(np.clip(shares_flow_pct / 0.30, -1.0, 1.0))
+
+    # Sub-signal 3: Buyer/seller ratio
+    n_buying = current.get("n_buying", 0) or 0
+    n_selling = current.get("n_selling", 0) or 0
+    n_unchanged = current.get("n_unchanged", 0) or 0
+    n_active = n_buying + n_selling
+    buyer_seller_ratio = (n_buying - n_selling) / n_active if n_active > 0 else 0.0
+    buyer_seller_score = float(np.clip(buyer_seller_ratio, -1.0, 1.0))
+
+    # Composite
+    score = (holder_score + shares_score + buyer_seller_score) / 3.0
+    score = float(np.clip(score, -1.0, 1.0))
+
+    metadata = {
+        "n_institutions": n_current,
+        "n_prior_institutions": n_prior,
+        "n_buying": n_buying,
+        "n_selling": n_selling,
+        "n_unchanged": n_unchanged,
+        "holder_count_change_pct": round(holder_change_pct * 100, 2),
+        "shares_flow_pct": round(shares_flow_pct * 100, 2),
+        "buyer_seller_ratio": round(buyer_seller_ratio, 3),
+        "sub_scores": {
+            "holder_count": round(holder_score, 4),
+            "shares_flow": round(shares_score, 4),
+            "buyer_seller": round(buyer_seller_score, 4),
+        },
+        "latest_rdate": current["rdate"],
+    }
+
+    return round(score, 4), metadata
+
+
 def fetch_and_score_institutional_flow(
     ticker: str,
     as_of_date: date,
+    wrds_store=None,
     fmp_client=None,
     fmp_cache=None,
     finnhub_client=None,
@@ -240,13 +347,13 @@ def fetch_and_score_institutional_flow(
     """
     Fetch institutional ownership data and compute flow score.
 
-    Uses three layers of caching:
-    1. Score cache: (ticker, quarter) → score (instant dict lookup)
-    2. Raw data cache: ticker → full API response (in-memory)
-    3. SQLite/disk cache: persistent across runs
+    Data source priority:
+    1. WRDS tr_13f.s34 (academic, pre-aggregated in SQLite — best quality)
+    2. FMP institutional ownership API (paid tier)
+    3. Finnhub institutional ownership (paid tier)
 
-    The score only changes quarterly, so within a CPCV run the same
-    (ticker, quarter) pair is computed once and reused for all combos.
+    Score memoization: (ticker, quarter) computed once, reused across
+    all CPCV combos and rebalance dates within the same quarter.
     """
     # --- Score memoization: same ticker + same quarter = same score ---
     pit_qkey = _pit_quarter_key(as_of_date, filing_lag_days)
@@ -254,11 +361,23 @@ def fetch_and_score_institutional_flow(
     if cache_key in _score_cache:
         return _score_cache[cache_key]
 
+    # --- Try WRDS first (primary, best quality) ---
+    wrds_rows = _fetch_wrds_data(ticker, wrds_store)
+    if wrds_rows:
+        result = _score_from_wrds_rows(wrds_rows, as_of_date, filing_lag_days)
+        if result is not None:
+            score, meta = result
+            meta["data_source"] = "wrds_13f"
+            meta["as_of_date"] = str(as_of_date)
+            if pit_qkey:
+                _score_cache[cache_key] = (score, meta)
+            return score, meta
+
+    # --- Fallback: FMP data ---
     current_snapshot = []
     prior_snapshot = []
     data_source = "none"
 
-    # --- Fetch FMP data (once per ticker, cached) ---
     fmp_data = _fetch_fmp_data(ticker, fmp_client, fmp_cache)
 
     if fmp_data:
@@ -284,7 +403,7 @@ def fetch_and_score_institutional_flow(
         if len(sorted_quarters) >= 2:
             prior_snapshot = quarters[sorted_quarters[1]]
 
-    # --- Finnhub enrichment (once per ticker, cached) ---
+    # --- Fallback: Finnhub enrichment ---
     finnhub_meta = {}
     fh_data = _fetch_finnhub_data(ticker, finnhub_client, finnhub_disk_cache)
 
@@ -320,6 +439,7 @@ def fetch_and_score_institutional_flow(
 
 def prefetch_institutional_data(
     tickers: list[str],
+    wrds_store=None,
     fmp_client=None,
     fmp_cache=None,
     finnhub_client=None,
@@ -335,18 +455,21 @@ def prefetch_institutional_data(
     """
     stats = {}
     for ticker in tickers:
+        wrds_data = _fetch_wrds_data(ticker, wrds_store)
         fmp_data = _fetch_fmp_data(ticker, fmp_client, fmp_cache)
         fh_data = _fetch_finnhub_data(ticker, finnhub_client, finnhub_disk_cache)
-        n = len(fmp_data) + len(fh_data)
+        n = len(wrds_data) + len(fmp_data) + len(fh_data)
         if n > 0:
             stats[ticker] = n
-        logger.debug("Prefetched %s: %d FMP + %d Finnhub records", ticker, len(fmp_data), len(fh_data))
+        logger.debug("Prefetched %s: %d WRDS + %d FMP + %d Finnhub records",
+                     ticker, len(wrds_data), len(fmp_data), len(fh_data))
     return stats
 
 
 def compute_institutional_flow_scores(
     tickers: list[str],
     as_of_date: date,
+    wrds_store=None,
     fmp_client=None,
     fmp_cache=None,
     finnhub_client=None,
@@ -364,6 +487,7 @@ def compute_institutional_flow_scores(
             score, meta = fetch_and_score_institutional_flow(
                 ticker=ticker,
                 as_of_date=as_of_date,
+                wrds_store=wrds_store,
                 fmp_client=fmp_client,
                 fmp_cache=fmp_cache,
                 finnhub_client=finnhub_client,

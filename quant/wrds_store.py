@@ -144,6 +144,19 @@ class WRDSPointInTimeStore:
                 PRIMARY KEY (ticker, link_start)
             );
 
+            CREATE TABLE IF NOT EXISTS inst_holdings_13f (
+                ticker      TEXT NOT NULL,
+                rdate       TEXT NOT NULL,
+                n_holders   INTEGER,
+                total_shares REAL,
+                n_buying    INTEGER,
+                n_selling   INTEGER,
+                n_unchanged INTEGER,
+                PRIMARY KEY (ticker, rdate)
+            );
+            CREATE INDEX IF NOT EXISTS idx_inst_13f_pit
+                ON inst_holdings_13f(ticker, rdate);
+
             CREATE TABLE IF NOT EXISTS commercial_tags (
                 table_name  TEXT PRIMARY KEY,
                 tag_json    TEXT NOT NULL,
@@ -361,6 +374,61 @@ class WRDSPointInTimeStore:
         conn.close()
         return n
 
+    def ingest_inst_holdings(self, df: pd.DataFrame) -> int:
+        """
+        Insert aggregated 13F institutional holdings.
+
+        Expects DataFrame with columns:
+            ticker, rdate, n_holders, total_shares, n_buying, n_selling, n_unchanged
+        """
+        conn = self._conn()
+        n = 0
+        for _, row in df.iterrows():
+            try:
+                conn.execute("""
+                    INSERT OR REPLACE INTO inst_holdings_13f
+                    (ticker, rdate, n_holders, total_shares, n_buying, n_selling, n_unchanged)
+                    VALUES (?,?,?,?,?,?,?)
+                """, (
+                    str(row["ticker"]).upper(),
+                    str(row["rdate"])[:10],
+                    int(row["n_holders"]) if pd.notna(row.get("n_holders")) else 0,
+                    float(row["total_shares"]) if pd.notna(row.get("total_shares")) else 0,
+                    int(row["n_buying"]) if pd.notna(row.get("n_buying")) else 0,
+                    int(row["n_selling"]) if pd.notna(row.get("n_selling")) else 0,
+                    int(row["n_unchanged"]) if pd.notna(row.get("n_unchanged")) else 0,
+                ))
+                n += 1
+            except Exception as exc:
+                logger.debug("13F ingest error: %s", exc)
+        conn.commit()
+        conn.close()
+        return n
+
+    def get_inst_holdings_as_of(
+        self,
+        ticker: str,
+        as_of_date: str,
+        n_quarters: int = 8,
+    ) -> list[dict]:
+        """
+        Return up to n_quarters of 13F holdings where rdate <= as_of_date.
+
+        Point-in-time safe: 13F filings are public ~45 days after quarter end.
+        The caller should pass as_of_date adjusted for filing lag.
+
+        Returns list of dicts ordered by rdate DESC (most recent first).
+        """
+        conn = self._conn()
+        rows = conn.execute("""
+            SELECT * FROM inst_holdings_13f
+            WHERE ticker = ? AND rdate <= ?
+            ORDER BY rdate DESC
+            LIMIT ?
+        """, (ticker.upper(), as_of_date, n_quarters)).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
     def save_commercial_tags(self) -> None:
         """Write all commercial migration tags to the database."""
         conn = self._conn()
@@ -377,7 +445,7 @@ class WRDSPointInTimeStore:
     def summary(self) -> dict:
         conn = self._conn()
         result = {}
-        for table in ["compustat_quarterly", "ibes_consensus", "ibes_actuals", "ticker_link"]:
+        for table in ["compustat_quarterly", "ibes_consensus", "ibes_actuals", "ticker_link", "inst_holdings_13f"]:
             row = conn.execute(f"SELECT COUNT(*) as cnt FROM {table}").fetchone()
             result[table] = row["cnt"]
         # Ticker counts
