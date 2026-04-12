@@ -83,11 +83,11 @@ SIGNAL_FIELDS = [
 ]
 
 DEFAULT_COMPOSITE_WEIGHTS = {
-    "obv_trend": 0.30,
-    "earnings_rank_score": 0.25,
+    "obv_trend": 0.40,
+    "earnings_rank_score": 0.30,
     "institutional_flow_score": 0.15,
     "sentiment_score": 0.10,
-    "sector_momentum_score": 0.20,
+    "sector_momentum_score": 0.00,  # infrastructure ready, needs orthogonal construction (e.g. sector-relative vs absolute)
 }
 
 
