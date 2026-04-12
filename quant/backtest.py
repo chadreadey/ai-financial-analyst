@@ -1333,10 +1333,11 @@ def build_target_portfolio(
     else:
         long_weights = [1.0 / max(len(longs), 1)] * len(longs)
 
-    # Capital pool: total for longs vs shorts
-    long_capital = capital * (len(longs) / max(n_positions, 1))
-    if not shorts:
-        long_capital = capital
+    # Capital pools: 130/30 structure — independent long and short books.
+    # Longs invest 100% of capital. Shorts are a 30% overlay (funded by margin).
+    # Gross exposure: 130%, Net exposure: ~70%, Target beta: ~0.5-0.7.
+    long_capital = capital  # 100% of capital to longs
+    short_capital_pool = capital * 0.30  # 30% overlay for shorts
 
     # Apply regime-based sizing scalar
     regime_scalar = regime.sizing_scalar
@@ -1390,8 +1391,8 @@ def build_target_portfolio(
         vol_scalar = min(2.0 / max(atr_pct, 0.5), 2.0)
         # In bearish regime, shorts get full sizing (not scaled down)
         short_regime_scalar = 1.0 if regime.level == "bearish" else regime_scalar
-        short_capital = capital / max(n_positions, 1)  # shorts always equal-weight
-        adjusted_capital = short_capital * vol_scalar * short_regime_scalar
+        per_short_capital = short_capital_pool / max(len(shorts), 1)  # equal-weight from 30% pool
+        adjusted_capital = per_short_capital * vol_scalar * short_regime_scalar
         shares = adjusted_capital / entry_price
 
         atr_val = sv.atr_regime.metadata.get("atr_value", entry_price * 0.02)
