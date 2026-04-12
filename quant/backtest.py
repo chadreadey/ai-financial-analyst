@@ -1205,24 +1205,30 @@ def build_target_portfolio(
     if n_stocks == 0:
         return positions
 
+    # ── Decile-based portfolio construction ──────────────────────────
+    # Instead of absolute thresholds (composite >= 0.20), use relative
+    # ranking: long the top decile, short the bottom decile. This
+    # generalizes across any universe size and avoids overfitting to
+    # threshold values calibrated on a specific stock list.
+    #
+    # Absolute thresholds still serve as a minimum quality floor —
+    # a stock in the top decile with a negative composite score
+    # shouldn't be longed just because it's the "least bad."
+
     # Risk-off: no new longs (close existing at next rebalance)
     if regime.level == "risk_off":
-        # Only allow shorts in risk-off — longs are too dangerous
         longs = []
     else:
-        # Golden cross / strong_bull: lower the long threshold to catch more entries,
-        # but only down to a minimum floor (0.15) — prevents admitting stocks with
-        # genuinely weak signals just because the macro regime is bullish.
-        effective_long_threshold = config.long_threshold
-        _GOLDEN_CROSS_FLOOR = 0.15
-        if regime.level == "strong_bull" and config.enable_death_golden_cross:
-            effective_long_threshold = max(
-                _GOLDEN_CROSS_FLOOR,
-                config.long_threshold - config.golden_cross_boost,
-            )
-            logger.debug("Golden cross active: long threshold lowered to %.2f", effective_long_threshold)
+        # Top decile = top 10% of universe by score
+        n_long_candidates = max(1, n_stocks // 10)
+        # But don't exceed max_long_positions
+        n_long_candidates = min(n_long_candidates, config.max_long_positions)
 
-        longs_raw = [(t, sc, sv) for t, sc, sv in scored if sc >= effective_long_threshold]
+        # Quality floor: still require positive composite score
+        # (weaker than old 0.20 threshold, but prevents longing negative-signal stocks)
+        _QUALITY_FLOOR = 0.05
+        longs_raw = [(t, sc, sv) for t, sc, sv in scored[:n_long_candidates]
+                     if sc >= _QUALITY_FLOOR]
 
         # Sector-diversified selection: cap positions per GICS sector
         if config.max_per_sector > 0 and config.max_per_sector < config.max_long_positions:
@@ -1243,8 +1249,13 @@ def build_target_portfolio(
         else:
             longs = longs_raw[:config.max_long_positions]
 
-    # Short: bottom scorers below threshold, with regime + signal confirmation filters
-    shorts_raw = [(t, sc, sv) for t, sc, sv in scored if sc <= config.short_threshold]
+    # Short: bottom decile of universe by score
+    n_short_candidates = max(1, n_stocks // 10)
+    n_short_candidates = min(n_short_candidates, config.max_short_positions)
+    # Quality floor for shorts: must have meaningfully negative score
+    _SHORT_FLOOR = -0.10
+    shorts_raw = [(t, sc, sv) for t, sc, sv in scored[-n_short_candidates:]
+                  if sc <= _SHORT_FLOOR]
     shorts = []
 
     # Risk-off with HIGH VIX = reduce ALL exposure (V-shaped crash risk)
