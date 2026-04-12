@@ -1069,26 +1069,10 @@ def blend_sentiment_into_signals(
     sentiment_weight: float = 0.10,
 ) -> dict[str, SignalVector]:
     """
-    Blend news sentiment into each stock's composite with adaptive weighting.
+    Set sentiment scores on SignalVectors for cross-sectional normalization.
 
-    Effective weight = base_weight
-                       × coverage_scale(n_articles)
-                       × regime_scale(atr_regime)
-
-    coverage_scale  = min(1.0, n_articles / COVERAGE_FULL)
-                      → full weight at 20+ articles, proportionally less below.
-                      → 0 articles (insider-only) → 0× news scale, but insider
-                         MSPR is still carried in the score itself.
-
-    regime_scale    = 0.5 if atr_regime == "high_vol" else 1.0
-                      → during high-vol periods news sentiment lags the move;
-                         halving weight prevents chasing panicked headlines.
-
-    Raw (score, n_articles) pairs are preserved in metadata so downstream
-    systems (e.g. GraphRAG, geopolitical NLP layer) can consume them directly
-    without re-running sentiment.
-
-    Order: IC weights → LSTM blend → sentiment blend (always last).
+    Applies coverage and regime scaling to the raw sentiment score, then
+    stores on sv.sentiment_score. No longer modifies composite_score.
     """
     if not sentiment_scores:
         return signals
@@ -1100,49 +1084,27 @@ def blend_sentiment_into_signals(
 
         score, n_articles = entry
 
-        # Coverage scaling: sparse news → reduced weight
+        # Coverage scaling: sparse news → reduced confidence
         coverage_scale = min(1.0, n_articles / _SENTIMENT_COVERAGE_FULL)
 
         # Regime scaling: noisy in high-vol environments
         vol_regime = sv.atr_regime.metadata.get("volatility_regime", "normal")
         regime_scale = _SENTIMENT_HIGH_VOL_SCALE if vol_regime == "high_vol" else 1.0
 
-        effective_weight = sentiment_weight * coverage_scale * regime_scale
+        effective_scale = coverage_scale * regime_scale
 
-        if effective_weight < 1e-6:
-            # No meaningful weight — skip blend but still log the raw signal
+        if effective_scale < 1e-6:
             sv.flags.append(
                 f"sentiment_suppressed(articles={n_articles},regime={vol_regime})"
             )
             continue
 
-        # Asymmetric blend: sentiment and quant signal must agree on direction
-        # for shorts. Positive news on a bearish stock is a conflict — flag it
-        # and skip the blend rather than diluting short conviction.
-        # For longs, sentiment can both add and reduce conviction (symmetric).
-        is_short_candidate = sv.composite_score < 0
-        sentiment_conflicts_short = is_short_candidate and score > 0
+        # Scale the raw sentiment score by coverage/regime confidence
+        sv.sentiment_score = score * effective_scale
 
-        if sentiment_conflicts_short:
-            sv.flags.append(
-                f"sentiment_conflict(quant=bearish,news=bullish,score={score:.2f},"
-                f"articles={n_articles})"
-            )
-            continue
-
-        quant_scale = 1.0 - effective_weight
-        blended = sv.composite_score * quant_scale + score * effective_weight
-        sv.composite_score = float(np.clip(blended, -1.0, 1.0))
-
-        reclassify(sv)
-
-        # Flag: log effective weight and extreme raw sentiment for audit trail
         sv.flags.append(
-            f"sentiment_w={effective_weight:.3f}"
-            f"(cov={coverage_scale:.2f},regime={vol_regime})"
+            f"sentiment(cov={coverage_scale:.2f},regime={vol_regime})"
         )
-        if abs(score) >= 0.7:
-            sv.flags.append(f"sentiment={'bullish' if score > 0 else 'bearish'}({score:.2f})")
 
     return signals
 

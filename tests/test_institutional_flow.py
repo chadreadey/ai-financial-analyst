@@ -220,7 +220,7 @@ class TestComputeInstitutionalFlowScore:
 class TestBlendInstitutionalFlow:
     """Test blending institutional flow into composite scores."""
 
-    def test_blend_adjusts_composite_score(self):
+    def test_blend_sets_institutional_flow_score(self):
         from quant.institutional_flow import blend_institutional_flow
         from quant.signals import SignalResult, SignalVector
 
@@ -232,15 +232,14 @@ class TestBlendInstitutionalFlow:
             obv_trend=SignalResult(0.5),
             atr_regime=SignalResult(0.0),
         )
-        sv.composite_score = 0.5
 
         signals = {"AAPL": sv}
         flow_scores = {"AAPL": (0.8, {"n_institutions": 50, "data_source": "fmp"})}
 
         result = blend_institutional_flow(signals, flow_scores, weight=0.15)
 
-        # composite = 0.5 * 0.85 + 0.8 * 0.15 = 0.425 + 0.12 = 0.545
-        assert abs(result["AAPL"].composite_score - 0.545) < 0.01
+        # Blend now sets the field instead of modifying composite
+        assert result["AAPL"].institutional_flow_score == 0.8
 
     def test_blend_skips_missing_tickers(self):
         from quant.institutional_flow import blend_institutional_flow

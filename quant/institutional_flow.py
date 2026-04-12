@@ -508,9 +508,11 @@ def blend_institutional_flow(
     weight: float = 0.15,
 ) -> dict:
     """
-    Blend institutional flow scores into SignalVector composite scores.
+    Set institutional flow scores on SignalVectors for cross-sectional normalization.
 
-    Same pattern as blend_earnings_signals in earnings_signals.py.
+    No longer modifies composite_score directly — just stores the flow
+    score on sv.institutional_flow_score. Composite is built later
+    by compute_normalized_composite after cross-sectional normalization.
     """
     if not flow_scores:
         return signals
@@ -521,14 +523,10 @@ def blend_institutional_flow(
             continue
 
         score, meta = entry
-        quant_scale = 1.0 - weight
-        blended = sv.composite_score * quant_scale + score * weight
-        sv.composite_score = float(np.clip(blended, -1.0, 1.0))
-
-        reclassify(sv)
+        sv.institutional_flow_score = score
 
         n_inst = meta.get("n_institutions", 0)
         src = meta.get("data_source", "unknown")
-        sv.flags.append(f"inst_flow_w={weight:.3f}(n={n_inst},src={src})")
+        sv.flags.append(f"inst_flow(n={n_inst},src={src})")
 
     return signals

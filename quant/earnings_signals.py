@@ -319,9 +319,11 @@ def blend_earnings_signals(
     weight: float = 0.30,
 ) -> dict:
     """
-    Blend earnings signal scores into SignalVector composite scores.
+    Set earnings signal scores on SignalVectors for cross-sectional normalization.
 
-    Same pattern as blend_fundamentals_into_signals.
+    No longer modifies composite_score directly — just stores the blended
+    earnings score on sv.earnings_rank_score. Composite is built later
+    by compute_normalized_composite after cross-sectional normalization.
     """
     if not earnings_scores:
         return signals
@@ -332,17 +334,7 @@ def blend_earnings_signals(
             continue
 
         score, n_signals, meta = entry
-        effective_weight = weight * (n_signals / 3.0)
-
-        quant_scale = 1.0 - effective_weight
-        blended = sv.composite_score * quant_scale + score * effective_weight
-        sv.composite_score = float(np.clip(blended, -1.0, 1.0))
-
-        reclassify(sv)
-
-        sv.flags.append(f"earnings_w={effective_weight:.3f}(n={n_signals},src=wrds_ibes)")
-
-        # Store raw earnings score for earnings-based ranking (Path A)
         sv.earnings_rank_score = score
+        sv.flags.append(f"earnings(n={n_signals},src=wrds_ibes)")
 
     return signals
