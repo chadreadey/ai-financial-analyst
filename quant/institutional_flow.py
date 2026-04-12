@@ -126,6 +126,107 @@ def _pit_safe_date(report_date: date, filing_lag_days: int = 45) -> date:
     return report_date + timedelta(days=filing_lag_days)
 
 
+# ── Caches ────────────────────────────────────────────────────────────
+# _raw_cache: ticker → full FMP/Finnhub data blob (fetched once per ticker)
+# _score_cache: (ticker, quarter_key) → (score, metadata) (computed once per quarter)
+# Both are module-level so they persist across rebalance dates and CPCV combos.
+_raw_cache: dict[str, list[dict] | None] = {}
+_finnhub_raw_cache: dict[str, list[dict] | None] = {}
+_score_cache: dict[tuple[str, str], tuple[float, dict]] = {}
+
+
+def _fetch_fmp_data(
+    ticker: str,
+    fmp_client=None,
+    fmp_cache=None,
+) -> list[dict]:
+    """
+    Fetch FMP institutional data for a ticker. Fetched ONCE per ticker,
+    then cached in-memory and in SQLite. Empty results are cached too
+    (negative caching) to avoid repeated failed API calls.
+    """
+    # Check in-memory cache first (fastest)
+    if ticker in _raw_cache:
+        return _raw_cache[ticker] or []
+
+    # Check SQLite cache
+    if fmp_cache is not None:
+        cached = fmp_cache.get_institutional_quarterly(ticker, max_age_seconds=0)
+        if cached is not None:  # None = not in cache; [] = cached empty result
+            _raw_cache[ticker] = cached
+            return cached
+
+    # Fetch from API
+    fmp_data = []
+    if fmp_client is not None:
+        if hasattr(fmp_client, "get_institutional_ownership_history"):
+            fmp_data = fmp_client.get_institutional_ownership_history(ticker)
+        elif hasattr(fmp_client, "_client"):
+            fmp_data = fmp_client._client.get_institutional_ownership_history(ticker)
+
+    # Cache result (including empty — negative caching)
+    if fmp_cache is not None:
+        fmp_cache.set_institutional_quarterly(ticker, fmp_data)
+    _raw_cache[ticker] = fmp_data
+
+    return fmp_data
+
+
+def _fetch_finnhub_data(
+    ticker: str,
+    finnhub_client=None,
+    finnhub_disk_cache=None,
+) -> list[dict]:
+    """
+    Fetch Finnhub institutional data for a ticker. Fetched ONCE per ticker,
+    cached in-memory and on disk. Empty results cached (negative caching).
+    """
+    if ticker in _finnhub_raw_cache:
+        return _finnhub_raw_cache[ticker] or []
+
+    # Check disk cache
+    if finnhub_disk_cache is not None:
+        cached = finnhub_disk_cache.get_institutional(ticker, "latest")
+        if cached is not None:
+            _finnhub_raw_cache[ticker] = cached
+            return cached
+
+    # Fetch from API
+    fh_data = []
+    if finnhub_client is not None:
+        fh_data = finnhub_client.get_institutional_ownership(ticker)
+
+    # Cache result (including empty)
+    if finnhub_disk_cache is not None:
+        finnhub_disk_cache.set_institutional(ticker, "latest", fh_data)
+    _finnhub_raw_cache[ticker] = fh_data
+
+    return fh_data
+
+
+def _pit_quarter_key(as_of_date: date, filing_lag_days: int = 45) -> str:
+    """
+    Determine which quarter's data is available at as_of_date.
+
+    Institutional data is quarterly and only changes when a new quarter's
+    filings become public. The score for any as_of_date within the same
+    PIT-safe quarter window is identical.
+    """
+    # Walk back to find the latest quarter-end whose filing is public
+    # Q4 (Dec 31) → available ~Feb 14; Q1 (Mar 31) → available ~May 15, etc.
+    for q_end_month in [12, 9, 6, 3]:
+        q_end = date(as_of_date.year, q_end_month, {12: 31, 9: 30, 6: 30, 3: 31}[q_end_month])
+        if q_end.year > as_of_date.year:
+            continue
+        if _pit_safe_date(q_end, filing_lag_days) <= as_of_date:
+            return _quarter_key(q_end)
+    # Try prior year Q4
+    q_end = date(as_of_date.year - 1, 12, 31)
+    if _pit_safe_date(q_end, filing_lag_days) <= as_of_date:
+        return _quarter_key(q_end)
+    return ""
+
+
 def fetch_and_score_institutional_flow(
     ticker: str,
     as_of_date: date,
@@ -139,33 +240,28 @@ def fetch_and_score_institutional_flow(
     """
     Fetch institutional ownership data and compute flow score.
 
-    Tries FMP first (richer data), uses Finnhub as enrichment.
-    Caches results to avoid repeat API calls during backtesting.
+    Uses three layers of caching:
+    1. Score cache: (ticker, quarter) → score (instant dict lookup)
+    2. Raw data cache: ticker → full API response (in-memory)
+    3. SQLite/disk cache: persistent across runs
 
-    Point-in-time safety: only uses snapshots where
-    report_date + filing_lag_days <= as_of_date.
+    The score only changes quarterly, so within a CPCV run the same
+    (ticker, quarter) pair is computed once and reused for all combos.
     """
+    # --- Score memoization: same ticker + same quarter = same score ---
+    pit_qkey = _pit_quarter_key(as_of_date, filing_lag_days)
+    cache_key = (ticker, pit_qkey)
+    if cache_key in _score_cache:
+        return _score_cache[cache_key]
+
     current_snapshot = []
     prior_snapshot = []
     data_source = "none"
 
-    # --- Try FMP data ---
-    fmp_data = None
-    if fmp_cache is not None:
-        fmp_data = fmp_cache.get_institutional_quarterly(ticker, max_age_seconds=0)
-
-    if fmp_data is None and fmp_client is not None:
-        if hasattr(fmp_client, "get_institutional_ownership_history"):
-            fmp_data = fmp_client.get_institutional_ownership_history(ticker)
-        elif hasattr(fmp_client, "_client"):
-            # FMPCache wrapper
-            fmp_data = fmp_client._client.get_institutional_ownership_history(ticker)
-
-        if fmp_data and fmp_cache is not None:
-            fmp_cache.set_institutional_quarterly(ticker, fmp_data)
+    # --- Fetch FMP data (once per ticker, cached) ---
+    fmp_data = _fetch_fmp_data(ticker, fmp_client, fmp_cache)
 
     if fmp_data:
-        # Group by quarter, filter by point-in-time safety
         quarters = defaultdict(list)
         for record in fmp_data:
             rec_date_str = record.get("date", "")
@@ -175,64 +271,77 @@ def fetch_and_score_institutional_flow(
                 rec_date = date.fromisoformat(str(rec_date_str)[:10])
             except (ValueError, TypeError):
                 continue
-
-            # Point-in-time: only use if filing would be public by as_of_date
             if _pit_safe_date(rec_date, filing_lag_days) > as_of_date:
                 continue
-
             qkey = _quarter_key(rec_date)
             quarters[qkey].append(record)
 
-        # Sort quarters descending
         sorted_quarters = sorted(quarters.keys(), reverse=True)
 
         if len(sorted_quarters) >= 1:
             current_snapshot = quarters[sorted_quarters[0]]
             data_source = "fmp"
-
         if len(sorted_quarters) >= 2:
             prior_snapshot = quarters[sorted_quarters[1]]
 
-    # --- Finnhub enrichment ---
+    # --- Finnhub enrichment (once per ticker, cached) ---
     finnhub_meta = {}
-    if finnhub_client is not None:
-        fh_data = None
-        quarter_str = _quarter_key(as_of_date)
+    fh_data = _fetch_finnhub_data(ticker, finnhub_client, finnhub_disk_cache)
 
-        if finnhub_disk_cache is not None:
-            fh_data = finnhub_disk_cache.get_institutional(ticker, quarter_str)
-
-        if fh_data is None:
-            fh_data = finnhub_client.get_institutional_ownership(ticker)
-            if fh_data and finnhub_disk_cache is not None:
-                finnhub_disk_cache.set_institutional(ticker, quarter_str, fh_data)
-
-        if fh_data:
-            finnhub_meta = {
-                "finnhub_n_holders": len(fh_data),
-                "finnhub_total_shares": sum(h.get("share", 0) for h in fh_data),
-            }
-            if data_source == "fmp":
-                data_source = "both"
-            else:
-                # Use Finnhub as primary if FMP failed
-                if not current_snapshot and len(fh_data) >= MIN_INSTITUTIONS:
-                    current_snapshot = [
-                        {
-                            "investorName": h.get("name", ""),
-                            "sharesNumber": h.get("share", 0),
-                            "sharesNumberChange": h.get("change", 0),
-                        }
-                        for h in fh_data
-                    ]
-                    data_source = "finnhub"
+    if fh_data:
+        finnhub_meta = {
+            "finnhub_n_holders": len(fh_data),
+            "finnhub_total_shares": sum(h.get("share", 0) for h in fh_data),
+        }
+        if data_source == "fmp":
+            data_source = "both"
+        elif not current_snapshot and len(fh_data) >= MIN_INSTITUTIONS:
+            current_snapshot = [
+                {
+                    "investorName": h.get("name", ""),
+                    "sharesNumber": h.get("share", 0),
+                    "sharesNumberChange": h.get("change", 0),
+                }
+                for h in fh_data
+            ]
+            data_source = "finnhub"
 
     score, meta = compute_institutional_flow_score(current_snapshot, prior_snapshot)
     meta["data_source"] = data_source
     meta["as_of_date"] = str(as_of_date)
     meta["finnhub_enrichment"] = finnhub_meta
 
+    # Cache the computed score
+    if pit_qkey:
+        _score_cache[cache_key] = (score, meta)
+
     return score, meta
+
+
+def prefetch_institutional_data(
+    tickers: list[str],
+    fmp_client=None,
+    fmp_cache=None,
+    finnhub_client=None,
+    finnhub_disk_cache=None,
+) -> dict[str, int]:
+    """
+    Pre-fetch and cache institutional data for all tickers.
+
+    Call this ONCE before backtesting to warm the cache. All subsequent
+    calls to fetch_and_score_institutional_flow will hit cache only.
+
+    Returns {ticker: n_records} for tickers with data.
+    """
+    stats = {}
+    for ticker in tickers:
+        fmp_data = _fetch_fmp_data(ticker, fmp_client, fmp_cache)
+        fh_data = _fetch_finnhub_data(ticker, finnhub_client, finnhub_disk_cache)
+        n = len(fmp_data) + len(fh_data)
+        if n > 0:
+            stats[ticker] = n
+        logger.debug("Prefetched %s: %d FMP + %d Finnhub records", ticker, len(fmp_data), len(fh_data))
+    return stats
 
 
 def compute_institutional_flow_scores(

@@ -2038,7 +2038,7 @@ def run_walk_forward(
                 elif _fmp_cache.ticker_count() == 0:
                     logger.info("FMP_API_KEY not set and cache empty — fundamentals disabled")
 
-    # Auto-init institutional flow data sources
+    # Auto-init institutional flow data sources + prefetch
     if config.enable_institutional_flow:
         global _inst_fmp_cache
         if _inst_fmp_cache is None:
@@ -2049,6 +2049,17 @@ def run_walk_forward(
             if fmp_key:
                 from fmp_client import FMPClient
                 _fmp_client = FMPClient(fmp_key)
+        # Prefetch all institutional data once before the backtest loop
+        from quant.institutional_flow import prefetch_institutional_data
+        prefetch_stats = prefetch_institutional_data(
+            config.tickers,
+            fmp_client=_fmp_client,
+            fmp_cache=_inst_fmp_cache,
+            finnhub_client=_finnhub_client,
+            finnhub_disk_cache=_sentiment_cache,
+        )
+        logger.info("Institutional flow prefetch: %d/%d tickers with data",
+                     len(prefetch_stats), len(config.tickers))
 
     # Load all data once
     if progress_cb:
