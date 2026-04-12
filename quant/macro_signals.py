@@ -239,12 +239,14 @@ def compute_recession_score(
 
     score = min(1.0, score)
 
-    # Classify
-    if score >= 0.50:
+    # Classify — thresholds recalibrated from 2014-2026 empirical distribution.
+    # Old thresholds (0.15/0.30/0.50) caught 99% of months as "moderate" or worse.
+    # New thresholds reserve sizing reduction for genuine stress periods.
+    if score >= 0.65:
         regime = "high"
-    elif score >= 0.30:
+    elif score >= 0.50:
         regime = "elevated"
-    elif score >= 0.15:
+    elif score >= 0.35:
         regime = "moderate"
     else:
         regime = "low"

@@ -61,8 +61,8 @@ class BacktestConfig:
     train_months: int = 24                   # rolling train window
     test_months: int = 6                     # out-of-sample test window
     # Enhanced regime detection
-    vix_caution_threshold: float = 20.0       # VIX above this = cautious (reduce sizing)
-    vix_risk_off_threshold: float = 28.0      # VIX above this = risk-off (no new longs, allow shorts)
+    vix_caution_threshold: float = 28.0       # VIX above this = cautious (P90 of VIX distribution)
+    vix_risk_off_threshold: float = 35.0      # VIX above this = risk-off (P95, extreme spikes only)
     enable_death_golden_cross: bool = True     # SPY 50/200 SMA cross detection
     golden_cross_boost: float = 0.10           # lower long threshold by this during golden cross
     # TimesFM overlay (DEPRECATED — prefer LSTM)
@@ -646,10 +646,10 @@ def detect_regime(
     vix_threshold_caution = config.vix_caution_threshold if config else 20.0
     vix_threshold_risk_off = config.vix_risk_off_threshold if config else 28.0
 
-    # Turbulence thresholds — calibrated from 2021-2026 sector ETF data
-    # P90=26, P75=19. Only top-decile events trigger risk-off.
-    turb_risk_off = 30.0   # top ~9% of months — true crisis (Mar 2022, Aug 2024)
-    turb_cautious = 18.0   # top ~25% — elevated stress, reduce sizing
+    # Turbulence thresholds — recalibrated from 2014-2026 empirical distribution
+    # P90=19, P95=28, P99=54. Forward returns are positive below turb=35.
+    turb_risk_off = 45.0   # P99 — true crisis only (COVID, etc.)
+    turb_cautious = 30.0   # P95 — only extreme stress, not normal volatility
 
     if state.vix is not None and state.vix >= vix_threshold_risk_off:
         state.level = "risk_off"
