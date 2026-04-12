@@ -1810,10 +1810,10 @@ def run_backtest(
                 signals = blend_institutional_flow(signals, inst_scores, config.institutional_flow_weight)
 
         # ── Cross-sectional normalization barrier ──
-        from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite
-        from quant.universe import get_sector
+        # Group by volatility tier (not sector) to preserve sector momentum
+        from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
         from quant.scoring import reclassify
-        signals = normalize_signals_cross_sectionally(signals, get_sector)
+        signals = normalize_signals_cross_sectionally(signals, make_volatility_tier_fn(signals))
         for sv in signals.values():
             sv.composite_score = compute_normalized_composite(sv)
             reclassify(sv)
@@ -2281,10 +2281,9 @@ def run_walk_forward(
                     signals = blend_institutional_flow(signals, inst_scores, config.institutional_flow_weight)
 
             # ── Cross-sectional normalization barrier ──
-            from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite
-            from quant.universe import get_sector
+            from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
             from quant.scoring import reclassify
-            signals = normalize_signals_cross_sectionally(signals, get_sector)
+            signals = normalize_signals_cross_sectionally(signals, make_volatility_tier_fn(signals))
             for sv in signals.values():
                 sv.composite_score = compute_normalized_composite(sv)
                 reclassify(sv)
@@ -2617,10 +2616,9 @@ def run_cpcv(
                     signals = blend_institutional_flow(signals, inst_scores, config.institutional_flow_weight)
 
             # ── Cross-sectional normalization barrier ──
-            from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite
-            from quant.universe import get_sector
+            from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
             from quant.scoring import reclassify
-            signals = normalize_signals_cross_sectionally(signals, get_sector)
+            signals = normalize_signals_cross_sectionally(signals, make_volatility_tier_fn(signals))
             for sv in signals.values():
                 sv.composite_score = compute_normalized_composite(sv)
                 reclassify(sv)

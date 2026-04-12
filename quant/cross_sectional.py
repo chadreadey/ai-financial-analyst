@@ -24,6 +24,52 @@ from quant.signals import SignalResult, SignalVector
 
 logger = logging.getLogger(__name__)
 
+
+def make_volatility_tier_fn(
+    signals: dict[str, SignalVector],
+    n_tiers: int = 3,
+) -> Callable[[str], str]:
+    """
+    Build a grouping function based on ATR volatility regime.
+
+    Groups stocks by volatility tier (low/mid/high) instead of GICS sector.
+    This removes size-magnitude bias without penalizing sector momentum —
+    a hot tech sector can still dominate rankings, but a 4% ATR growth stock
+    is normalized against other high-vol stocks, not against 1% ATR utilities.
+
+    Uses ATR% from each stock's atr_regime metadata. Falls back to equal
+    grouping if ATR data is missing.
+    """
+    # Extract ATR% for each ticker
+    atr_pcts = {}
+    for ticker, sv in signals.items():
+        atr_pct = sv.atr_regime.metadata.get("atr_pct", None)
+        if atr_pct is not None:
+            atr_pcts[ticker] = float(atr_pct)
+
+    if len(atr_pcts) < 3:
+        # Not enough ATR data — single group (no adjustment)
+        return lambda t: "all"
+
+    # Compute tier boundaries from percentiles
+    values = sorted(atr_pcts.values())
+    boundaries = []
+    for i in range(1, n_tiers):
+        pct = i / n_tiers
+        idx = int(len(values) * pct)
+        boundaries.append(values[min(idx, len(values) - 1)])
+
+    def tier_fn(ticker: str) -> str:
+        atr = atr_pcts.get(ticker)
+        if atr is None:
+            return "mid"  # default to middle tier
+        for i, b in enumerate(boundaries):
+            if atr <= b:
+                return f"tier_{i}"
+        return f"tier_{len(boundaries)}"
+
+    return tier_fn
+
 MIN_CROSS_SECTION = 10
 WINSORIZE_LOW = 2.5
 WINSORIZE_HIGH = 97.5
