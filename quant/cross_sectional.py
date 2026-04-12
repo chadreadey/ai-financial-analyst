@@ -79,13 +79,15 @@ SIGNAL_FIELDS = [
     ("earnings_rank_score", None),
     ("institutional_flow_score", None),
     ("sentiment_score", None),
+    ("sector_momentum_score", None),
 ]
 
 DEFAULT_COMPOSITE_WEIGHTS = {
-    "obv_trend": 0.40,
-    "earnings_rank_score": 0.30,
+    "obv_trend": 0.30,
+    "earnings_rank_score": 0.25,
     "institutional_flow_score": 0.15,
     "sentiment_score": 0.10,
+    "sector_momentum_score": 0.20,
 }
 
 

@@ -1809,6 +1809,17 @@ def run_backtest(
             if inst_scores:
                 signals = blend_institutional_flow(signals, inst_scores, config.institutional_flow_weight)
 
+        # Sector momentum (sets sector_momentum_score from sector ETF returns)
+        if _sector_etf_data:
+            from quant.sector_momentum import compute_sector_momentum_scores
+            from quant.universe import get_sector
+            sec_mom_scores = compute_sector_momentum_scores(
+                _sector_etf_data, signals, reb_date, get_sector,
+            )
+            for ticker, mom_score in sec_mom_scores.items():
+                if ticker in signals:
+                    signals[ticker].sector_momentum_score = mom_score
+
         # ── Cross-sectional normalization barrier ──
         # Group by volatility tier (not sector) to preserve sector momentum
         from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
@@ -2280,6 +2291,17 @@ def run_walk_forward(
                 if inst_scores:
                     signals = blend_institutional_flow(signals, inst_scores, config.institutional_flow_weight)
 
+            # Sector momentum
+            if _sector_etf_data:
+                from quant.sector_momentum import compute_sector_momentum_scores
+                from quant.universe import get_sector
+                sec_mom_scores = compute_sector_momentum_scores(
+                    _sector_etf_data, signals, reb_date, get_sector,
+                )
+                for ticker, mom_score in sec_mom_scores.items():
+                    if ticker in signals:
+                        signals[ticker].sector_momentum_score = mom_score
+
             # ── Cross-sectional normalization barrier ──
             from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
             from quant.scoring import reclassify
@@ -2614,6 +2636,17 @@ def run_cpcv(
                 )
                 if inst_scores:
                     signals = blend_institutional_flow(signals, inst_scores, config.institutional_flow_weight)
+
+            # Sector momentum
+            if _sector_etf_data:
+                from quant.sector_momentum import compute_sector_momentum_scores
+                from quant.universe import get_sector
+                sec_mom_scores = compute_sector_momentum_scores(
+                    _sector_etf_data, signals, reb_date, get_sector,
+                )
+                for ticker, mom_score in sec_mom_scores.items():
+                    if ticker in signals:
+                        signals[ticker].sector_momentum_score = mom_score
 
             # ── Cross-sectional normalization barrier ──
             from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
