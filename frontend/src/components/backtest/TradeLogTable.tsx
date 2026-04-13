@@ -30,23 +30,22 @@ export function TradeLogTable({ trades }: Props) {
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+        <h3 className="text-sm font-semibold text-foreground">
           Trade Log ({filtered.length})
         </h3>
         <input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder="Filter by ticker..."
-          className="rounded px-3 py-1 text-xs w-32"
-          style={{ background: "var(--bg-primary)", border: "1px solid var(--border)", color: "var(--text-primary)" }}
+          className="rounded px-3 py-1 text-xs w-32 bg-background border border-border text-foreground"
         />
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr style={{ borderBottom: "1px solid var(--border)" }}>
+            <tr className="border-b border-border">
               {["Date", "Ticker", "Entry", "Exit", "Return %", "Reason"].map((h) => (
-                <th key={h} className="text-left py-2 px-2 font-medium" style={{ color: "var(--text-muted)" }}>
+                <th key={h} className="text-left py-2 px-2 font-medium text-muted-foreground">
                   {h}
                 </th>
               ))}
@@ -54,12 +53,12 @@ export function TradeLogTable({ trades }: Props) {
           </thead>
           <tbody>
             {filtered.map((t, i) => (
-              <tr key={i} style={{ borderBottom: "1px solid var(--border-subtle, var(--border))" }}>
-                <td className="py-1.5 px-2" style={{ color: "var(--text-secondary)" }}>{t.entry_date}</td>
-                <td className="py-1.5 px-2 font-medium" style={{ color: "var(--text-primary)" }}>{t.ticker}</td>
-                <td className="py-1.5 px-2" style={{ color: "var(--text-secondary)" }}>${t.entry_price.toFixed(2)}</td>
-                <td className="py-1.5 px-2" style={{ color: "var(--text-secondary)" }}>${t.exit_price.toFixed(2)}</td>
-                <td className="py-1.5 px-2 font-medium" style={{ color: t.pnl_pct >= 0 ? "var(--accent-green)" : "var(--accent-red)" }}>
+              <tr key={i} className="border-b border-border">
+                <td className="py-1.5 px-2 text-muted-foreground">{t.entry_date}</td>
+                <td className="py-1.5 px-2 font-medium text-foreground">{t.ticker}</td>
+                <td className="py-1.5 px-2 text-muted-foreground">${t.entry_price.toFixed(2)}</td>
+                <td className="py-1.5 px-2 text-muted-foreground">${t.exit_price.toFixed(2)}</td>
+                <td className={["py-1.5 px-2 font-medium", t.pnl_pct >= 0 ? "text-[--positive]" : "text-[--negative]"].join(" ")}>
                   {t.pnl_pct >= 0 ? "+" : ""}{t.pnl_pct.toFixed(2)}%
                 </td>
                 <td className="py-1.5 px-2">

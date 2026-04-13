@@ -56,25 +56,19 @@ export function ProgressStream({ progress }: ProgressStreamProps): React.ReactEl
   const currentStage = matchStage(progress.step ?? "");
 
   return (
-    <div
-      className="rounded-lg overflow-hidden"
-      style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
-    >
+    <div className="rounded-lg overflow-hidden bg-card border border-border">
       {/* Header */}
-      <div
-        className="flex items-center gap-3 px-4 py-3 border-b"
-        style={{ borderColor: "var(--border-subtle)" }}
-      >
-        <Loader2 size={15} className="animate-spin" style={{ color: "var(--accent-blue)" }} />
-        <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+        <Loader2 size={15} className="animate-spin text-primary" />
+        <span className="text-sm font-medium text-foreground">
           {progress.step || "Initializing analysis..."}
         </span>
         {currentPct > 0 && (
           <div className="ml-auto flex items-center gap-3">
-            <span className="text-[11px] tabular-nums" style={{ color: "var(--text-muted)" }}>
+            <span className="text-[11px] tabular-nums text-muted-foreground">
               Elapsed: {elapsedSeconds}s
             </span>
-            <span className="text-xs font-semibold tabular-nums" style={{ color: "var(--accent-blue)" }}>
+            <span className="text-xs font-semibold tabular-nums text-primary">
               {currentPct}%
             </span>
           </div>
@@ -82,12 +76,12 @@ export function ProgressStream({ progress }: ProgressStreamProps): React.ReactEl
       </div>
 
       {/* Progress bar */}
-      <div className="h-0.5 w-full" style={{ background: "var(--bg-primary)" }}>
+      <div className="h-0.5 w-full bg-background">
         <div
           className="h-full transition-all duration-700 ease-out"
           style={{
             width: `${Math.max(currentPct, 4)}%`,
-            background: "linear-gradient(90deg, var(--accent-blue), #60a5fa)",
+            background: "linear-gradient(90deg, hsl(var(--primary)), #60a5fa)",
             boxShadow: "0 0 8px rgba(59,130,246,0.5)",
           }}
         />
@@ -107,23 +101,22 @@ export function ProgressStream({ progress }: ProgressStreamProps): React.ReactEl
                 <div className="flex flex-col items-center flex-shrink-0">
                   <div className="transition-fast">
                     {isDone ? (
-                      <CheckCircle2 size={16} style={{ color: "var(--accent-green)" }} />
+                      <CheckCircle2 size={16} className="text-[--positive]" />
                     ) : isActive ? (
-                      <Loader2 size={16} className="animate-spin" style={{ color: "var(--accent-blue)" }} />
+                      <Loader2 size={16} className="animate-spin text-primary" />
                     ) : (
-                      <Circle size={16} style={{ color: "var(--border)" }} />
+                      <Circle size={16} className="text-border" />
                     )}
                   </div>
                   <span
-                    className="mt-1.5 text-[10px] text-center leading-tight max-w-[72px]"
-                    style={{
-                      color: isDone
-                        ? "var(--accent-green)"
+                    className={[
+                      "mt-1.5 text-[10px] text-center leading-tight max-w-[72px]",
+                      isDone
+                        ? "text-[--positive]"
                         : isActive
-                        ? "var(--text-primary)"
-                        : "var(--text-muted)",
-                      fontWeight: isActive ? 500 : 400,
-                    }}
+                        ? "text-foreground font-medium"
+                        : "text-muted-foreground",
+                    ].join(" ")}
                   >
                     {stage}
                   </span>
@@ -132,11 +125,11 @@ export function ProgressStream({ progress }: ProgressStreamProps): React.ReactEl
                 {/* Connector line */}
                 {i < ANALYSIS_STAGES.length - 1 && (
                   <div
-                    className="flex-1 h-px mx-1 mt-[-1.25rem] transition-fast"
-                    style={{
-                      background: isDone ? "var(--accent-green)" : "var(--border-subtle)",
-                      opacity: isPending ? 0.4 : 1,
-                    }}
+                    className={[
+                      "flex-1 h-px mx-1 mt-[-1.25rem] transition-fast",
+                      isDone ? "bg-[--positive]" : "bg-border",
+                      isPending ? "opacity-40" : "opacity-100",
+                    ].join(" ")}
                   />
                 )}
               </div>
@@ -147,20 +140,19 @@ export function ProgressStream({ progress }: ProgressStreamProps): React.ReactEl
 
       {/* Step history */}
       {history.length > 1 && (
-        <div
-          className="px-4 pb-3 space-y-1 border-t"
-          style={{ borderColor: "var(--border-subtle)" }}
-        >
-          <p className="text-[10px] pt-3 uppercase tracking-wider mb-2" style={{ color: "var(--text-muted)" }}>
+        <div className="px-4 pb-3 space-y-1 border-t border-border">
+          <p className="text-[10px] pt-3 uppercase tracking-wider mb-2 text-muted-foreground">
             Log
           </p>
           {history.slice(-4).map((h, i) => (
             <div key={i} className="flex items-center gap-2">
               <div
-                className="w-1 h-1 rounded-full flex-shrink-0"
-                style={{ background: i === history.slice(-4).length - 1 ? "var(--accent-blue)" : "var(--border)" }}
+                className={[
+                  "w-1 h-1 rounded-full flex-shrink-0",
+                  i === history.slice(-4).length - 1 ? "bg-primary" : "bg-border",
+                ].join(" ")}
               />
-              <span className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>
+              <span className="text-[11px] truncate text-muted-foreground">
                 {h.step}
               </span>
             </div>

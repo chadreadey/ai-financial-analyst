@@ -24,19 +24,19 @@ export function HistoricalPerformanceCards({ records }: Props) {
         return (
           <Card key={i} className="p-2.5">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs" style={{ color: "var(--text-muted)" }}>{date}</span>
+              <span className="text-xs text-muted-foreground">{date}</span>
               <Badge className={verdictClassName(rec.verdict || "")}>{rec.verdict || "N/A"}</Badge>
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
-                <span style={{ color: "var(--text-muted)" }}>Entry: </span>
-                <span style={{ color: "var(--text-secondary)" }}>
+                <span className="text-muted-foreground">Entry: </span>
+                <span className="text-foreground">
                   {rec.entry_price != null ? `$${rec.entry_price.toFixed(2)}` : "—"}
                 </span>
               </div>
               <div>
-                <span style={{ color: "var(--text-muted)" }}>Target: </span>
-                <span style={{ color: "var(--text-secondary)" }}>
+                <span className="text-muted-foreground">Target: </span>
+                <span className="text-foreground">
                   {rec.target_price != null ? `$${rec.target_price.toFixed(2)}` : "—"}
                 </span>
               </div>
