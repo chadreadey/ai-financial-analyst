@@ -76,6 +76,8 @@ def main():
                         help="Enable institutional flow signal (FMP + Finnhub)")
     parser.add_argument("--institutional-flow-weight", type=float, default=0.15,
                         help="Institutional flow signal weight (default: 0.15)")
+    parser.add_argument("--enable-xgb-ranker", action="store_true",
+                        help="Use XGBoost ranking instead of linear composite")
     parser.add_argument("--output", default="",
                         help="Save results to JSON")
     parser.add_argument("--verbose", "-v", action="store_true")
@@ -128,6 +130,7 @@ def main():
         news_sentiment_weight=0.10,
         enable_institutional_flow=args.enable_institutional_flow,
         institutional_flow_weight=args.institutional_flow_weight,
+        enable_xgb_ranker=args.enable_xgb_ranker,
     )
 
     # ── Phase 0: Walk-Forward (always runs — needed for 0b and 0c) ────

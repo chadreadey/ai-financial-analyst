@@ -101,6 +101,10 @@ class BacktestConfig:
     # Institutional flow signal (FMP + Finnhub 13F ownership data)
     enable_institutional_flow: bool = False
     institutional_flow_weight: float = 0.15  # weight in composite
+    # XGBoost meta-model
+    enable_xgb_ranker: bool = False
+    xgb_train_months: int = 96           # months of history to train on (8 years)
+    xgb_retrain_freq: int = 12           # retrain every N rebalance periods
     conviction_sizing: float = 0.0        # 0=equal weight, 1=fully score-proportional sizing
     enable_agent_veto: bool = False       # Path C: quantified agent veto on candidates
     agent_veto_min_flags: int = 2         # minimum veto signals to remove a candidate (2 of 3)
@@ -1854,9 +1858,80 @@ def run_backtest(
         from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
         from quant.scoring import reclassify
         signals = normalize_signals_cross_sectionally(signals, make_volatility_tier_fn(signals))
-        for sv in signals.values():
-            sv.composite_score = compute_normalized_composite(sv)
-            reclassify(sv)
+
+        # ── XGBoost ranking OR linear composite ──
+        if config.enable_xgb_ranker:
+            from quant.xgb_ranker import XGBMetaModel, FEATURE_COLS
+            from quant.xgb_features import build_feature_matrix
+            import pandas as _pd
+
+            # Train/retrain XGB model if needed
+            if not hasattr(config, '_xgb_model') or config._xgb_model is None:
+                # Build feature matrix from data up to current rebalance date
+                _reb_dates_past = [d for d in pd.date_range(config.start_date, reb_date, freq="ME")]
+                if len(_reb_dates_past) >= 24:  # need at least 2 years
+                    fm = build_feature_matrix(
+                        universe_data=universe_data,
+                        rebalance_dates=_reb_dates_past,
+                        wrds_provider=_wrds_provider,
+                        finnhub_client=_finnhub_client,
+                        sentiment_cache=_sentiment_cache,
+                        inst_wrds_store=_inst_wrds_store,
+                        sector_etf_data=_sector_etf_data,
+                        vix_df=vix_df,
+                    )
+                    if len(fm) >= 200:
+                        model = XGBMetaModel()
+                        model.fit(fm[FEATURE_COLS], fm["fwd_21d_return"], fm["qid"])
+                        config._xgb_model = model
+                        config._xgb_retrain_counter = 0
+                        logger.info("XGB model trained on %d rows", len(fm))
+
+            # Predict rankings if model exists
+            if hasattr(config, '_xgb_model') and config._xgb_model is not None:
+                # Build feature row for each ticker from current signals
+                feature_rows = []
+                feature_tickers = []
+                for ticker, sv in signals.items():
+                    feature_rows.append({
+                        "obv_trend": sv.obv_trend.score,
+                        "earnings": sv.earnings_rank_score,
+                        "inst_flow": sv.institutional_flow_score,
+                        "sentiment": sv.sentiment_score,
+                        "quality": sv.quality_score,
+                        "price_mom": sv.price_momentum_score,
+                        "insider": sv.insider_score,
+                        "atr_pct": sv.atr_regime.metadata.get("atr_pct", 0.0),
+                        "vix_level": float(vix_df[vix_df.index <= reb_date].iloc[-1]["close"]) if vix_df is not None and len(vix_df[vix_df.index <= reb_date]) > 0 else 0.0,
+                    })
+                    feature_tickers.append(ticker)
+
+                X = _pd.DataFrame(feature_rows, columns=FEATURE_COLS)
+                xgb_scores = config._xgb_model.predict(X)
+
+                # Normalize XGB scores to [-1, +1] via rank percentile
+                ranks = xgb_scores.argsort().argsort()  # double argsort = rank
+                n = len(ranks)
+                normalized = (ranks / (n - 1)) * 2.0 - 1.0 if n > 1 else np.zeros(n)
+
+                for i, ticker in enumerate(feature_tickers):
+                    signals[ticker].composite_score = float(normalized[i])
+                    reclassify(signals[ticker])
+                    signals[ticker].flags.append(f"xgb_rank={float(xgb_scores[i]):.3f}")
+
+                # Retrain periodically
+                config._xgb_retrain_counter = getattr(config, '_xgb_retrain_counter', 0) + 1
+                if config._xgb_retrain_counter >= config.xgb_retrain_freq:
+                    config._xgb_model = None  # triggers retrain next period
+            else:
+                # Fallback to linear composite
+                for sv in signals.values():
+                    sv.composite_score = compute_normalized_composite(sv)
+                    reclassify(sv)
+        else:
+            for sv in signals.values():
+                sv.composite_score = compute_normalized_composite(sv)
+                reclassify(sv)
 
         # FOMC proximity risk premium (after all signal blends, before regime)
         if config.enable_fomc_proximity:
