@@ -23,38 +23,46 @@ const reasonClassName: Record<string, string> = {
 export function ClosedTradesTable({ trades }: Props) {
   return (
     <div>
-      <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
-        Closed Trades ({trades.length})
-      </h3>
+      <div className="px-3 py-2 border-b border-border">
+        <span className="text-xs font-medium text-foreground">Closed Trades ({trades.length})</span>
+      </div>
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="w-full">
           <thead>
-            <tr style={{ borderBottom: "1px solid var(--border)" }}>
+            <tr className="border-b border-border bg-secondary">
               {["Ticker", "Entry", "Exit", "P&L", "Date", "Reason"].map((h) => (
-                <th key={h} className="text-left py-2 px-2 font-medium" style={{ color: "var(--text-muted)" }}>{h}</th>
+                <th
+                  key={h}
+                  className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50"
+                >
+                  {h}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {trades.map((t, i) => (
-              <tr key={i} style={{ borderBottom: "1px solid var(--border-subtle, var(--border))" }}>
-                <td className="py-1.5 px-2 font-medium" style={{ color: "var(--text-primary)" }}>{t.ticker}</td>
-                <td className="py-1.5 px-2" style={{ color: "var(--text-secondary)" }}>${t.entry_price.toFixed(2)}</td>
-                <td className="py-1.5 px-2" style={{ color: "var(--text-secondary)" }}>${t.exit_price.toFixed(2)}</td>
-                <td className="py-1.5 px-2 font-medium" style={{
-                  color: t.pnl_pct >= 0 ? "var(--accent-green)" : "var(--accent-red)"
-                }}>
+              <tr key={i} className="border-b border-border last:border-0 hover:bg-secondary/40 transition-colors">
+                <td className="px-3 py-1.5 text-xs font-medium text-foreground">{t.ticker}</td>
+                <td className="px-3 py-1.5 text-xs text-muted-foreground">${t.entry_price.toFixed(2)}</td>
+                <td className="px-3 py-1.5 text-xs text-muted-foreground">${t.exit_price.toFixed(2)}</td>
+                <td className={`px-3 py-1.5 text-xs font-medium ${t.pnl_pct >= 0 ? "text-[--positive]" : "text-[--negative]"}`}>
                   {t.pnl_pct >= 0 ? "+" : ""}{t.pnl_pct.toFixed(2)}%
                 </td>
-                <td className="py-1.5 px-2" style={{ color: "var(--text-secondary)" }}>{t.exit_date}</td>
-                <td className="py-1.5 px-2">
-                  <Badge variant={reasonClassName[t.exit_reason] ? "outline" : "secondary"} className={reasonClassName[t.exit_reason] || ""}>{t.exit_reason}</Badge>
+                <td className="px-3 py-1.5 text-xs text-muted-foreground">{t.exit_date}</td>
+                <td className="px-3 py-1.5">
+                  <Badge
+                    variant={reasonClassName[t.exit_reason] ? "outline" : "secondary"}
+                    className={`text-[10px] ${reasonClassName[t.exit_reason] || ""}`}
+                  >
+                    {t.exit_reason}
+                  </Badge>
                 </td>
               </tr>
             ))}
             {trades.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-center py-4" style={{ color: "var(--text-muted)" }}>
+                <td colSpan={6} className="px-3 py-6 text-center text-xs text-muted-foreground">
                   No closed trades yet
                 </td>
               </tr>

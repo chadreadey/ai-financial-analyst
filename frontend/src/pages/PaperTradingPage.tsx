@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { PaperMetricsPanel } from "../components/paper-trading/PaperMetricsPanel";
 import { OpenPositionsTable } from "../components/paper-trading/OpenPositionsTable";
 import { ClosedTradesTable } from "../components/paper-trading/ClosedTradesTable";
 import { EquityCurveChart } from "../components/charts/EquityCurveChart";
 import { usePaperTrading } from "../hooks/usePaperTrading";
+import { Plus, X } from "lucide-react";
 
 export function PaperTradingPage() {
   const { openPositions, closedTrades, equityCurve, metrics, isLoading, addPosition, closePosition } = usePaperTrading();
@@ -23,99 +26,95 @@ export function PaperTradingPage() {
     setShowAdd(false);
   };
 
-  const inputStyle = {
-    background: "var(--bg-primary)",
-    border: "1px solid var(--border)",
-    color: "var(--text-primary)",
-  };
-
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>Paper Trading</h1>
+      <div className="p-6 max-w-6xl mx-auto space-y-4">
+        <h1 className="text-lg font-semibold text-foreground">Paper Trading</h1>
         {[1, 2].map((i) => (
-          <div key={i} className="rounded-lg h-32 animate-pulse" style={{ background: "var(--bg-card)" }} />
+          <div key={i} className="rounded-xl border bg-card h-32 animate-pulse" />
         ))}
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 max-w-6xl mx-auto space-y-4">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>Paper Trading</h1>
-        <button
-          onClick={() => setShowAdd(!showAdd)}
-          className="px-3 py-1.5 rounded text-sm font-medium"
-          style={{ background: "var(--accent-blue)", color: "white" }}
-        >
-          {showAdd ? "Cancel" : "Add Position"}
-        </button>
+        <h1 className="text-lg font-semibold text-foreground">Paper Trading</h1>
+        <Button size="sm" onClick={() => setShowAdd(!showAdd)}>
+          {showAdd ? (
+            <><X size={13} className="mr-1.5" />Cancel</>
+          ) : (
+            <><Plus size={13} className="mr-1.5" />Add Position</>
+          )}
+        </Button>
       </div>
 
+      {/* Add position form */}
       {showAdd && (
-        <Card>
+        <Card className="p-4">
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
             <div>
-              <label className="block text-xs mb-1" style={{ color: "var(--text-muted)" }}>Ticker</label>
-              <input
+              <label className="block text-[10px] uppercase tracking-wider font-medium text-muted-foreground mb-1">
+                Ticker
+              </label>
+              <Input
                 value={form.ticker}
                 onChange={(e) => setForm({ ...form, ticker: e.target.value.toUpperCase() })}
                 placeholder="AAPL"
-                className="w-full rounded px-3 py-1.5 text-sm"
-                style={inputStyle}
+                className="h-8 text-sm"
               />
             </div>
             <div>
-              <label className="block text-xs mb-1" style={{ color: "var(--text-muted)" }}>Entry Price</label>
-              <input
+              <label className="block text-[10px] uppercase tracking-wider font-medium text-muted-foreground mb-1">
+                Entry Price
+              </label>
+              <Input
                 value={form.entry_price}
                 onChange={(e) => setForm({ ...form, entry_price: e.target.value })}
                 placeholder="150.00"
-                className="w-full rounded px-3 py-1.5 text-sm"
-                style={inputStyle}
+                className="h-8 text-sm"
               />
             </div>
             <div>
-              <label className="block text-xs mb-1" style={{ color: "var(--text-muted)" }}>Verdict</label>
+              <label className="block text-[10px] uppercase tracking-wider font-medium text-muted-foreground mb-1">
+                Verdict
+              </label>
               <select
                 value={form.verdict}
                 onChange={(e) => setForm({ ...form, verdict: e.target.value })}
-                className="w-full rounded px-3 py-1.5 text-sm"
-                style={inputStyle}
+                className="flex h-8 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-foreground"
               >
                 <option value="BUY">BUY</option>
                 <option value="SELL">SELL</option>
                 <option value="HOLD">HOLD</option>
               </select>
             </div>
-            <button
-              onClick={handleAdd}
-              className="px-4 py-1.5 rounded text-sm font-medium"
-              style={{ background: "var(--accent-green)", color: "white" }}
-            >
+            <Button onClick={handleAdd} size="sm" className="h-8">
               Add
-            </button>
+            </Button>
           </div>
         </Card>
       )}
 
+      {/* Metrics */}
       <PaperMetricsPanel metrics={metrics} />
 
+      {/* Equity curve */}
       {equityCurve.length > 0 && (
-        <Card>
-          <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
-            Paper Trading Equity Curve
-          </h3>
+        <Card className="p-3">
+          <div className="text-xs font-medium text-muted-foreground mb-3">Equity Curve</div>
           <EquityCurveChart data={equityCurve} />
         </Card>
       )}
 
+      {/* Tables */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <Card>
+        <Card className="p-0 overflow-hidden">
           <OpenPositionsTable positions={openPositions} onClose={closePosition} />
         </Card>
-        <Card>
+        <Card className="p-0 overflow-hidden">
           <ClosedTradesTable trades={closedTrades} />
         </Card>
       </div>

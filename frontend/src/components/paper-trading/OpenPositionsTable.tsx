@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface Position {
   ticker: string;
@@ -29,59 +31,86 @@ export function OpenPositionsTable({ positions, onClose }: Props) {
 
   return (
     <div>
-      <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>
-        Open Positions ({positions.length})
-      </h3>
+      <div className="px-3 py-2 border-b border-border">
+        <span className="text-xs font-medium text-foreground">Open Positions ({positions.length})</span>
+      </div>
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="w-full">
           <thead>
-            <tr style={{ borderBottom: "1px solid var(--border)" }}>
+            <tr className="border-b border-border bg-secondary">
               {["Ticker", "Entry", "Current", "P&L", "Days", "Action"].map((h) => (
-                <th key={h} className="text-left py-2 px-2 font-medium" style={{ color: "var(--text-muted)" }}>{h}</th>
+                <th
+                  key={h}
+                  className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50"
+                >
+                  {h}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {positions.map((p) => (
-              <tr key={p.ticker} style={{ borderBottom: "1px solid var(--border-subtle, var(--border))" }}>
-                <td className="py-1.5 px-2 font-medium" style={{ color: "var(--text-primary)" }}>{p.ticker}</td>
-                <td className="py-1.5 px-2" style={{ color: "var(--text-secondary)" }}>${p.entry_price.toFixed(2)}</td>
-                <td className="py-1.5 px-2" style={{ color: "var(--text-secondary)" }}>
-                  {p.current_price != null ? `$${p.current_price.toFixed(2)}` : "—"}
-                </td>
-                <td className="py-1.5 px-2 font-medium" style={{
-                  color: p.unrealized_pnl_pct != null
-                    ? (p.unrealized_pnl_pct >= 0 ? "var(--accent-green)" : "var(--accent-red)")
-                    : "var(--text-muted)"
-                }}>
-                  {p.unrealized_pnl_pct != null ? `${p.unrealized_pnl_pct >= 0 ? "+" : ""}${p.unrealized_pnl_pct.toFixed(2)}%` : "—"}
-                </td>
-                <td className="py-1.5 px-2" style={{ color: "var(--text-secondary)" }}>{p.days_held}d</td>
-                <td className="py-1.5 px-2">
-                  {closing === p.ticker ? (
-                    <div className="flex items-center gap-1">
-                      <input
-                        value={exitPrice}
-                        onChange={(e) => setExitPrice(e.target.value)}
-                        placeholder="Exit $"
-                        className="w-20 rounded px-2 py-0.5 text-xs"
-                        style={{ background: "var(--bg-primary)", border: "1px solid var(--border)", color: "var(--text-primary)" }}
-                      />
-                      <button onClick={() => handleClose(p.ticker)} className="text-xs px-2 py-0.5 rounded"
-                        style={{ background: "var(--accent-red)", color: "white" }}>OK</button>
-                      <button onClick={() => setClosing(null)} className="text-xs px-2 py-0.5 rounded"
-                        style={{ background: "var(--bg-hover)", color: "var(--text-secondary)" }}>X</button>
-                    </div>
-                  ) : (
-                    <button onClick={() => setClosing(p.ticker)} className="text-xs px-2 py-0.5 rounded"
-                      style={{ background: "var(--bg-hover)", color: "var(--accent-red)" }}>Close</button>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {positions.map((p) => {
+              const pnlPositive = p.unrealized_pnl_pct != null && p.unrealized_pnl_pct >= 0;
+              return (
+                <tr key={p.ticker} className="border-b border-border last:border-0 hover:bg-secondary/40 transition-colors">
+                  <td className="px-3 py-1.5 text-xs font-medium text-foreground">{p.ticker}</td>
+                  <td className="px-3 py-1.5 text-xs text-muted-foreground">${p.entry_price.toFixed(2)}</td>
+                  <td className="px-3 py-1.5 text-xs text-muted-foreground">
+                    {p.current_price != null ? `$${p.current_price.toFixed(2)}` : "—"}
+                  </td>
+                  <td className={`px-3 py-1.5 text-xs font-medium ${
+                    p.unrealized_pnl_pct != null
+                      ? pnlPositive ? "text-[--positive]" : "text-[--negative]"
+                      : "text-muted-foreground"
+                  }`}>
+                    {p.unrealized_pnl_pct != null
+                      ? `${p.unrealized_pnl_pct >= 0 ? "+" : ""}${p.unrealized_pnl_pct.toFixed(2)}%`
+                      : "—"}
+                  </td>
+                  <td className="px-3 py-1.5 text-xs text-muted-foreground">{p.days_held}d</td>
+                  <td className="px-3 py-1.5">
+                    {closing === p.ticker ? (
+                      <div className="flex items-center gap-1">
+                        <Input
+                          value={exitPrice}
+                          onChange={(e) => setExitPrice(e.target.value)}
+                          placeholder="Exit $"
+                          className="h-6 w-20 text-xs px-2"
+                        />
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="h-6 px-2 text-xs"
+                          onClick={() => handleClose(p.ticker)}
+                        >
+                          OK
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-6 px-2 text-xs"
+                          onClick={() => setClosing(null)}
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-6 px-2 text-xs text-[--negative] hover:text-[--negative]"
+                        onClick={() => setClosing(p.ticker)}
+                      >
+                        Close
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
             {positions.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-center py-4" style={{ color: "var(--text-muted)" }}>
+                <td colSpan={6} className="px-3 py-6 text-center text-xs text-muted-foreground">
                   No open positions
                 </td>
               </tr>
