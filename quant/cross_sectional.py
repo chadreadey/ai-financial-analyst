@@ -98,7 +98,7 @@ DEFAULT_COMPOSITE_WEIGHTS = {
     "quality_score": 0.15,
     "price_momentum_score": 0.10,
     "insider_score": 0.10,
-    "event_timing_score": 0.15,  # PEAD from WRDS IBES actuals
+    "event_timing_score": 0.00,  # PEAD data is sparse — distorts cross-sectional normalization. Better as a post-ranking filter than a composite signal.
 }
 
 
