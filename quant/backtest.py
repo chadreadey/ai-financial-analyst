@@ -1195,7 +1195,7 @@ def build_target_portfolio(
         _QUALITY_FLOOR = 0.05
         longs_raw = [(t, sc, sv) for t, sc, sv in scored[:n_long_candidates]
                      if sc >= _QUALITY_FLOOR
-                     and not getattr(sv, 'earnings_blocked', False)]
+]  # earnings_blocked disabled — Finnhub calendar data sparse in backtest
 
         # Sector-diversified selection: cap positions per GICS sector
         if config.max_per_sector > 0 and config.max_per_sector < config.max_long_positions:
