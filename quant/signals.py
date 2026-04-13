@@ -42,6 +42,8 @@ class SignalVector:
     quality_score: float = 0.0  # Set by quality/profitability signal (WRDS Compustat)
     price_momentum_score: float = 0.0  # Set by 12-1M price momentum
     insider_score: float = 0.0  # Set by standalone insider MSPR signal
+    event_timing_score: float = 0.0  # Set by event timing (PEAD + catalyst proximity)
+    earnings_blocked: bool = False  # True if earnings within 3 days — block new entries
     flags: list = field(default_factory=list)
 
     # Weights — Phase 0 (2026-04-09) showed zero IC for SMA, MR, BB, RSI, 52W.

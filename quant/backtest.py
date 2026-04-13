@@ -1194,7 +1194,8 @@ def build_target_portfolio(
         # (weaker than old 0.20 threshold, but prevents longing negative-signal stocks)
         _QUALITY_FLOOR = 0.05
         longs_raw = [(t, sc, sv) for t, sc, sv in scored[:n_long_candidates]
-                     if sc >= _QUALITY_FLOOR]
+                     if sc >= _QUALITY_FLOOR
+                     and not getattr(sv, 'earnings_blocked', False)]
 
         # Sector-diversified selection: cap positions per GICS sector
         if config.max_per_sector > 0 and config.max_per_sector < config.max_long_positions:
@@ -1853,6 +1854,19 @@ def run_backtest(
                 if ticker in signals:
                     signals[ticker].insider_score = iscore
 
+        # Event timing (PEAD + catalyst proximity)
+        if _finnhub_client is not None or _sentiment_cache is not None:
+            from quant.event_timing import compute_event_timing_scores
+            event_scores = compute_event_timing_scores(
+                list(signals.keys()), reb_date,
+                finnhub_client=_finnhub_client,
+                disk_cache=_sentiment_cache,
+            )
+            for ticker, (escore, emeta) in event_scores.items():
+                if ticker in signals:
+                    signals[ticker].event_timing_score = escore
+                    signals[ticker].earnings_blocked = emeta.get("earnings_blocked", False)
+
         # ── Cross-sectional normalization barrier ──
         # Group by volatility tier (not sector) to preserve sector momentum
         from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
@@ -1895,6 +1909,7 @@ def run_backtest(
                         "quality": sv.quality_score,
                         "price_mom": sv.price_momentum_score,
                         "insider": sv.insider_score,
+                        "event_timing": sv.event_timing_score,
                         "atr_pct": sv.atr_regime.metadata.get("atr_pct", 0.0),
                         "vix_level": float(vix_df[vix_df.index <= reb_date].iloc[-1]["close"]) if vix_df is not None and len(vix_df[vix_df.index <= reb_date]) > 0 else 0.0,
                     })
@@ -2441,6 +2456,19 @@ def run_walk_forward(
                     if ticker in signals:
                         signals[ticker].insider_score = iscore
 
+            # Event timing (PEAD + catalyst proximity)
+            if _finnhub_client is not None or _sentiment_cache is not None:
+                from quant.event_timing import compute_event_timing_scores
+                event_scores = compute_event_timing_scores(
+                    list(signals.keys()), reb_date,
+                    finnhub_client=_finnhub_client,
+                    disk_cache=_sentiment_cache,
+                )
+                for ticker, (escore, emeta) in event_scores.items():
+                    if ticker in signals:
+                        signals[ticker].event_timing_score = escore
+                        signals[ticker].earnings_blocked = emeta.get("earnings_blocked", False)
+
             # ── Cross-sectional normalization barrier ──
             from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
             from quant.scoring import reclassify
@@ -2868,6 +2896,19 @@ def run_cpcv(
                 for ticker, iscore in insider_scores.items():
                     if ticker in signals:
                         signals[ticker].insider_score = iscore
+
+            # Event timing (PEAD + catalyst proximity)
+            if _finnhub_client is not None or _sentiment_cache is not None:
+                from quant.event_timing import compute_event_timing_scores
+                event_scores = compute_event_timing_scores(
+                    list(signals.keys()), reb_date,
+                    finnhub_client=_finnhub_client,
+                    disk_cache=_sentiment_cache,
+                )
+                for ticker, (escore, emeta) in event_scores.items():
+                    if ticker in signals:
+                        signals[ticker].event_timing_score = escore
+                        signals[ticker].earnings_blocked = emeta.get("earnings_blocked", False)
 
             # ── Cross-sectional normalization barrier ──
             from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn

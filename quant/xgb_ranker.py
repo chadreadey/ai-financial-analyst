@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 FEATURE_COLS = [
     "obv_trend", "earnings", "inst_flow", "sentiment",
-    "quality", "price_mom", "insider",
+    "quality", "price_mom", "insider", "event_timing",
     "atr_pct", "vix_level",
 ]
 

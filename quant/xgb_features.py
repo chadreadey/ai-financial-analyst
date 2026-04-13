@@ -161,6 +161,7 @@ def build_feature_matrix(
                 "quality": quality_scores.get(ticker, 0.0),
                 "price_mom": mom_scores.get(ticker, 0.0),
                 "insider": insider_scores.get(ticker, 0.0),
+                "event_timing": 0.0,  # populated below if available
                 # Context features
                 "atr_pct": sv.atr_regime.metadata.get("atr_pct", 0.0),
                 "vix_level": vix_level or 0.0,

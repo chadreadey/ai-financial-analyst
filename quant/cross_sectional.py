@@ -83,21 +83,22 @@ SIGNAL_FIELDS = [
     ("quality_score", None),
     ("price_momentum_score", None),
     ("insider_score", None),
+    ("event_timing_score", None),
 ]
 
-# 7 active signals. Weights reflect expected IC and orthogonality.
-# Earnings-related (ERM+SUE+dispersion) and quality are strongest per literature.
-# Price momentum is strong but overlaps with UMD factor — moderate weight.
-# Insider is sparse but high-conviction when present.
+# 8 signal fields (7 active + sector_momentum zeroed).
+# Event timing (PEAD) is orthogonal — captures post-earnings drift,
+# which is distinct from earnings revision momentum (ERM).
 DEFAULT_COMPOSITE_WEIGHTS = {
     "obv_trend": 0.15,
     "earnings_rank_score": 0.20,
     "institutional_flow_score": 0.10,
     "sentiment_score": 0.05,
-    "sector_momentum_score": 0.00,  # zeroed — overlaps with UMD factor
-    "quality_score": 0.20,
-    "price_momentum_score": 0.15,
+    "sector_momentum_score": 0.00,
+    "quality_score": 0.15,
+    "price_momentum_score": 0.10,
     "insider_score": 0.10,
+    "event_timing_score": 0.15,
 }
 
 
