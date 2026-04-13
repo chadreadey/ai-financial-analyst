@@ -1,4 +1,4 @@
-import { Badge } from "../common/Badge";
+import { Badge } from "@/components/ui/badge";
 
 interface Trade {
   ticker: string;
@@ -14,11 +14,10 @@ interface Props {
   trades: Trade[];
 }
 
-const reasonVariant: Record<string, "green" | "red" | "muted" | "amber"> = {
-  target_hit: "green",
-  stop_loss: "red",
-  time_decay: "muted",
-  manual_close: "amber",
+const reasonClassName: Record<string, string> = {
+  target_hit: "bg-[--positive]/10 text-[--positive] border-[--positive]/20",
+  stop_loss: "bg-[--negative]/10 text-[--negative] border-[--negative]/20",
+  manual_close: "bg-[--warning]/10 text-[--warning] border-[--warning]/20",
 };
 
 export function ClosedTradesTable({ trades }: Props) {
@@ -49,7 +48,7 @@ export function ClosedTradesTable({ trades }: Props) {
                 </td>
                 <td className="py-1.5 px-2" style={{ color: "var(--text-secondary)" }}>{t.exit_date}</td>
                 <td className="py-1.5 px-2">
-                  <Badge label={t.exit_reason} variant={reasonVariant[t.exit_reason] || "muted"} size="sm" />
+                  <Badge variant={reasonClassName[t.exit_reason] ? "outline" : "secondary"} className={reasonClassName[t.exit_reason] || ""}>{t.exit_reason}</Badge>
                 </td>
               </tr>
             ))}

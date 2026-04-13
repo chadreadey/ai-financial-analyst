@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api/client";
 import type { AnalysisResult, HistoryEntry } from "../../api/types";
-import { Card } from "../common/Card";
+import { Card } from "@/components/ui/card";
 
 interface Props {
   onOpenResult: (result: AnalysisResult) => void;

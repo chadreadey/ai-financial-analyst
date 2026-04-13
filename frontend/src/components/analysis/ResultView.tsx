@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { AnalysisResult } from "../../api/types";
-import { Badge } from "../common/Badge";
-import { Card } from "../common/Card";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
 import { MarkdownRenderer } from "../common/MarkdownRenderer";
 import { AgentTabs } from "./AgentTabs";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
@@ -12,12 +12,18 @@ interface Props {
   result: AnalysisResult;
 }
 
-function verdictColor(verdict: string): "green" | "amber" | "red" | "blue" {
+function verdictClassName(verdict: string): string {
   const v = verdict.toUpperCase();
-  if (v.includes("BUY") || v.includes("BULLISH")) return "green";
-  if (v.includes("SELL") || v.includes("BEARISH")) return "red";
-  if (v.includes("HOLD") || v.includes("NEUTRAL")) return "amber";
-  return "blue";
+  if (v.includes("BUY") || v.includes("BULLISH")) return "bg-[--positive]/10 text-[--positive] border-[--positive]/20";
+  if (v.includes("SELL") || v.includes("BEARISH")) return "bg-[--negative]/10 text-[--negative] border-[--negative]/20";
+  if (v.includes("HOLD") || v.includes("NEUTRAL")) return "bg-[--warning]/10 text-[--warning] border-[--warning]/20";
+  return "bg-primary/10 text-primary border-primary/20";
+}
+
+function scoreClassName(score: number): string {
+  if (score >= 7) return "bg-[--positive]/10 text-[--positive] border-[--positive]/20";
+  if (score >= 4) return "bg-[--warning]/10 text-[--warning] border-[--warning]/20";
+  return "bg-[--negative]/10 text-[--negative] border-[--negative]/20";
 }
 
 export function ResultView({ result }: Props) {
@@ -39,17 +45,13 @@ export function ResultView({ result }: Props) {
           {sv && (
             <div className="flex items-center gap-2 flex-wrap">
               {sv.verdict && (
-                <Badge label={sv.verdict} variant={verdictColor(sv.verdict)} />
+                <Badge variant="outline" className={verdictClassName(sv.verdict)}>{sv.verdict}</Badge>
               )}
-              {sv.conviction && <Badge label={`Conviction: ${sv.conviction}`} />}
+              {sv.conviction && <Badge variant="secondary">Conviction: {sv.conviction}</Badge>}
               {sv.health_scores?.overall != null && (
-                <Badge
-                  label={`Score: ${sv.health_scores.overall}/10`}
-                  variant={
-                    sv.health_scores.overall >= 7 ? "green" :
-                    sv.health_scores.overall >= 4 ? "amber" : "red"
-                  }
-                />
+                <Badge variant="outline" className={scoreClassName(sv.health_scores.overall)}>
+                  Score: {sv.health_scores.overall}/10
+                </Badge>
               )}
             </div>
           )}

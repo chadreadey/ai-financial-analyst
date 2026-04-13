@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card } from "../common/Card";
+import { Card } from "@/components/ui/card";
 
 interface Props {
   onSubmit: (config: { tickers: string[]; start_date: string; end_date: string }) => void;

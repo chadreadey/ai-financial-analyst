@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card } from "../components/common/Card";
+import { Card } from "@/components/ui/card";
 import { BacktestConfigPanel } from "../components/backtest/BacktestConfigPanel";
 import { BacktestMetricsPanel } from "../components/backtest/BacktestMetricsPanel";
 import { TradeLogTable } from "../components/backtest/TradeLogTable";

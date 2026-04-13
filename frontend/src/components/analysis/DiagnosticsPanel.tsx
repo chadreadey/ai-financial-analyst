@@ -1,4 +1,4 @@
-import { Badge } from "../common/Badge";
+import { Badge } from "@/components/ui/badge";
 
 interface Props {
   sources: string[];
@@ -56,7 +56,7 @@ export function DiagnosticsPanel({ sources, warnings, stats, metrics }: Props) {
         </h3>
         <div className="flex flex-wrap gap-2">
           {Object.entries(stats).map(([k, v]) => (
-            <Badge key={k} label={`${k}: ${v}`} />
+            <Badge key={k} variant="secondary">{k}: {v}</Badge>
           ))}
           {Object.keys(stats).length === 0 && (
             <p className="text-xs" style={{ color: "var(--text-muted)" }}>No filter stats.</p>

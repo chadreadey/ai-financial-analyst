@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card } from "../components/common/Card";
+import { Card } from "@/components/ui/card";
 import { PaperMetricsPanel } from "../components/paper-trading/PaperMetricsPanel";
 import { OpenPositionsTable } from "../components/paper-trading/OpenPositionsTable";
 import { ClosedTradesTable } from "../components/paper-trading/ClosedTradesTable";
