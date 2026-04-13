@@ -98,7 +98,7 @@ DEFAULT_COMPOSITE_WEIGHTS = {
     "quality_score": 0.15,
     "price_momentum_score": 0.10,
     "insider_score": 0.10,
-    "event_timing_score": 0.00,  # zeroed — Finnhub calendar data sparse in backtest, adds noise
+    "event_timing_score": 0.15,  # PEAD from WRDS IBES actuals
 }
 
 

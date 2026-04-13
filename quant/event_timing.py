@@ -1,17 +1,17 @@
 """
-Event timing signal.
+Event timing signal from WRDS IBES actuals + consensus.
 
-Computes a per-stock signal based on proximity to catalysts:
-  1. Earnings proximity — days until next earnings report
-  2. Post-earnings drift — direction and magnitude of most recent surprise
-  3. Macro event proximity — FOMC, CPI, NFP within N days
+Computes post-earnings announcement drift (PEAD) using:
+  - IBES actuals: announcement date (anndats) + actual EPS
+  - IBES consensus: last estimate before announcement (meanest)
+  - Surprise = (actual - estimate) / |estimate|
 
-The signal captures two effects:
-  - Pre-earnings: avoid new entries within 3 days (binary event risk)
-  - Post-earnings: drift in direction of surprise for 60 days (PEAD)
-  - Macro proximity: reduce conviction when high-impact macro events are imminent
+The PEAD effect: stocks drift in the direction of the earnings surprise
+for 60+ trading days after the announcement. This is one of the most
+robust anomalies in finance (Bernard & Thomas 1989).
 
-Returns a score in [-1, +1] plus a risk flag for earnings proximity.
+Also flags earnings proximity for risk management:
+  - earnings_blocked = True if next earnings is within 3 days
 """
 
 from __future__ import annotations
@@ -25,199 +25,167 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# ── Module-level caches ──
-_earnings_cache: dict[str, list[dict]] = {}
-_economic_cache: dict[str, list[dict]] = {}
+# Module-level caches
+_actuals_cache: dict[str, list[dict]] = {}
+_consensus_cache: dict[str, list[dict]] = {}
 
 
-def _fetch_earnings_calendar(
-    from_date: str,
-    to_date: str,
-    finnhub_client=None,
-    disk_cache=None,
-) -> list[dict]:
-    """Fetch earnings calendar with caching."""
-    cache_key = f"{from_date}_{to_date}"
-    if cache_key in _earnings_cache:
-        return _earnings_cache[cache_key]
+def _load_ibes_actuals(ticker: str, wrds_store) -> list[dict]:
+    """Load IBES actuals for a ticker (cached)."""
+    if ticker in _actuals_cache:
+        return _actuals_cache[ticker]
 
-    if disk_cache is not None:
-        cached = disk_cache.get_institutional(f"earnings_cal", cache_key)
-        if cached is not None:
-            _earnings_cache[cache_key] = cached
-            return cached
+    try:
+        conn = wrds_store._conn()
+        # Map our ticker to IBES ticker via the link table
+        link = conn.execute(
+            "SELECT ibes_ticker FROM ticker_link WHERE ticker = ? AND ibes_ticker IS NOT NULL LIMIT 1",
+            (ticker.upper(),)
+        ).fetchone()
+        if link is None:
+            _actuals_cache[ticker] = []
+            conn.close()
+            return []
 
-    data = []
-    if finnhub_client is not None:
-        data = finnhub_client.get_earnings_calendar(from_date, to_date)
+        ibes_ticker = link["ibes_ticker"]
+        rows = conn.execute("""
+            SELECT ticker, pends, anndats, value as eps_actual
+            FROM ibes_actuals
+            WHERE ticker = ?
+            ORDER BY pends DESC
+        """, (ibes_ticker,)).fetchall()
+        conn.close()
 
-    # Cache (including empty)
-    _earnings_cache[cache_key] = data
-    if disk_cache is not None and data:
-        disk_cache.set_institutional(f"earnings_cal", cache_key, data)
+        result = [dict(r) for r in rows]
+        _actuals_cache[ticker] = result
+        return result
+    except Exception as exc:
+        logger.debug("Failed to load IBES actuals for %s: %s", ticker, exc)
+        _actuals_cache[ticker] = []
+        return []
 
-    return data
 
+def _load_ibes_consensus_at_date(ticker: str, as_of_date: str, wrds_store) -> float | None:
+    """Load the most recent IBES consensus estimate before a given date."""
+    cache_key = f"{ticker}_{as_of_date}"
+    if cache_key in _consensus_cache:
+        cached = _consensus_cache[cache_key]
+        return cached[0] if cached else None
 
-def _fetch_economic_calendar(
-    from_date: str,
-    to_date: str,
-    finnhub_client=None,
-) -> list[dict]:
-    """Fetch economic calendar with caching."""
-    cache_key = f"{from_date}_{to_date}"
-    if cache_key in _economic_cache:
-        return _economic_cache[cache_key]
+    try:
+        conn = wrds_store._conn()
+        link = conn.execute(
+            "SELECT ibes_ticker FROM ticker_link WHERE ticker = ? AND ibes_ticker IS NOT NULL LIMIT 1",
+            (ticker.upper(),)
+        ).fetchone()
+        if link is None:
+            _consensus_cache[cache_key] = []
+            conn.close()
+            return None
 
-    data = []
-    if finnhub_client is not None:
-        data = finnhub_client.get_economic_calendar(from_date, to_date)
+        ibes_ticker = link["ibes_ticker"]
+        row = conn.execute("""
+            SELECT meanest FROM ibes_consensus
+            WHERE ticker = ? AND statpers <= ? AND fpi = '1'
+            ORDER BY statpers DESC LIMIT 1
+        """, (ibes_ticker, as_of_date)).fetchone()
+        conn.close()
 
-    _economic_cache[cache_key] = data
-    return data
+        if row and row["meanest"] is not None:
+            _consensus_cache[cache_key] = [float(row["meanest"])]
+            return float(row["meanest"])
+
+        _consensus_cache[cache_key] = []
+        return None
+    except Exception as exc:
+        logger.debug("Failed to load IBES consensus for %s: %s", ticker, exc)
+        _consensus_cache[cache_key] = []
+        return None
 
 
 def compute_event_timing_scores(
     tickers: list[str],
     as_of_date: pd.Timestamp,
-    finnhub_client=None,
-    disk_cache=None,
-    earnings_window_days: int = 60,
-    macro_window_days: int = 5,
-    earnings_block_days: int = 3,
+    wrds_store=None,
+    drift_window_days: int = 60,
+    block_days: int = 3,
+    **kwargs,
 ) -> dict[str, tuple[float, dict]]:
     """
-    Compute event timing signal for each ticker.
+    Compute PEAD-based event timing signal from WRDS IBES data.
 
-    Returns {ticker: (score, metadata)} where:
-      score: [-1, +1] based on post-earnings drift + event proximity
-      metadata: includes earnings_blocked flag, days_to_earnings, surprise info
-
-    Score components:
-    1. Post-earnings drift (+/- 0.7 weight): if last earnings surprise was positive,
-       signal is bullish for up to 60 days. Decays linearly.
-    2. Macro proximity penalty (-0.3 weight): if high-impact macro event within
-       macro_window_days, reduce conviction (uncertainty spike).
+    Returns {ticker: (score, metadata)}.
     """
+    if wrds_store is None:
+        return {}
+
     as_of = as_of_date.date() if hasattr(as_of_date, "date") else as_of_date
+    as_of_str = str(as_of)
 
-    # Fetch earnings calendar: look back 90 days and forward 30 days
-    lookback_start = (as_of - timedelta(days=90)).strftime("%Y-%m-%d")
-    forward_end = (as_of + timedelta(days=30)).strftime("%Y-%m-%d")
-    as_of_str = as_of.strftime("%Y-%m-%d") if hasattr(as_of, "strftime") else str(as_of)
-
-    earnings_events = _fetch_earnings_calendar(
-        lookback_start, forward_end, finnhub_client, disk_cache,
-    )
-
-    # Build per-ticker earnings info
-    ticker_earnings = {}
-    for event in earnings_events:
-        sym = event.get("symbol", "")
-        if sym not in tickers:
-            continue
-        event_date_str = event.get("date", "")
-        if not event_date_str:
-            continue
-        try:
-            event_date = date.fromisoformat(str(event_date_str)[:10])
-        except (ValueError, TypeError):
-            continue
-
-        if sym not in ticker_earnings:
-            ticker_earnings[sym] = []
-        ticker_earnings[sym].append({
-            "date": event_date,
-            "eps_actual": event.get("epsActual"),
-            "eps_estimate": event.get("epsEstimate"),
-            "revenue_actual": event.get("revenueActual"),
-            "revenue_estimate": event.get("revenueEstimate"),
-        })
-
-    # Fetch macro calendar: look forward from as_of
-    macro_events = _fetch_economic_calendar(
-        as_of_str,
-        (as_of + timedelta(days=macro_window_days + 1)).strftime("%Y-%m-%d"),
-        finnhub_client,
-    )
-
-    # Count high-impact macro events in window
-    high_impact_count = sum(
-        1 for e in macro_events
-        if e.get("impact") == "high" and e.get("country", "") == "US"
-    )
-    macro_penalty = min(high_impact_count * 0.15, 0.5)  # cap at 0.5
-
-    # Score each ticker
     results = {}
     for ticker in tickers:
-        events = ticker_earnings.get(ticker, [])
-        if not events:
+        actuals = _load_ibes_actuals(ticker, wrds_store)
+        if not actuals:
             continue
 
-        # Sort by date
-        events.sort(key=lambda e: e["date"])
+        # Find most recent past earnings and next future earnings
+        past = []
+        future = []
+        for a in actuals:
+            try:
+                ann_date = date.fromisoformat(str(a["anndats"])[:10])
+            except (ValueError, TypeError):
+                continue
+            if ann_date <= as_of:
+                past.append((ann_date, a))
+            else:
+                future.append((ann_date, a))
 
-        # Find most recent past earnings
-        past_earnings = [e for e in events if e["date"] <= as_of]
-        future_earnings = [e for e in events if e["date"] > as_of]
-
+        meta = {}
         score = 0.0
-        meta = {
-            "n_earnings_events": len(events),
-            "macro_high_impact": high_impact_count,
-        }
 
-        # ── Earnings proximity check ──
-        if future_earnings:
-            next_earnings = future_earnings[0]
-            days_to_earnings = (next_earnings["date"] - as_of).days
-            meta["days_to_earnings"] = days_to_earnings
-            meta["earnings_blocked"] = days_to_earnings <= earnings_block_days
+        # Earnings proximity (blocking)
+        if future:
+            future.sort(key=lambda x: x[0])
+            days_to = (future[0][0] - as_of).days
+            meta["days_to_earnings"] = days_to
+            meta["earnings_blocked"] = days_to <= block_days
         else:
             meta["days_to_earnings"] = None
             meta["earnings_blocked"] = False
 
-        # ── Post-earnings drift ──
-        if past_earnings:
-            last = past_earnings[-1]
-            days_since = (as_of - last["date"]).days
+        # Post-earnings drift
+        if past:
+            past.sort(key=lambda x: x[0], reverse=True)
+            last_date, last_actual = past[0]
+            days_since = (as_of - last_date).days
 
-            if days_since <= earnings_window_days and last["eps_actual"] is not None and last["eps_estimate"] is not None:
-                try:
-                    actual = float(last["eps_actual"])
-                    estimate = float(last["eps_estimate"])
+            if days_since <= drift_window_days and last_actual.get("eps_actual") is not None:
+                actual = float(last_actual["eps_actual"])
 
-                    if abs(estimate) > 0.01:
-                        surprise_pct = (actual - estimate) / abs(estimate)
-                    elif actual > 0:
-                        surprise_pct = 1.0
-                    elif actual < 0:
-                        surprise_pct = -1.0
-                    else:
-                        surprise_pct = 0.0
+                # Get the consensus estimate that was active just before announcement
+                estimate = _load_ibes_consensus_at_date(
+                    ticker, str(last_date - timedelta(days=1)), wrds_store
+                )
 
-                    # Decay: full signal at day 0, zero at earnings_window_days
-                    decay = max(0.0, 1.0 - days_since / earnings_window_days)
+                if estimate is not None and abs(estimate) > 0.01:
+                    surprise_pct = (actual - estimate) / abs(estimate)
 
-                    # Map surprise to [-1, +1]: >10% surprise = max, clip at ±1
+                    # Decay linearly over drift_window_days
+                    decay = max(0.0, 1.0 - days_since / drift_window_days)
+
+                    # Map: >10% surprise = max score, clip at ±1
                     drift_score = float(np.clip(surprise_pct / 0.10, -1.0, 1.0))
-                    drift_score *= decay
+                    score = drift_score * decay
 
-                    score = drift_score * 0.7  # 70% weight on PEAD
-
+                    meta["eps_actual"] = round(actual, 3)
+                    meta["eps_estimate"] = round(estimate, 3)
                     meta["surprise_pct"] = round(surprise_pct * 100, 2)
                     meta["days_since_earnings"] = days_since
                     meta["decay"] = round(decay, 3)
-                    meta["drift_score"] = round(drift_score, 4)
-                except (TypeError, ValueError):
-                    pass
-
-        # ── Macro proximity penalty ──
-        if macro_penalty > 0:
-            score -= macro_penalty * 0.3  # 30% weight on macro uncertainty
 
         score = float(np.clip(score, -1.0, 1.0))
-        results[ticker] = (round(score, 4), meta)
+        if score != 0.0 or "surprise_pct" in meta:
+            results[ticker] = (round(score, 4), meta)
 
     return results

@@ -1854,13 +1854,14 @@ def run_backtest(
                 if ticker in signals:
                     signals[ticker].insider_score = iscore
 
-        # Event timing (PEAD + catalyst proximity)
-        if _finnhub_client is not None or _sentiment_cache is not None:
+        # Event timing (PEAD from WRDS IBES actuals + consensus)
+        if _wrds_provider is not None:
             from quant.event_timing import compute_event_timing_scores
+            from quant.wrds_store import WRDSPointInTimeStore
+            _evt_store = WRDSPointInTimeStore()
             event_scores = compute_event_timing_scores(
                 list(signals.keys()), reb_date,
-                finnhub_client=_finnhub_client,
-                disk_cache=_sentiment_cache,
+                wrds_store=_evt_store,
             )
             for ticker, (escore, emeta) in event_scores.items():
                 if ticker in signals:
@@ -2456,13 +2457,14 @@ def run_walk_forward(
                     if ticker in signals:
                         signals[ticker].insider_score = iscore
 
-            # Event timing (PEAD + catalyst proximity)
-            if _finnhub_client is not None or _sentiment_cache is not None:
+            # Event timing (PEAD from WRDS IBES)
+            if _wrds_provider is not None:
                 from quant.event_timing import compute_event_timing_scores
+                from quant.wrds_store import WRDSPointInTimeStore
+                _evt_store = WRDSPointInTimeStore()
                 event_scores = compute_event_timing_scores(
                     list(signals.keys()), reb_date,
-                    finnhub_client=_finnhub_client,
-                    disk_cache=_sentiment_cache,
+                    wrds_store=_evt_store,
                 )
                 for ticker, (escore, emeta) in event_scores.items():
                     if ticker in signals:
@@ -2897,13 +2899,14 @@ def run_cpcv(
                     if ticker in signals:
                         signals[ticker].insider_score = iscore
 
-            # Event timing (PEAD + catalyst proximity)
-            if _finnhub_client is not None or _sentiment_cache is not None:
+            # Event timing (PEAD from WRDS IBES)
+            if _wrds_provider is not None:
                 from quant.event_timing import compute_event_timing_scores
+                from quant.wrds_store import WRDSPointInTimeStore
+                _evt_store = WRDSPointInTimeStore()
                 event_scores = compute_event_timing_scores(
                     list(signals.keys()), reb_date,
-                    finnhub_client=_finnhub_client,
-                    disk_cache=_sentiment_cache,
+                    wrds_store=_evt_store,
                 )
                 for ticker, (escore, emeta) in event_scores.items():
                     if ticker in signals:

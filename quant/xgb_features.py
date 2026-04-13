@@ -124,6 +124,19 @@ def build_feature_matrix(
             except Exception:
                 pass
 
+        # Event timing (PEAD from WRDS)
+        event_scores = {}
+        if wrds_provider is not None:
+            try:
+                from quant.event_timing import compute_event_timing_scores
+                from quant.wrds_store import WRDSPointInTimeStore
+                _evt_store = WRDSPointInTimeStore()
+                event_scores = compute_event_timing_scores(
+                    active_tickers, reb_date, wrds_store=_evt_store,
+                )
+            except Exception:
+                pass
+
         # VIX
         vix_level = None
         if vix_df is not None:
@@ -161,7 +174,7 @@ def build_feature_matrix(
                 "quality": quality_scores.get(ticker, 0.0),
                 "price_mom": mom_scores.get(ticker, 0.0),
                 "insider": insider_scores.get(ticker, 0.0),
-                "event_timing": 0.0,  # populated below if available
+                "event_timing": event_scores.get(ticker, (0.0, {}))[0] if isinstance(event_scores.get(ticker), tuple) else 0.0,
                 # Context features
                 "atr_pct": sv.atr_regime.metadata.get("atr_pct", 0.0),
                 "vix_level": vix_level or 0.0,
