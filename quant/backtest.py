@@ -1335,7 +1335,7 @@ def build_target_portfolio(
 
         # ATR-based position sizing: reduce size in high-vol regimes
         atr_pct = sv.atr_regime.metadata.get("atr_pct", 1.5)
-        vol_scalar = min(2.0 / max(atr_pct, 0.5), 2.0)  # scale down if vol > 2%
+        vol_scalar = min(2.0 / max(atr_pct, 0.5), 2.0)  # TODO: replace with dynamic ATR scaling
         adjusted_capital = per_position_capital * vol_scalar * regime_scalar
         shares = adjusted_capital / entry_price
 
@@ -1365,7 +1365,7 @@ def build_target_portfolio(
             continue
 
         atr_pct = sv.atr_regime.metadata.get("atr_pct", 1.5)
-        vol_scalar = min(2.0 / max(atr_pct, 0.5), 2.0)
+        vol_scalar = min(2.0 / max(atr_pct, 0.5), 2.0)  # TODO: replace with dynamic ATR scaling
         # In bearish regime, shorts get full sizing (not scaled down)
         short_regime_scalar = 1.0 if regime.level == "bearish" else regime_scalar
         per_short_capital = short_capital_pool / max(len(shorts), 1)  # equal-weight from 30% pool
