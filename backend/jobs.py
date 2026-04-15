@@ -135,9 +135,6 @@ def run_analysis_job(job: JobState, request) -> None:
                 loop.close()
 
         result_dict = result.model_dump()
-        result_dict["agent_reports"] = [
-            (r.agent_name, r.analysis) for r in result.agent_reports
-        ]
         save_report(result_dict)
         try:
             save_pdf_report(result_dict)
