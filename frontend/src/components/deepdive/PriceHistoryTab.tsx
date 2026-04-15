@@ -21,11 +21,12 @@ export function PriceHistoryTab({ ticker }: Props) {
           <button
             key={p}
             onClick={() => setPeriod(p)}
-            className="px-3 py-1 rounded-full text-xs font-medium transition-colors"
-            style={{
-              background: period === p ? "var(--accent-blue)" : "var(--bg-hover)",
-              color: period === p ? "white" : "var(--text-secondary)",
-            }}
+            className={[
+              "px-3 py-1 rounded-full text-xs font-medium transition-colors",
+              period === p
+                ? "bg-primary text-primary-foreground"
+                : "bg-secondary text-muted-foreground hover:text-foreground",
+            ].join(" ")}
           >
             {p}
           </button>
@@ -33,16 +34,13 @@ export function PriceHistoryTab({ ticker }: Props) {
       </div>
 
       {isLoading ? (
-        <div
-          className="rounded animate-pulse"
-          style={{ height: 400, background: "var(--bg-primary)" }}
-        />
+        <div className="rounded animate-pulse bg-background" style={{ height: 400 }} />
       ) : bars.length > 0 ? (
         <PriceChart bars={bars} recommendations={records} />
       ) : (
         <div
-          className="rounded flex items-center justify-center"
-          style={{ height: 400, background: "var(--bg-primary)", color: "var(--text-muted)" }}
+          className="rounded flex items-center justify-center bg-background text-muted-foreground"
+          style={{ height: 400 }}
         >
           No price data available
         </div>

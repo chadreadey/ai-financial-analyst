@@ -55,30 +55,30 @@ export function PriceChart({ bars, recommendations, forecast, height = 400 }: Pr
     const chart = createChart(containerRef.current, {
       width: containerRef.current.clientWidth,
       height,
-      layout: { background: { color: "#111827" }, textColor: "#94a3b8" },
-      grid: { vertLines: { color: "#1e2d40" }, horzLines: { color: "#1e2d40" } },
+      layout: { background: { color: "#0f0f11" }, textColor: "#71717a" },
+      grid: { vertLines: { color: "#1a1a1e" }, horzLines: { color: "#1a1a1e" } },
       crosshair: { mode: CrosshairMode.Normal },
-      rightPriceScale: { borderColor: "#1e2d40" },
-      timeScale: { borderColor: "#1e2d40" },
+      rightPriceScale: { borderColor: "#1a1a1e" },
+      timeScale: { borderColor: "#1a1a1e" },
     });
     chartRef.current = chart;
 
     const sorted = [...bars].sort((a, b) => a.time.localeCompare(b.time));
 
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: "#34d399",
-      downColor: "#f87171",
-      borderUpColor: "#34d399",
-      borderDownColor: "#f87171",
-      wickUpColor: "#34d399",
-      wickDownColor: "#f87171",
+      upColor: "#22c55e",
+      downColor: "#ef4444",
+      borderUpColor: "#22c55e",
+      borderDownColor: "#ef4444",
+      wickUpColor: "#22c55e",
+      wickDownColor: "#ef4444",
     });
     candleSeries.setData(sorted);
 
     const markers: any[] = [];
     const verdictColors: Record<string, string> = {
-      BUY: "#34d399", "STRONG BUY": "#34d399",
-      SELL: "#f87171", "STRONG SELL": "#f87171",
+      BUY: "#22c55e", "STRONG BUY": "#22c55e",
+      SELL: "#ef4444", "STRONG SELL": "#ef4444",
       HOLD: "#fbbf24",
     };
 
@@ -121,9 +121,9 @@ export function PriceChart({ bars, recommendations, forecast, height = 400 }: Pr
 
     if (forecast && forecast.length > 0) {
       const p90Series = chart.addSeries(AreaSeries, {
-        topColor: "rgba(129,140,248,0.12)",
+        topColor: "rgba(6,182,212,0.12)",
         bottomColor: "transparent",
-        lineColor: "rgba(129,140,248,0.3)",
+        lineColor: "rgba(6,182,212,0.3)",
         lineWidth: 1,
         priceLineVisible: false,
         lastValueVisible: false,
@@ -132,8 +132,8 @@ export function PriceChart({ bars, recommendations, forecast, height = 400 }: Pr
 
       const p10Series = chart.addSeries(AreaSeries, {
         topColor: "transparent",
-        bottomColor: "rgba(129,140,248,0.08)",
-        lineColor: "rgba(129,140,248,0.3)",
+        bottomColor: "rgba(6,182,212,0.08)",
+        lineColor: "rgba(6,182,212,0.3)",
         lineWidth: 1,
         priceLineVisible: false,
         lastValueVisible: false,
@@ -141,7 +141,7 @@ export function PriceChart({ bars, recommendations, forecast, height = 400 }: Pr
       p10Series.setData(forecast.map((f) => ({ time: f.time, value: f.p10 })));
 
       const p50Line = chart.addSeries(LineSeries, {
-        color: "#818cf8",
+        color: "#06b6d4",
         lineWidth: 1,
         lineStyle: LineStyle.Dashed,
         priceLineVisible: false,
@@ -193,8 +193,8 @@ export function PriceChart({ bars, recommendations, forecast, height = 400 }: Pr
           style={{
             left: Math.min(tooltip.x + 12, (containerRef.current?.clientWidth || 400) - 180),
             top: tooltip.y - 60,
-            background: "rgba(17,24,39,0.95)",
-            border: "1px solid #1e2d40",
+            background: "rgba(15,15,17,0.95)",
+            border: "1px solid #1a1a1e",
             color: "#f0f4f8",
           }}
         >

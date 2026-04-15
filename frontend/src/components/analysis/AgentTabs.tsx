@@ -10,7 +10,7 @@ export function AgentTabs({ reports }: Props) {
   const [active, setActive] = useState(0);
 
   if (reports.length === 0) {
-    return <p style={{ color: "var(--text-muted)" }}>No agent reports available.</p>;
+    return <p className="text-muted-foreground">No agent reports available.</p>;
   }
 
   return (
@@ -20,11 +20,12 @@ export function AgentTabs({ reports }: Props) {
           <button
             key={i}
             onClick={() => setActive(i)}
-            className="px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors"
-            style={{
-              background: active === i ? "var(--bg-hover)" : "transparent",
-              color: active === i ? "var(--text-primary)" : "var(--text-muted)",
-            }}
+            className={[
+              "px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-colors",
+              active === i
+                ? "bg-secondary text-foreground"
+                : "bg-transparent text-muted-foreground hover:text-foreground",
+            ].join(" ")}
           >
             {r.agent_name}
           </button>

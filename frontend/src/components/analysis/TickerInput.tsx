@@ -14,19 +14,11 @@ export function TickerInput({ ticker, onTickerChange, onRun, isRunning }: Ticker
   const hasValue = ticker.trim().length > 0;
 
   return (
-    <div
-      className="rounded-lg overflow-hidden transition-fast"
-      style={{
-        background: "var(--bg-card)",
-        border: "1px solid var(--border)",
-        boxShadow: "var(--shadow-sm)",
-      }}
-    >
+    <div className="rounded-lg overflow-hidden transition-fast bg-card border border-border">
       <div className="flex items-center px-4 py-3 gap-3">
         <Search
           size={18}
-          className="flex-shrink-0 transition-fast"
-          style={{ color: hasValue ? "var(--accent-blue)" : "var(--text-muted)" }}
+          className={["flex-shrink-0 transition-fast", hasValue ? "text-primary" : "text-muted-foreground"].join(" ")}
         />
 
         <input
@@ -35,11 +27,7 @@ export function TickerInput({ ticker, onTickerChange, onRun, isRunning }: Ticker
           onChange={(e) => onTickerChange(e.target.value.toUpperCase().replace(/[^A-Z.]/g, ""))}
           onKeyDown={(e) => e.key === "Enter" && !isRunning && onRun()}
           placeholder="Enter ticker symbol (e.g. AAPL)"
-          className="flex-1 bg-transparent outline-none font-semibold tracking-wide placeholder:font-normal"
-          style={{
-            fontSize: "1.125rem",
-            color: "var(--text-primary)",
-          }}
+          className="flex-1 bg-transparent outline-none font-semibold tracking-wide placeholder:font-normal text-foreground text-lg"
           spellCheck={false}
           autoComplete="off"
           autoCapitalize="characters"
@@ -48,10 +36,7 @@ export function TickerInput({ ticker, onTickerChange, onRun, isRunning }: Ticker
 
         {/* Enter hint */}
         {hasValue && !isRunning && (
-          <span
-            className="flex items-center gap-1 text-[11px] flex-shrink-0"
-            style={{ color: "var(--text-muted)" }}
-          >
+          <span className="flex items-center gap-1 text-[11px] flex-shrink-0 text-muted-foreground">
             <CornerDownLeft size={11} />
             Enter
           </span>
@@ -60,12 +45,13 @@ export function TickerInput({ ticker, onTickerChange, onRun, isRunning }: Ticker
         <button
           onClick={onRun}
           disabled={isRunning || !hasValue}
-          className="flex-shrink-0 flex items-center gap-2 px-5 py-2 rounded-md text-sm font-semibold transition-fast disabled:opacity-40 disabled:cursor-not-allowed"
-          style={{
-            background: hasValue && !isRunning ? "var(--accent-blue)" : "var(--bg-hover)",
-            color: hasValue && !isRunning ? "white" : "var(--text-muted)",
-            boxShadow: hasValue && !isRunning ? "0 0 16px rgba(59,130,246,0.3)" : "none",
-          }}
+          className={[
+            "flex-shrink-0 flex items-center gap-2 px-5 py-2 rounded-md text-sm font-semibold transition-fast disabled:opacity-40 disabled:cursor-not-allowed",
+            hasValue && !isRunning
+              ? "bg-primary text-primary-foreground"
+              : "bg-secondary text-muted-foreground",
+          ].join(" ")}
+          style={hasValue && !isRunning ? { boxShadow: "0 0 16px rgba(59,130,246,0.3)" } : undefined}
         >
           {isRunning ? (
             <>
@@ -85,7 +71,7 @@ export function TickerInput({ ticker, onTickerChange, onRun, isRunning }: Ticker
       {isRunning && (
         <div
           className="h-0.5 w-full animate-pulse"
-          style={{ background: "linear-gradient(90deg, transparent, var(--accent-blue), transparent)" }}
+          style={{ background: "linear-gradient(90deg, transparent, hsl(var(--primary)), transparent)" }}
         />
       )}
     </div>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../../api/client";
 import type { AnalysisResult, HistoryEntry } from "../../api/types";
-import { Card } from "../common/Card";
+import { Card } from "@/components/ui/card";
 
 interface Props {
   onOpenResult: (result: AnalysisResult) => void;
@@ -52,26 +52,26 @@ export function PastAnalysesPanel({ onOpenResult }: Props) {
   return (
     <Card>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+        <h3 className="text-sm font-semibold text-foreground">
           Past Analyses
         </h3>
-        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+        <span className="text-xs text-muted-foreground">
           {entries.length} saved
         </span>
       </div>
 
       {isLoading && (
-        <div className="text-sm" style={{ color: "var(--text-muted)" }}>
+        <div className="text-sm text-muted-foreground">
           Loading past analyses...
         </div>
       )}
       {error && (
-        <div className="text-sm" style={{ color: "var(--accent-red)" }}>
+        <div className="text-sm text-[--negative]">
           {error}
         </div>
       )}
       {!isLoading && !error && entries.length === 0 && (
-        <div className="text-sm" style={{ color: "var(--text-muted)" }}>
+        <div className="text-sm text-muted-foreground">
           No analyses saved yet.
         </div>
       )}
@@ -80,7 +80,7 @@ export function PastAnalysesPanel({ onOpenResult }: Props) {
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr style={{ borderBottom: "1px solid var(--border)" }}>
+              <tr className="border-b border-border">
                 {[
                   "Date",
                   "Ticker",
@@ -92,7 +92,7 @@ export function PastAnalysesPanel({ onOpenResult }: Props) {
                   "Outcome",
                   "Days Left",
                 ].map((h) => (
-                  <th key={h} className="text-left py-2 px-2 font-medium" style={{ color: "var(--text-muted)" }}>
+                  <th key={h} className="text-left py-2 px-2 font-medium text-muted-foreground">
                     {h}
                   </th>
                 ))}
@@ -102,24 +102,24 @@ export function PastAnalysesPanel({ onOpenResult }: Props) {
               {entries.map((entry) => (
                 <tr
                   key={entry.analysis_id || `${entry.ticker}-${entry.run_at}`}
-                  style={{ borderBottom: "1px solid var(--border-subtle, var(--border))", cursor: "pointer" }}
+                  className="border-b border-border cursor-pointer hover:bg-secondary/50 transition-colors"
                   onClick={() => openDetail(entry.analysis_id)}
                 >
-                  <td className="py-1.5 px-2" style={{ color: "var(--text-secondary)" }}>{formatDate(entry.run_at)}</td>
-                  <td className="py-1.5 px-2 font-medium" style={{ color: "var(--text-primary)" }}>{entry.ticker}</td>
-                  <td className="py-1.5 px-2" style={{ color: "var(--text-secondary)" }}>{entry.verdict || "—"}</td>
-                  <td className="py-1.5 px-2" style={{ color: "var(--text-secondary)" }}>
+                  <td className="py-1.5 px-2 text-muted-foreground">{formatDate(entry.run_at)}</td>
+                  <td className="py-1.5 px-2 font-medium text-foreground">{entry.ticker}</td>
+                  <td className="py-1.5 px-2 text-muted-foreground">{entry.verdict || "—"}</td>
+                  <td className="py-1.5 px-2 text-muted-foreground">
                     {entry.price_target != null ? `$${entry.price_target.toFixed(2)}` : "—"}
                   </td>
-                  <td className="py-1.5 px-2" style={{ color: "var(--text-secondary)" }}>{entry.time_horizon || "—"}</td>
-                  <td className="py-1.5 px-2" style={{ color: "var(--text-secondary)" }}>{stopLossLabel(entry)}</td>
-                  <td className="py-1.5 px-2" style={{ color: "var(--text-secondary)" }}>
+                  <td className="py-1.5 px-2 text-muted-foreground">{entry.time_horizon || "—"}</td>
+                  <td className="py-1.5 px-2 text-muted-foreground">{stopLossLabel(entry)}</td>
+                  <td className="py-1.5 px-2 text-muted-foreground">
                     {entry.return_since_analysis_pct != null
                       ? `${entry.return_since_analysis_pct > 0 ? "+" : ""}${entry.return_since_analysis_pct}%`
                       : "—"}
                   </td>
-                  <td className="py-1.5 px-2" style={{ color: "var(--text-secondary)" }}>{entry.outcome_status || "—"}</td>
-                  <td className="py-1.5 px-2" style={{ color: "var(--text-secondary)" }}>
+                  <td className="py-1.5 px-2 text-muted-foreground">{entry.outcome_status || "—"}</td>
+                  <td className="py-1.5 px-2 text-muted-foreground">
                     {entry.days_remaining != null ? String(entry.days_remaining) : "—"}
                   </td>
                 </tr>

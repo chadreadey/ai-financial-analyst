@@ -112,6 +112,14 @@ class FMPFundamentalCache:
             return data[0] if isinstance(data, list) else data
         return None
 
+    def get_institutional_quarterly(self, ticker: str, max_age_seconds: float = -1) -> Optional[list[dict]]:
+        """Get cached institutional ownership data."""
+        return self._get(ticker, "institutional_q", max_age_seconds)
+
+    def set_institutional_quarterly(self, ticker: str, data: list[dict]) -> None:
+        """Cache institutional ownership data."""
+        self._set(ticker, "institutional_q", data)
+
     # ── Prefetch ─────────────────────────────────────────────────────
 
     def prefetch(

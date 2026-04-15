@@ -61,8 +61,8 @@ class BacktestConfig:
     train_months: int = 24                   # rolling train window
     test_months: int = 6                     # out-of-sample test window
     # Enhanced regime detection
-    vix_caution_threshold: float = 20.0       # VIX above this = cautious (reduce sizing)
-    vix_risk_off_threshold: float = 28.0      # VIX above this = risk-off (no new longs, allow shorts)
+    vix_caution_threshold: float = 28.0       # VIX above this = cautious (P90 of VIX distribution)
+    vix_risk_off_threshold: float = 35.0      # VIX above this = risk-off (P95, extreme spikes only)
     enable_death_golden_cross: bool = True     # SPY 50/200 SMA cross detection
     golden_cross_boost: float = 0.10           # lower long threshold by this during golden cross
     # TimesFM overlay (DEPRECATED — prefer LSTM)
@@ -98,6 +98,13 @@ class BacktestConfig:
     enable_earnings_signals: bool = False
     earnings_signal_weight: float = 0.30  # total weight for combined earnings signal
     earnings_rank_mode: bool = False      # Path A: rank by earnings score, technicals filter only
+    # Institutional flow signal (FMP + Finnhub 13F ownership data)
+    enable_institutional_flow: bool = False
+    institutional_flow_weight: float = 0.15  # weight in composite
+    # XGBoost meta-model
+    enable_xgb_ranker: bool = False
+    xgb_train_months: int = 96           # months of history to train on (8 years)
+    xgb_retrain_freq: int = 12           # retrain every N rebalance periods
     conviction_sizing: float = 0.0        # 0=equal weight, 1=fully score-proportional sizing
     enable_agent_veto: bool = False       # Path C: quantified agent veto on candidates
     agent_veto_min_flags: int = 2         # minimum veto signals to remove a candidate (2 of 3)
@@ -643,10 +650,10 @@ def detect_regime(
     vix_threshold_caution = config.vix_caution_threshold if config else 20.0
     vix_threshold_risk_off = config.vix_risk_off_threshold if config else 28.0
 
-    # Turbulence thresholds — calibrated from 2021-2026 sector ETF data
-    # P90=26, P75=19. Only top-decile events trigger risk-off.
-    turb_risk_off = 30.0   # top ~9% of months — true crisis (Mar 2022, Aug 2024)
-    turb_cautious = 18.0   # top ~25% — elevated stress, reduce sizing
+    # Turbulence thresholds — recalibrated from 2014-2026 empirical distribution
+    # P90=19, P95=28, P99=54. Forward returns are positive below turb=35.
+    turb_risk_off = 45.0   # P99 — true crisis only (COVID, etc.)
+    turb_cautious = 30.0   # P95 — only extreme stress, not normal volatility
 
     if state.vix is not None and state.vix >= vix_threshold_risk_off:
         state.level = "risk_off"
@@ -820,6 +827,8 @@ _sentiment_cache = None  # SentimentDiskCache — set externally or auto-initial
 _fmp_client = None       # FMPClient — auto-initialized from FMP_API_KEY
 _fmp_cache = None        # FMPFundamentalCache — SQLite cache for fundamentals
 _wrds_provider = None    # WRDSFundamentalProvider — auto-initialized from .wrds_pit.db
+_inst_fmp_cache = None  # FMPFundamentalCache for institutional data
+_inst_wrds_store = None  # WRDSPointInTimeStore for 13F holdings
 
 
 def _get_timesfm_model():
@@ -1064,26 +1073,10 @@ def blend_sentiment_into_signals(
     sentiment_weight: float = 0.10,
 ) -> dict[str, SignalVector]:
     """
-    Blend news sentiment into each stock's composite with adaptive weighting.
+    Set sentiment scores on SignalVectors for cross-sectional normalization.
 
-    Effective weight = base_weight
-                       × coverage_scale(n_articles)
-                       × regime_scale(atr_regime)
-
-    coverage_scale  = min(1.0, n_articles / COVERAGE_FULL)
-                      → full weight at 20+ articles, proportionally less below.
-                      → 0 articles (insider-only) → 0× news scale, but insider
-                         MSPR is still carried in the score itself.
-
-    regime_scale    = 0.5 if atr_regime == "high_vol" else 1.0
-                      → during high-vol periods news sentiment lags the move;
-                         halving weight prevents chasing panicked headlines.
-
-    Raw (score, n_articles) pairs are preserved in metadata so downstream
-    systems (e.g. GraphRAG, geopolitical NLP layer) can consume them directly
-    without re-running sentiment.
-
-    Order: IC weights → LSTM blend → sentiment blend (always last).
+    Applies coverage and regime scaling to the raw sentiment score, then
+    stores on sv.sentiment_score. No longer modifies composite_score.
     """
     if not sentiment_scores:
         return signals
@@ -1095,49 +1088,27 @@ def blend_sentiment_into_signals(
 
         score, n_articles = entry
 
-        # Coverage scaling: sparse news → reduced weight
+        # Coverage scaling: sparse news → reduced confidence
         coverage_scale = min(1.0, n_articles / _SENTIMENT_COVERAGE_FULL)
 
         # Regime scaling: noisy in high-vol environments
         vol_regime = sv.atr_regime.metadata.get("volatility_regime", "normal")
         regime_scale = _SENTIMENT_HIGH_VOL_SCALE if vol_regime == "high_vol" else 1.0
 
-        effective_weight = sentiment_weight * coverage_scale * regime_scale
+        effective_scale = coverage_scale * regime_scale
 
-        if effective_weight < 1e-6:
-            # No meaningful weight — skip blend but still log the raw signal
+        if effective_scale < 1e-6:
             sv.flags.append(
                 f"sentiment_suppressed(articles={n_articles},regime={vol_regime})"
             )
             continue
 
-        # Asymmetric blend: sentiment and quant signal must agree on direction
-        # for shorts. Positive news on a bearish stock is a conflict — flag it
-        # and skip the blend rather than diluting short conviction.
-        # For longs, sentiment can both add and reduce conviction (symmetric).
-        is_short_candidate = sv.composite_score < 0
-        sentiment_conflicts_short = is_short_candidate and score > 0
+        # Scale the raw sentiment score by coverage/regime confidence
+        sv.sentiment_score = score * effective_scale
 
-        if sentiment_conflicts_short:
-            sv.flags.append(
-                f"sentiment_conflict(quant=bearish,news=bullish,score={score:.2f},"
-                f"articles={n_articles})"
-            )
-            continue
-
-        quant_scale = 1.0 - effective_weight
-        blended = sv.composite_score * quant_scale + score * effective_weight
-        sv.composite_score = float(np.clip(blended, -1.0, 1.0))
-
-        reclassify(sv)
-
-        # Flag: log effective weight and extreme raw sentiment for audit trail
         sv.flags.append(
-            f"sentiment_w={effective_weight:.3f}"
-            f"(cov={coverage_scale:.2f},regime={vol_regime})"
+            f"sentiment(cov={coverage_scale:.2f},regime={vol_regime})"
         )
-        if abs(score) >= 0.7:
-            sv.flags.append(f"sentiment={'bullish' if score > 0 else 'bearish'}({score:.2f})")
 
     return signals
 
@@ -1200,24 +1171,31 @@ def build_target_portfolio(
     if n_stocks == 0:
         return positions
 
+    # ── Decile-based portfolio construction ──────────────────────────
+    # Instead of absolute thresholds (composite >= 0.20), use relative
+    # ranking: long the top decile, short the bottom decile. This
+    # generalizes across any universe size and avoids overfitting to
+    # threshold values calibrated on a specific stock list.
+    #
+    # Absolute thresholds still serve as a minimum quality floor —
+    # a stock in the top decile with a negative composite score
+    # shouldn't be longed just because it's the "least bad."
+
     # Risk-off: no new longs (close existing at next rebalance)
     if regime.level == "risk_off":
-        # Only allow shorts in risk-off — longs are too dangerous
         longs = []
     else:
-        # Golden cross / strong_bull: lower the long threshold to catch more entries,
-        # but only down to a minimum floor (0.15) — prevents admitting stocks with
-        # genuinely weak signals just because the macro regime is bullish.
-        effective_long_threshold = config.long_threshold
-        _GOLDEN_CROSS_FLOOR = 0.15
-        if regime.level == "strong_bull" and config.enable_death_golden_cross:
-            effective_long_threshold = max(
-                _GOLDEN_CROSS_FLOOR,
-                config.long_threshold - config.golden_cross_boost,
-            )
-            logger.debug("Golden cross active: long threshold lowered to %.2f", effective_long_threshold)
+        # Top decile = top 10% of universe by score
+        n_long_candidates = max(1, n_stocks // 10)
+        # But don't exceed max_long_positions
+        n_long_candidates = min(n_long_candidates, config.max_long_positions)
 
-        longs_raw = [(t, sc, sv) for t, sc, sv in scored if sc >= effective_long_threshold]
+        # Quality floor: still require positive composite score
+        # (weaker than old 0.20 threshold, but prevents longing negative-signal stocks)
+        _QUALITY_FLOOR = 0.05
+        longs_raw = [(t, sc, sv) for t, sc, sv in scored[:n_long_candidates]
+                     if sc >= _QUALITY_FLOOR
+]  # earnings_blocked disabled — Finnhub calendar data sparse in backtest
 
         # Sector-diversified selection: cap positions per GICS sector
         if config.max_per_sector > 0 and config.max_per_sector < config.max_long_positions:
@@ -1238,8 +1216,13 @@ def build_target_portfolio(
         else:
             longs = longs_raw[:config.max_long_positions]
 
-    # Short: bottom scorers below threshold, with regime + signal confirmation filters
-    shorts_raw = [(t, sc, sv) for t, sc, sv in scored if sc <= config.short_threshold]
+    # Short: bottom decile of universe by score
+    n_short_candidates = max(1, n_stocks // 10)
+    n_short_candidates = min(n_short_candidates, config.max_short_positions)
+    # Quality floor for shorts: must have meaningfully negative score
+    _SHORT_FLOOR = -0.10
+    shorts_raw = [(t, sc, sv) for t, sc, sv in scored[-n_short_candidates:]
+                  if sc <= _SHORT_FLOOR]
     shorts = []
 
     # Risk-off with HIGH VIX = reduce ALL exposure (V-shaped crash risk)
@@ -1328,10 +1311,11 @@ def build_target_portfolio(
     else:
         long_weights = [1.0 / max(len(longs), 1)] * len(longs)
 
-    # Capital pool: total for longs vs shorts
-    long_capital = capital * (len(longs) / max(n_positions, 1))
-    if not shorts:
-        long_capital = capital
+    # Capital pools: 130/30 structure — independent long and short books.
+    # Longs invest 100% of capital. Shorts are a 30% overlay (funded by margin).
+    # Gross exposure: 130%, Net exposure: ~70%, Target beta: ~0.5-0.7.
+    long_capital = capital  # 100% of capital to longs
+    short_capital_pool = capital * 0.30  # 30% overlay for shorts
 
     # Apply regime-based sizing scalar
     regime_scalar = regime.sizing_scalar
@@ -1352,7 +1336,7 @@ def build_target_portfolio(
 
         # ATR-based position sizing: reduce size in high-vol regimes
         atr_pct = sv.atr_regime.metadata.get("atr_pct", 1.5)
-        vol_scalar = min(2.0 / max(atr_pct, 0.5), 2.0)  # scale down if vol > 2%
+        vol_scalar = min(2.0 / max(atr_pct, 0.5), 2.0)  # TODO: replace with dynamic ATR scaling
         adjusted_capital = per_position_capital * vol_scalar * regime_scalar
         shares = adjusted_capital / entry_price
 
@@ -1382,11 +1366,11 @@ def build_target_portfolio(
             continue
 
         atr_pct = sv.atr_regime.metadata.get("atr_pct", 1.5)
-        vol_scalar = min(2.0 / max(atr_pct, 0.5), 2.0)
+        vol_scalar = min(2.0 / max(atr_pct, 0.5), 2.0)  # TODO: replace with dynamic ATR scaling
         # In bearish regime, shorts get full sizing (not scaled down)
         short_regime_scalar = 1.0 if regime.level == "bearish" else regime_scalar
-        short_capital = capital / max(n_positions, 1)  # shorts always equal-weight
-        adjusted_capital = short_capital * vol_scalar * short_regime_scalar
+        per_short_capital = short_capital_pool / max(len(shorts), 1)  # equal-weight from 30% pool
+        adjusted_capital = per_short_capital * vol_scalar * short_regime_scalar
         shares = adjusted_capital / entry_price
 
         atr_val = sv.atr_regime.metadata.get("atr_value", entry_price * 0.02)
@@ -1815,6 +1799,142 @@ def run_backtest(
             if earn_scores:
                 signals = blend_earnings_signals(signals, earn_scores, config.earnings_signal_weight)
 
+        # Institutional flow overlay (FMP + Finnhub 13F ownership)
+        if config.enable_institutional_flow:
+            from quant.institutional_flow import compute_institutional_flow_scores, blend_institutional_flow
+            inst_scores = compute_institutional_flow_scores(
+                list(signals.keys()),
+                as_of_date=reb_date.date(),
+                wrds_store=_inst_wrds_store,
+                fmp_client=_fmp_client,
+                fmp_cache=_inst_fmp_cache,
+                finnhub_client=_finnhub_client,
+                finnhub_disk_cache=_sentiment_cache,
+            )
+            if inst_scores:
+                signals = blend_institutional_flow(signals, inst_scores, config.institutional_flow_weight)
+
+        # Sector momentum (sets sector_momentum_score from sector ETF returns)
+        if _sector_etf_data:
+            from quant.sector_momentum import compute_sector_momentum_scores
+            from quant.universe import get_sector
+            sec_mom_scores = compute_sector_momentum_scores(
+                _sector_etf_data, signals, reb_date, get_sector,
+            )
+            for ticker, mom_score in sec_mom_scores.items():
+                if ticker in signals:
+                    signals[ticker].sector_momentum_score = mom_score
+
+        # Quality / Profitability (sets quality_score from WRDS Compustat)
+        if _wrds_provider is not None:
+            from quant.additional_signals import compute_quality_scores
+            quality_scores = compute_quality_scores(
+                list(signals.keys()), _wrds_provider, as_of_date=reb_date.date(),
+            )
+            for ticker, qscore in quality_scores.items():
+                if ticker in signals:
+                    signals[ticker].quality_score = qscore
+
+        # Price Momentum 12-1M (sets price_momentum_score from price cache)
+        from quant.additional_signals import compute_price_momentum_scores
+        mom_scores = compute_price_momentum_scores(universe_data, reb_date)
+        for ticker, mscore in mom_scores.items():
+            if ticker in signals:
+                signals[ticker].price_momentum_score = mscore
+
+        # Insider Activity (sets insider_score from Finnhub MSPR)
+        if _finnhub_client is not None or _sentiment_cache is not None:
+            from quant.additional_signals import compute_insider_scores
+            insider_scores = compute_insider_scores(
+                list(signals.keys()), reb_date,
+                finnhub_client=_finnhub_client,
+                sentiment_cache=_sentiment_cache,
+            )
+            for ticker, iscore in insider_scores.items():
+                if ticker in signals:
+                    signals[ticker].insider_score = iscore
+
+        # Event timing (PEAD from WRDS IBES actuals + consensus)
+        if _wrds_provider is not None:
+            from quant.event_timing import compute_event_timing_scores
+            from quant.wrds_store import WRDSPointInTimeStore
+            _evt_store = WRDSPointInTimeStore()
+            event_scores = compute_event_timing_scores(
+                list(signals.keys()), reb_date,
+                wrds_store=_evt_store,
+            )
+            for ticker, (escore, emeta) in event_scores.items():
+                if ticker in signals:
+                    signals[ticker].event_timing_score = escore
+                    signals[ticker].earnings_blocked = emeta.get("earnings_blocked", False)
+
+        # ── Cross-sectional normalization barrier ──
+        # Group by volatility tier (not sector) to preserve sector momentum
+        from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
+        from quant.scoring import reclassify
+        signals = normalize_signals_cross_sectionally(signals, make_volatility_tier_fn(signals))
+
+        # ── XGBoost ranking OR linear composite ──
+        _xgb_active = False
+        if config.enable_xgb_ranker and hasattr(config, '_xgb_feature_matrix') and config._xgb_feature_matrix is not None:
+            from quant.xgb_ranker import XGBMetaModel, FEATURE_COLS
+            import pandas as _pd
+
+            # Rolling retrain: retrain every xgb_retrain_freq periods using expanding window
+            _needs_retrain = (
+                config._xgb_model is None or
+                config._xgb_last_train_date is None or
+                (reb_date - config._xgb_last_train_date).days > config.xgb_retrain_freq * 30
+            )
+
+            if _needs_retrain:
+                _fm = config._xgb_feature_matrix
+                _fm_train = _fm[_fm["date"] < reb_date]  # strict: no data from current date
+                if len(_fm_train) >= 200:
+                    _model = XGBMetaModel()
+                    _model.fit(_fm_train[FEATURE_COLS], _fm_train["fwd_21d_return"], _fm_train["qid"])
+                    config._xgb_model = _model
+                    config._xgb_last_train_date = reb_date
+                    logger.info("XGB retrained on %d rows (up to %s)", len(_fm_train), reb_date.date())
+
+            if config._xgb_model is not None:
+                # Build feature row for each ticker from current signals
+                feature_rows = []
+                feature_tickers = []
+                for ticker, sv in signals.items():
+                    feature_rows.append({
+                        "obv_trend": sv.obv_trend.score,
+                        "earnings": sv.earnings_rank_score,
+                        "inst_flow": sv.institutional_flow_score,
+                        "sentiment": sv.sentiment_score,
+                        "quality": sv.quality_score,
+                        "price_mom": sv.price_momentum_score,
+                        "insider": sv.insider_score,
+                        "event_timing": sv.event_timing_score,
+                        "atr_pct": sv.atr_regime.metadata.get("atr_pct", 0.0),
+                        "vix_level": float(vix_df[vix_df.index <= reb_date].iloc[-1]["close"]) if vix_df is not None and len(vix_df[vix_df.index <= reb_date]) > 0 else 0.0,
+                    })
+                    feature_tickers.append(ticker)
+
+                X = _pd.DataFrame(feature_rows, columns=FEATURE_COLS)
+                xgb_scores = config._xgb_model.predict(X)
+
+                # Normalize XGB scores to [-1, +1] via rank percentile
+                ranks = xgb_scores.argsort().argsort()
+                n = len(ranks)
+                normalized = (ranks / (n - 1)) * 2.0 - 1.0 if n > 1 else np.zeros(n)
+
+                for i, ticker in enumerate(feature_tickers):
+                    signals[ticker].composite_score = float(normalized[i])
+                    reclassify(signals[ticker])
+                    signals[ticker].flags.append(f"xgb_rank={float(xgb_scores[i]):.3f}")
+                _xgb_active = True
+
+        if not _xgb_active:
+            for sv in signals.values():
+                sv.composite_score = compute_normalized_composite(sv)
+                reclassify(sv)
+
         # FOMC proximity risk premium (after all signal blends, before regime)
         if config.enable_fomc_proximity:
             all_dates_flat = sorted(set().union(*(df.index for df in universe_data.values())))
@@ -2020,6 +2140,65 @@ def run_walk_forward(
                 elif _fmp_cache.ticker_count() == 0:
                     logger.info("FMP_API_KEY not set and cache empty — fundamentals disabled")
 
+    # Auto-init institutional flow data sources + prefetch
+    if config.enable_institutional_flow:
+        global _inst_fmp_cache, _inst_wrds_store
+        if _inst_fmp_cache is None:
+            from quant.fmp_cache import FMPFundamentalCache
+            _inst_fmp_cache = FMPFundamentalCache()
+        if _fmp_client is None:
+            fmp_key = os.getenv("FMP_API_KEY", "").strip()
+            if fmp_key:
+                from fmp_client import FMPClient
+                _fmp_client = FMPClient(fmp_key)
+        # Use WRDS 13F store as primary source (if seeded)
+        if _inst_wrds_store is None and _wrds_provider is not None:
+            try:
+                from quant.wrds_store import WRDSPointInTimeStore
+                _inst_wrds_store = WRDSPointInTimeStore()
+                # Quick check if 13F data is seeded
+                test = _inst_wrds_store.get_inst_holdings_as_of(config.tickers[0], "2099-12-31", n_quarters=1)
+                if test:
+                    logger.info("WRDS 13F store available (%d test rows for %s)", len(test), config.tickers[0])
+                else:
+                    logger.info("WRDS 13F store empty — run: python scripts/seed_wrds.py --universe liquid_50")
+                    _inst_wrds_store = None
+            except Exception as exc:
+                logger.debug("WRDS 13F store init failed: %s", exc)
+                _inst_wrds_store = None
+        # Prefetch all institutional data once before the backtest loop
+        from quant.institutional_flow import prefetch_institutional_data
+        prefetch_stats = prefetch_institutional_data(
+            config.tickers,
+            wrds_store=_inst_wrds_store,
+            fmp_client=_fmp_client,
+            fmp_cache=_inst_fmp_cache,
+            finnhub_client=_finnhub_client,
+            finnhub_disk_cache=_sentiment_cache,
+        )
+        logger.info("Institutional flow prefetch: %d/%d tickers with data",
+                     len(prefetch_stats), len(config.tickers))
+
+    # XGBoost: load feature matrix for rolling retraining during walk-forward
+    if config.enable_xgb_ranker:
+        import os as _os
+        _fm_path = None
+        for _try_path in [f".xgb_features_liquid_{len(config.tickers)}.csv", ".xgb_features.csv"]:
+            if _os.path.exists(_try_path):
+                _fm_path = _try_path
+                break
+        if _fm_path:
+            from quant.xgb_features import load_feature_matrix
+            config._xgb_feature_matrix = load_feature_matrix(_fm_path)
+            config._xgb_feature_matrix["date"] = pd.to_datetime(config._xgb_feature_matrix["date"])
+            config._xgb_model = None  # trained per-window below
+            config._xgb_last_train_date = None
+            logger.info("XGB feature matrix loaded: %d rows for rolling retraining", len(config._xgb_feature_matrix))
+        else:
+            logger.warning("XGB: no feature matrix found — run scripts/run_xgb_test.py --rebuild-features first")
+            config._xgb_feature_matrix = None
+            config._xgb_model = None
+
     # Load all data once
     if progress_cb:
         progress_cb("Loading price data for walk-forward...")
@@ -2223,6 +2402,135 @@ def run_walk_forward(
                 )
                 if earn_scores:
                     signals = blend_earnings_signals(signals, earn_scores, config.earnings_signal_weight)
+
+            # Institutional flow overlay (FMP + Finnhub 13F ownership)
+            if config.enable_institutional_flow:
+                from quant.institutional_flow import compute_institutional_flow_scores, blend_institutional_flow
+                inst_scores = compute_institutional_flow_scores(
+                    list(signals.keys()),
+                    as_of_date=reb_date.date(),
+                    fmp_client=_fmp_client,
+                    fmp_cache=_inst_fmp_cache,
+                    finnhub_client=_finnhub_client,
+                    finnhub_disk_cache=_sentiment_cache,
+                )
+                if inst_scores:
+                    signals = blend_institutional_flow(signals, inst_scores, config.institutional_flow_weight)
+
+            # Sector momentum
+            if _sector_etf_data:
+                from quant.sector_momentum import compute_sector_momentum_scores
+                from quant.universe import get_sector
+                sec_mom_scores = compute_sector_momentum_scores(
+                    _sector_etf_data, signals, reb_date, get_sector,
+                )
+                for ticker, mom_score in sec_mom_scores.items():
+                    if ticker in signals:
+                        signals[ticker].sector_momentum_score = mom_score
+
+            # Quality / Profitability
+            if _wrds_provider is not None:
+                from quant.additional_signals import compute_quality_scores
+                quality_scores = compute_quality_scores(
+                    list(signals.keys()), _wrds_provider, as_of_date=reb_date.date(),
+                )
+                for ticker, qscore in quality_scores.items():
+                    if ticker in signals:
+                        signals[ticker].quality_score = qscore
+
+            # Price Momentum 12-1M
+            from quant.additional_signals import compute_price_momentum_scores
+            mom_scores = compute_price_momentum_scores(universe_data, reb_date)
+            for ticker, mscore in mom_scores.items():
+                if ticker in signals:
+                    signals[ticker].price_momentum_score = mscore
+
+            # Insider Activity
+            if _finnhub_client is not None or _sentiment_cache is not None:
+                from quant.additional_signals import compute_insider_scores
+                insider_scores = compute_insider_scores(
+                    list(signals.keys()), reb_date,
+                    finnhub_client=_finnhub_client,
+                    sentiment_cache=_sentiment_cache,
+                )
+                for ticker, iscore in insider_scores.items():
+                    if ticker in signals:
+                        signals[ticker].insider_score = iscore
+
+            # Event timing (PEAD from WRDS IBES)
+            if _wrds_provider is not None:
+                from quant.event_timing import compute_event_timing_scores
+                from quant.wrds_store import WRDSPointInTimeStore
+                _evt_store = WRDSPointInTimeStore()
+                event_scores = compute_event_timing_scores(
+                    list(signals.keys()), reb_date,
+                    wrds_store=_evt_store,
+                )
+                for ticker, (escore, emeta) in event_scores.items():
+                    if ticker in signals:
+                        signals[ticker].event_timing_score = escore
+                        signals[ticker].earnings_blocked = emeta.get("earnings_blocked", False)
+
+            # ── Cross-sectional normalization barrier ──
+            from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
+            from quant.scoring import reclassify
+            signals = normalize_signals_cross_sectionally(signals, make_volatility_tier_fn(signals))
+
+            # ── XGBoost ranking OR linear composite ──
+            _xgb_active = False
+            if config.enable_xgb_ranker and hasattr(config, '_xgb_feature_matrix') and config._xgb_feature_matrix is not None:
+                from quant.xgb_ranker import XGBMetaModel, FEATURE_COLS
+                import pandas as _pd
+
+                _needs_retrain = (
+                    config._xgb_model is None or
+                    config._xgb_last_train_date is None or
+                    (reb_date - config._xgb_last_train_date).days > config.xgb_retrain_freq * 30
+                )
+                if _needs_retrain:
+                    _fm = config._xgb_feature_matrix
+                    _fm_train = _fm[_fm["date"] < reb_date]
+                    if len(_fm_train) >= 200:
+                        _model = XGBMetaModel()
+                        _model.fit(_fm_train[FEATURE_COLS], _fm_train["fwd_21d_return"], _fm_train["qid"])
+                        config._xgb_model = _model
+                        config._xgb_last_train_date = reb_date
+                        logger.info("XGB retrained on %d rows (up to %s)", len(_fm_train), reb_date.date())
+
+                if config._xgb_model is not None:
+                    feature_rows = []
+                    feature_tickers = []
+                    for ticker, sv in signals.items():
+                        feature_rows.append({
+                            "obv_trend": sv.obv_trend.score,
+                            "earnings": sv.earnings_rank_score,
+                            "inst_flow": sv.institutional_flow_score,
+                            "sentiment": sv.sentiment_score,
+                            "quality": sv.quality_score,
+                            "price_mom": sv.price_momentum_score,
+                            "insider": sv.insider_score,
+                            "atr_pct": sv.atr_regime.metadata.get("atr_pct", 0.0),
+                            "vix_level": float(vix_df[vix_df.index <= reb_date].iloc[-1]["close"]) if vix_df is not None and len(vix_df[vix_df.index <= reb_date]) > 0 else 0.0,
+                        })
+                        feature_tickers.append(ticker)
+
+                    X = _pd.DataFrame(feature_rows, columns=FEATURE_COLS)
+                    xgb_scores = config._xgb_model.predict(X)
+
+                    ranks = xgb_scores.argsort().argsort()
+                    n = len(ranks)
+                    normalized = (ranks / (n - 1)) * 2.0 - 1.0 if n > 1 else np.zeros(n)
+
+                    for i, ticker in enumerate(feature_tickers):
+                        signals[ticker].composite_score = float(normalized[i])
+                        reclassify(signals[ticker])
+                        signals[ticker].flags.append(f"xgb_rank={float(xgb_scores[i]):.3f}")
+                    _xgb_active = True
+
+            if not _xgb_active:
+                for sv in signals.values():
+                    sv.composite_score = compute_normalized_composite(sv)
+                    reclassify(sv)
 
             # FOMC proximity risk premium
             if config.enable_fomc_proximity:
@@ -2536,6 +2844,82 @@ def run_cpcv(
                 )
                 if earn_scores:
                     signals = blend_earnings_signals(signals, earn_scores, config.earnings_signal_weight)
+
+            # Institutional flow overlay (FMP + Finnhub 13F ownership)
+            if config.enable_institutional_flow:
+                from quant.institutional_flow import compute_institutional_flow_scores, blend_institutional_flow
+                inst_scores = compute_institutional_flow_scores(
+                    list(signals.keys()),
+                    as_of_date=reb_date.date(),
+                    fmp_client=_fmp_client,
+                    fmp_cache=_inst_fmp_cache,
+                    finnhub_client=_finnhub_client,
+                    finnhub_disk_cache=_sentiment_cache,
+                )
+                if inst_scores:
+                    signals = blend_institutional_flow(signals, inst_scores, config.institutional_flow_weight)
+
+            # Sector momentum
+            if _sector_etf_data:
+                from quant.sector_momentum import compute_sector_momentum_scores
+                from quant.universe import get_sector
+                sec_mom_scores = compute_sector_momentum_scores(
+                    _sector_etf_data, signals, reb_date, get_sector,
+                )
+                for ticker, mom_score in sec_mom_scores.items():
+                    if ticker in signals:
+                        signals[ticker].sector_momentum_score = mom_score
+
+            # Quality / Profitability
+            if _wrds_provider is not None:
+                from quant.additional_signals import compute_quality_scores
+                quality_scores = compute_quality_scores(
+                    list(signals.keys()), _wrds_provider, as_of_date=reb_date.date(),
+                )
+                for ticker, qscore in quality_scores.items():
+                    if ticker in signals:
+                        signals[ticker].quality_score = qscore
+
+            # Price Momentum 12-1M
+            from quant.additional_signals import compute_price_momentum_scores
+            mom_scores = compute_price_momentum_scores(universe_data, reb_date)
+            for ticker, mscore in mom_scores.items():
+                if ticker in signals:
+                    signals[ticker].price_momentum_score = mscore
+
+            # Insider Activity
+            if _finnhub_client is not None or _sentiment_cache is not None:
+                from quant.additional_signals import compute_insider_scores
+                insider_scores = compute_insider_scores(
+                    list(signals.keys()), reb_date,
+                    finnhub_client=_finnhub_client,
+                    sentiment_cache=_sentiment_cache,
+                )
+                for ticker, iscore in insider_scores.items():
+                    if ticker in signals:
+                        signals[ticker].insider_score = iscore
+
+            # Event timing (PEAD from WRDS IBES)
+            if _wrds_provider is not None:
+                from quant.event_timing import compute_event_timing_scores
+                from quant.wrds_store import WRDSPointInTimeStore
+                _evt_store = WRDSPointInTimeStore()
+                event_scores = compute_event_timing_scores(
+                    list(signals.keys()), reb_date,
+                    wrds_store=_evt_store,
+                )
+                for ticker, (escore, emeta) in event_scores.items():
+                    if ticker in signals:
+                        signals[ticker].event_timing_score = escore
+                        signals[ticker].earnings_blocked = emeta.get("earnings_blocked", False)
+
+            # ── Cross-sectional normalization barrier ──
+            from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
+            from quant.scoring import reclassify
+            signals = normalize_signals_cross_sectionally(signals, make_volatility_tier_fn(signals))
+            for sv in signals.values():
+                sv.composite_score = compute_normalized_composite(sv)
+                reclassify(sv)
 
             if config.enable_fomc_proximity:
                 vix_now = None

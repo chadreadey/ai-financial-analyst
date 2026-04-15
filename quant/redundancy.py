@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 SIGNAL_NAMES = [
     "obv_trend",
+    "institutional_flow",
 ]
 
 
@@ -39,6 +40,21 @@ def compute_signal_scores_at_date(
     Returns DataFrame with tickers as rows and signal names as columns.
     Returns None if fewer than 5 tickers have valid signals.
     """
+    # Compute institutional flow scores for all tickers (if cache available)
+    inst_flow_scores = {}
+    try:
+        from quant.institutional_flow import compute_institutional_flow_scores
+        from quant.fmp_cache import FMPFundamentalCache
+        fmp_cache = FMPFundamentalCache()
+        as_of = as_of_date.date() if hasattr(as_of_date, 'date') else as_of_date
+        inst_flow_scores = compute_institutional_flow_scores(
+            list(universe_data.keys()),
+            as_of_date=as_of,
+            fmp_cache=fmp_cache,
+        )
+    except Exception:
+        pass
+
     rows = {}
     for ticker, df in universe_data.items():
         available = df[df.index <= as_of_date]
@@ -52,6 +68,7 @@ def compute_signal_scores_at_date(
                 high=window["high"],
                 low=window["low"],
             )
+            inst_entry = inst_flow_scores.get(ticker)
             rows[ticker] = {
                 "sma_trend": sv.sma_trend.score,
                 "mean_reversion_z": sv.mean_reversion_z.score,
@@ -59,6 +76,7 @@ def compute_signal_scores_at_date(
                 "rsi": sv.rsi.score,
                 "obv_trend": sv.obv_trend.score,
                 "high_52w": sv.high_52w.score,
+                "institutional_flow": inst_entry[0] if inst_entry else 0.0,
             }
         except Exception:
             continue
@@ -251,7 +269,8 @@ def print_correlation_report(
 
     # Header
     short = {"sma_trend": "SMA", "mean_reversion_z": "MR", "bollinger_pctb": "BB",
-             "rsi": "RSI", "obv_trend": "OBV", "high_52w": "52W"}
+             "rsi": "RSI", "obv_trend": "OBV", "high_52w": "52W",
+             "institutional_flow": "INST"}
     header = "         " + "  ".join(f"{short[s]:>6s}" for s in SIGNAL_NAMES)
     lines.append(f"  {header}")
     lines.append(f"  {'-' * len(header)}")

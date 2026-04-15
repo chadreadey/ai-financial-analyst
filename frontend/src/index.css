@@ -1,45 +1,55 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --bg-primary: #070b12;
-  --bg-secondary: #0d1420;
-  --bg-card: #111827;
-  --bg-hover: #1a2332;
-  --border: #1e2d40;
-  --border-subtle: #162030;
-  --text-primary: #f0f4f8;
-  --text-secondary: #94a3b8;
-  --text-muted: #4b5a6e;
-  --accent-green: #10b981;
-  --accent-amber: #f59e0b;
-  --accent-red: #ef4444;
-  --accent-blue: #3b82f6;
-  --accent-purple: #818cf8;
-  --accent-yellow: #fbbf24;
-  --accent-blue-hover: #2563eb;
-  --accent-blue-dim: rgba(59, 130, 246, 0.12);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5), 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
-  --radius: 8px;
-  --transition: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-}
+@layer base {
+  :root {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 240 6% 10%;
+    --card-foreground: 0 0% 98%;
+    --popover: 240 6% 10%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 187 72% 43%;
+    --primary-foreground: 240 10% 3.9%;
+    --secondary: 240 4% 16%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 187 72% 43%;
+    --accent-foreground: 240 10% 3.9%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 187 72% 43%;
+    --radius: 0.5rem;
 
-* {
-  box-sizing: border-box;
-}
+    /* Semantic financial colors (non-shadcn, used directly) */
+    --positive: #22c55e;
+    --negative: #ef4444;
+    --warning: #f59e0b;
+    --sidebar-bg: #0f0f11;
+    --card-elevated: #141416;
+  }
 
-body {
-  margin: 0;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  font-size: 14px;
-  line-height: 1.5;
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    margin: 0;
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    font-size: 13px;
+    line-height: 1.5;
+  }
 }
 
 ::-webkit-scrollbar {
@@ -50,99 +60,61 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
+  background: hsl(var(--border));
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: hsl(var(--muted-foreground));
 }
 
-:focus-visible {
-  outline: 2px solid var(--accent-blue);
-  outline-offset: 2px;
-}
-
-input,
-select,
-textarea {
-  font-family: inherit;
-  font-size: 14px;
-}
-
-/* Prose styles for markdown content */
+/* Prose styles for markdown agent reports */
 .prose {
-  color: var(--text-secondary);
+  color: hsl(var(--muted-foreground));
   line-height: 1.7;
 }
-.prose h1,
-.prose h2,
-.prose h3 {
-  color: var(--text-primary);
+.prose h1, .prose h2, .prose h3 {
+  color: hsl(var(--foreground));
   font-weight: 600;
   margin-top: 1.5em;
   margin-bottom: 0.5em;
 }
-.prose h1 {
-  font-size: 1.25rem;
-}
-.prose h2 {
-  font-size: 1.1rem;
-}
-.prose h3 {
-  font-size: 1rem;
-}
-.prose p {
-  margin: 0.75em 0;
-}
-.prose ul,
-.prose ol {
-  padding-left: 1.5em;
-  margin: 0.75em 0;
-}
-.prose li {
-  margin: 0.25em 0;
-}
-.prose strong {
-  color: var(--text-primary);
-  font-weight: 600;
-}
+.prose h1 { font-size: 1.25rem; }
+.prose h2 { font-size: 1.1rem; }
+.prose h3 { font-size: 1rem; }
+.prose p { margin: 0.75em 0; }
+.prose ul, .prose ol { padding-left: 1.5em; margin: 0.75em 0; }
+.prose li { margin: 0.25em 0; }
+.prose strong { color: hsl(var(--foreground)); font-weight: 600; }
 .prose code {
-  background: var(--bg-hover);
+  background: hsl(var(--secondary));
   padding: 0.1em 0.4em;
   border-radius: 4px;
   font-size: 0.85em;
-  color: var(--accent-blue);
+  color: hsl(var(--primary));
 }
 .prose blockquote {
-  border-left: 3px solid var(--accent-blue);
+  border-left: 3px solid hsl(var(--primary));
   padding-left: 1em;
-  color: var(--text-muted);
+  color: hsl(var(--muted-foreground));
   margin: 1em 0;
   font-style: italic;
 }
-.prose table {
-  width: 100%;
-  border-collapse: collapse;
-}
+.prose table { width: 100%; border-collapse: collapse; }
 .prose th {
-  background: var(--bg-hover);
+  background: hsl(var(--secondary));
   padding: 0.5em 0.75em;
   text-align: left;
   font-weight: 600;
-  color: var(--text-primary);
-  border-bottom: 1px solid var(--border);
+  color: hsl(var(--foreground));
+  border-bottom: 1px solid hsl(var(--border));
 }
 .prose td {
   padding: 0.5em 0.75em;
-  border-bottom: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
+  border-bottom: 1px solid hsl(var(--border));
+  color: hsl(var(--muted-foreground));
 }
 .prose hr {
   border: none;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid hsl(var(--border));
   margin: 1.5em 0;
-}
-
-.transition-fast {
-  transition: all var(--transition);
 }

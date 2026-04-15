@@ -1,4 +1,4 @@
-import { Card } from "../common/Card";
+import { Card } from "@/components/ui/card";
 import type { WatchlistSummary } from "../../api/types";
 
 interface Props {
@@ -15,11 +15,11 @@ export function PerformanceMetricsPanel({ summary }: Props) {
   return (
     <div className="grid grid-cols-3 gap-3">
       {metrics.map((m) => (
-        <Card key={m.label} padding="sm">
-          <div className="text-[10px] uppercase tracking-wider mb-1" style={{ color: "var(--text-muted)" }}>
+        <Card key={m.label} className="p-2.5">
+          <div className="text-[10px] uppercase tracking-wider mb-1 text-muted-foreground">
             {m.label}
           </div>
-          <div className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
+          <div className="text-lg font-bold text-foreground">
             {m.value}
           </div>
         </Card>

@@ -7,7 +7,7 @@ interface Props {
 }
 
 export function SparklineChart({ closes, isPositive, height = 40 }: Props) {
-  const color = isPositive ? "#10b981" : "#ef4444";
+  const color = isPositive ? "#06b6d4" : "#ef4444";
   const data = closes.map((v, i) => ({ v, i }));
 
   return (
