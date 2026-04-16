@@ -108,6 +108,11 @@ class BacktestConfig:
     conviction_sizing: float = 0.0        # 0=equal weight, 1=fully score-proportional sizing
     enable_agent_veto: bool = False       # Path C: quantified agent veto on candidates
     agent_veto_min_flags: int = 2         # minimum veto signals to remove a candidate (2 of 3)
+    # Kalshi event prediction signals
+    enable_kalshi_signal: bool = False          # Master switch for all Kalshi signals
+    kalshi_macro_weight: float = 0.10           # Weight of macro modifier in composite
+    kalshi_event_weight: float = 0.20           # Weight of event divergence signal in composite
+    kalshi_event_threshold: float = 0.20        # Min divergence to fire event signal (20pp)
     # Sector-diversified selection (wide scan, concentrated picks)
     max_per_sector: int = 3               # max positions from any single GICS sector
     min_score_gap: float = 0.0            # min score above universe median to enter (0 = disabled)
