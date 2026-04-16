@@ -43,6 +43,8 @@ class SignalVector:
     price_momentum_score: float = 0.0  # Set by 12-1M price momentum
     insider_score: float = 0.0  # Set by standalone insider MSPR signal
     event_timing_score: float = 0.0  # Set by event timing (PEAD + catalyst proximity)
+    kalshi_macro_score: float = 0.0   # Macro regime from Kalshi Fed/CPI/JOBS markets
+    kalshi_event_score: float = 0.0   # Pre-earnings divergence vs Kalshi-implied prob
     earnings_blocked: bool = False  # True if earnings within 3 days — block new entries
     flags: list = field(default_factory=list)
 
