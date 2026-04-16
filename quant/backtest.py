@@ -3451,11 +3451,69 @@ def run_cpcv(
             if config.vix_smoothing and _vix_risk_off_flag:
                 regime.level = "risk_off"
 
+            # ETF ladder allocation (Phase 2B)
+            _equity_capital_frac = 1.0
+            _etf_positions = []
+            if config.enable_dynamic_risk_off:
+                _ladder_tier = compute_etf_ladder_tier(
+                    vix_ratio=_vix_ratio,
+                    copper_bearish=getattr(regime, "copper_bearish", False),
+                    config=config,
+                )
+                if _ladder_tier is not None:
+                    _alloc = ETF_LADDER_TIERS[_ladder_tier]
+                    _equity_capital_frac = _alloc["equity_frac"]
+                    logger.info(
+                        "ETF ladder tier=%s equity_frac=%.2f at %s",
+                        _ladder_tier,
+                        _equity_capital_frac,
+                        reb_date,
+                    )
+                    for _etf_ticker, _etf_weight in _alloc.items():
+                        if _etf_ticker == "equity_frac":
+                            continue
+                        if _etf_ticker not in hedge_prices:
+                            logger.warning(
+                                "No price data for hedge ETF %s, skipping", _etf_ticker
+                            )
+                            continue
+                        _etf_price_series = hedge_prices[_etf_ticker]["close"]
+                        _etf_price_avail = _etf_price_series[
+                            _etf_price_series.index <= reb_date
+                        ]
+                        _etf_price = (
+                            float(_etf_price_avail.iloc[-1])
+                            if len(_etf_price_avail) > 0
+                            else None
+                        )
+                        if _etf_price is None or pd.isna(_etf_price) or _etf_price <= 0:
+                            continue
+                        _etf_notional = config.initial_capital * _etf_weight
+                        _etf_shares = _etf_notional / _etf_price
+                        _etf_positions.append(
+                            Position(
+                                ticker=_etf_ticker,
+                                direction="LONG",
+                                entry_date=reb_date,
+                                entry_price=_etf_price,
+                                shares=_etf_shares,
+                                stop_price=0.0,
+                                composite_score=0.0,
+                                flags=[f"hedge_etf:{_ladder_tier}"],
+                            )
+                        )
+
             # Use fresh capital per combination (no carry-over between
             # non-contiguous test groups — per CPCV methodology)
             positions = build_target_portfolio(
-                signals, universe_data, reb_date, config, config.initial_capital, regime=regime,
+                signals,
+                universe_data,
+                reb_date,
+                config,
+                config.initial_capital * _equity_capital_frac,
+                regime=regime,
             )
+            positions.extend(_etf_positions)
             if not positions:
                 continue
             trades, period_pnl = _compute_daily_portfolio_returns(
