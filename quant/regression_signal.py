@@ -38,9 +38,10 @@ def compute_price_regression_score(
     """
     if len(prices) < window:
         return 0.0
-    series = np.log(prices.iloc[-window:].values.astype(float))
-    if np.any(np.isnan(series)) or np.any(series <= 0):
+    raw = prices.iloc[-window:].values.astype(float)
+    if np.any(np.isnan(raw)) or np.any(raw <= 0):
         return 0.0
+    series = np.log(raw)
     x = np.arange(len(series), dtype=float)
     slope, _, r_value, _, _ = linregress(x, series)
     r2 = r_value ** 2

@@ -91,3 +91,27 @@ def test_regression_scores_wrapper_returns_dict():
     for ticker, score in result.items():
         assert isinstance(score, float)
         assert -1.0 <= score <= 1.0, f"Score for {ticker} out of [-1, 1]: {score}"
+
+
+def test_regression_scores_wrapper_handles_raw_dataframe():
+    """Wrapper must also accept a raw DataFrame (not dict-wrapped) as ticker value."""
+    import datetime
+
+    prices_up = pd.Series(
+        np.linspace(90.0, 110.0, 120),
+        index=pd.date_range("2024-01-01", periods=120, freq="B"),
+    )
+    df_up = pd.DataFrame({"close": prices_up})
+
+    # Pass the DataFrame directly, not wrapped in {"price_history": df}
+    universe_data = {"AAPL": df_up}
+
+    reb_date = datetime.date(2024, 6, 30)
+    result = compute_price_regression_scores(
+        universe_data, reb_date, window=60, r2_threshold=0.6
+    )
+
+    assert isinstance(result, dict)
+    assert "AAPL" in result
+    assert isinstance(result["AAPL"], float)
+    assert -1.0 <= result["AAPL"] <= 1.0
