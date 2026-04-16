@@ -196,3 +196,31 @@ export interface PaperMetrics {
   total_pnl_pct: number | null;
   total_trades: number;
 }
+
+export interface AlpacaAccount {
+  cash: number;
+  equity: number;
+  buying_power: number;
+  portfolio_value: number;
+  currency: string;
+  error?: string;
+}
+
+export interface AlpacaOrder {
+  order_id: string;
+  symbol: string;
+  qty: number;
+  side: string;
+  status: string;
+  filled_avg_price: number | null;
+  filled_at: string | null;
+  submitted_at: string | null;
+  order_type: string;
+}
+
+export interface RebalanceResult {
+  status: string;
+  closed: string[];
+  opened: string[];
+  errors: string[];
+}
