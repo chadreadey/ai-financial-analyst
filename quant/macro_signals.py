@@ -334,6 +334,7 @@ def compute_macro_regime(
     t10y3m_series: Optional[pd.Series],
     as_of_date: pd.Timestamp,
     vix: Optional[float] = None,
+    copper_series: Optional[pd.Series] = None,
 ) -> MacroRegimeSignal:
     """
     Compute full macro regime signal from FRED data.
@@ -388,6 +389,14 @@ def compute_macro_regime(
         signal.regime_multiplier = 1.0
         signal.regime_label = "risk_on"
 
+    # Copper signal
+    if copper_series is not None and not copper_series.empty:
+        _cu_price, _cu_dd, _cu_regime, _cu_score = compute_copper_signal(copper_series, as_of_date)
+        signal.copper_price = _cu_price
+        signal.copper_drawdown_12m = _cu_dd
+        signal.copper_regime = _cu_regime
+        signal.copper_score = _cu_score
+
     return signal
 
 
@@ -395,26 +404,27 @@ def compute_macro_regime(
 
 _hy_oas_cache: Optional[pd.Series] = None
 _t10y3m_cache: Optional[pd.Series] = None
+_copper_cache: Optional[pd.Series] = None
 
 
-def load_fred_macro_data(start_date: str = "2010-01-01") -> tuple[Optional[pd.Series], Optional[pd.Series]]:
+def load_fred_macro_data(start_date: str = "2010-01-01") -> tuple[Optional[pd.Series], Optional[pd.Series], Optional[pd.Series]]:
     """
-    Load HY OAS and 10Y-3M yield curve spread from FRED.
+    Load HY OAS, 10Y-3M yield curve spread, and copper price from FRED.
 
-    Returns (hy_oas_series, t10y3m_series) — both as pd.Series with DatetimeIndex.
+    Returns (hy_oas_series, t10y3m_series, copper_series) — all as pd.Series with DatetimeIndex.
     Returns cached data on subsequent calls.
     """
-    global _hy_oas_cache, _t10y3m_cache
+    global _hy_oas_cache, _t10y3m_cache, _copper_cache
 
-    if _hy_oas_cache is not None and _t10y3m_cache is not None:
-        return _hy_oas_cache, _t10y3m_cache
+    if _hy_oas_cache is not None and _t10y3m_cache is not None and _copper_cache is not None:
+        return _hy_oas_cache, _t10y3m_cache, _copper_cache
 
     try:
         from fred_client import get_fred_client
         client = get_fred_client()
         if client is None:
             logger.warning("No FRED API key — macro signals disabled")
-            return None, None
+            return None, None, None
 
         logger.info("Loading FRED macro data for backtest...")
         hy = client.get_series("BAMLH0A0HYM2", observation_start=start_date)
@@ -427,8 +437,18 @@ def load_fred_macro_data(start_date: str = "2010-01-01") -> tuple[Optional[pd.Se
             _t10y3m_cache = t10y3m
             logger.info("T10Y3M: %d obs, %s to %s", len(t10y3m), t10y3m.index[0].date(), t10y3m.index[-1].date())
 
-        return _hy_oas_cache, _t10y3m_cache
+        copper = pd.Series(dtype=float)
+        try:
+            raw = client.get_series("PCOPPUSDM", observation_start=start_date)
+            if raw is not None and not raw.empty:
+                copper = raw.resample("MS").last().ffill()
+                _copper_cache = copper
+                logger.info("Copper: %d obs, %s to %s", len(copper), copper.index[0].date(), copper.index[-1].date())
+        except Exception as exc:
+            logger.warning("Failed to load PCOPPUSDM: %s", exc)
+
+        return _hy_oas_cache, _t10y3m_cache, _copper_cache
 
     except Exception as e:
         logger.warning("Failed to load FRED data: %s", e)
-        return None, None
+        return None, None, None

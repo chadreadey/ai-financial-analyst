@@ -720,6 +720,7 @@ def detect_regime(
     sector_data: Optional[dict[str, pd.DataFrame]] = None,
     hy_oas_series: Optional[pd.Series] = None,
     t10y3m_series: Optional[pd.Series] = None,
+    copper_series: Optional[pd.Series] = None,
 ) -> RegimeState:
     """
     Multi-factor regime detection: VIX + SPY SMA + death/golden cross + turbulence + macro.
@@ -816,11 +817,11 @@ def detect_regime(
     else:
         state.level = "unknown"
 
-    # Macro regime overlay (HY OAS + yield curve + recession score)
-    if hy_oas_series is not None or t10y3m_series is not None:
+    # Macro regime overlay (HY OAS + yield curve + recession score + copper)
+    if hy_oas_series is not None or t10y3m_series is not None or copper_series is not None:
         try:
             from quant.macro_signals import compute_macro_regime
-            macro = compute_macro_regime(hy_oas_series, t10y3m_series, as_of_date, state.vix)
+            macro = compute_macro_regime(hy_oas_series, t10y3m_series, as_of_date, state.vix, copper_series=copper_series)
             state.macro_signal = macro
 
             # Macro can override to more cautious levels (never less cautious)
@@ -833,6 +834,10 @@ def detect_regime(
                     state.level = "risk_off"
                 elif macro.regime_label == "cautious" and state.level in ("bullish", "strong_bull"):
                     state.level = "cautious"
+
+            # Populate copper_bearish flag from copper signal
+            _copper_regime = getattr(macro, "copper_regime", "unknown")
+            state.copper_bearish = _copper_regime in ("bearish", "crisis")
         except Exception as e:
             logger.debug("Macro regime computation failed: %s", e)
 
@@ -1834,6 +1839,7 @@ def run_backtest(
     vix_df = None
     hy_oas_series = None
     t10y3m_series = None
+    copper_series = None
     if config.enable_regime_filter:
         if progress_cb:
             progress_cb("Loading VIX data...")
@@ -1842,10 +1848,10 @@ def run_backtest(
         if progress_cb:
             progress_cb("Loading sector ETFs for turbulence index...")
         _load_sector_etf_data(fetch_start, provider)
-        # Load FRED macro data for credit spread + yield curve regime signals
+        # Load FRED macro data for credit spread + yield curve + copper regime signals
         try:
             from quant.macro_signals import load_fred_macro_data
-            hy_oas_series, t10y3m_series = load_fred_macro_data(fetch_start)
+            hy_oas_series, t10y3m_series, copper_series = load_fred_macro_data(fetch_start)
         except Exception as e:
             logger.warning("FRED macro data load failed (continuing without): %s", e)
 
@@ -2204,17 +2210,52 @@ def run_backtest(
 
         # Detect market regime for short filtering + position sizing
         if config.enable_regime_filter:
-            regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data, hy_oas_series=hy_oas_series, t10y3m_series=t10y3m_series)
+            regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data, hy_oas_series=hy_oas_series, t10y3m_series=t10y3m_series, copper_series=copper_series)
         else:
             regime = RegimeState(level="unknown")
         # Override regime level when VIX smoothing is enabled and risk-off triggered
         if config.vix_smoothing and _vix_risk_off_flag:
             regime.level = "risk_off"
 
-        # Build target portfolio
+        # ETF ladder allocation (Phase 2B)
+        _equity_capital_frac = 1.0
+        _etf_positions = []
+        if config.enable_dynamic_risk_off:
+            _ladder_tier = compute_etf_ladder_tier(
+                vix_ratio=_vix_ratio,
+                copper_bearish=getattr(regime, "copper_bearish", False),
+                config=config,
+            )
+            if _ladder_tier is not None:
+                _alloc = ETF_LADDER_TIERS[_ladder_tier]
+                _equity_capital_frac = _alloc["equity_frac"]
+                logger.info("ETF ladder tier=%s equity_frac=%.2f at %s", _ladder_tier, _equity_capital_frac, reb_date)
+                for _etf_ticker, _etf_weight in _alloc.items():
+                    if _etf_ticker == "equity_frac":
+                        continue
+                    if _etf_ticker not in hedge_prices:
+                        logger.warning("No price data for hedge ETF %s, skipping", _etf_ticker)
+                        continue
+                    _etf_price_series = hedge_prices[_etf_ticker]["close"]
+                    _etf_price_avail = _etf_price_series[_etf_price_series.index <= reb_date]
+                    _etf_price = float(_etf_price_avail.iloc[-1]) if len(_etf_price_avail) > 0 else None
+                    if _etf_price is None or pd.isna(_etf_price) or _etf_price <= 0:
+                        continue
+                    _etf_notional = capital * _etf_weight
+                    _etf_shares = _etf_notional / _etf_price
+                    _etf_positions.append(Position(
+                        ticker=_etf_ticker, direction="LONG",
+                        entry_date=reb_date,
+                        entry_price=_etf_price, shares=_etf_shares,
+                        stop_price=0.0, composite_score=0.0,
+                        flags=[f"hedge_etf:{_ladder_tier}"],
+                    ))
+
+        # Build target portfolio (scaled capital after ETF ladder carve-out)
         positions = build_target_portfolio(
-            signals, universe_data, reb_date, config, capital, regime=regime,
+            signals, universe_data, reb_date, config, capital * _equity_capital_frac, regime=regime,
         )
+        positions.extend(_etf_positions)
         if not positions:
             continue
 
@@ -2477,19 +2518,32 @@ def run_walk_forward(
     vix_df = None
     hy_oas_series = None
     t10y3m_series = None
+    copper_series = None
     if config.enable_regime_filter:
         vix_df = load_vix_data(fetch_start)
         if progress_cb:
             progress_cb("Loading sector ETFs for turbulence index...")
         _load_sector_etf_data(fetch_start, provider)
-        # Load FRED macro data for credit spread + yield curve regime signals
+        # Load FRED macro data for credit spread + yield curve + copper regime signals
         try:
             from quant.macro_signals import load_fred_macro_data
-            hy_oas_series, t10y3m_series = load_fred_macro_data(fetch_start)
+            hy_oas_series, t10y3m_series, copper_series = load_fred_macro_data(fetch_start)
             if hy_oas_series is not None and progress_cb:
                 progress_cb(f"FRED macro data loaded: HY OAS ({len(hy_oas_series)} obs), T10Y3M ({len(t10y3m_series) if t10y3m_series is not None else 0} obs)")
         except Exception as e:
             logger.warning("FRED macro data load failed (continuing without): %s", e)
+
+    # Load hedge ETF price data for ETF ladder (Phase 2B)
+    hedge_prices = {}
+    if config.enable_dynamic_risk_off:
+        if progress_cb:
+            progress_cb("Loading hedge ETF data for risk-off ladder...")
+        hedge_prices = _load_hedge_etf_data(fetch_start, config.end_date)
+        _missing_hedge = [t for t in HEDGE_ETFS if t not in hedge_prices]
+        if _missing_hedge:
+            logger.warning("Missing hedge ETF price data for: %s", _missing_hedge)
+        for _ht, _hdf in hedge_prices.items():
+            universe_data[_ht] = _hdf
 
     # Generate walk-forward windows
     start = datetime.strptime(config.start_date, "%Y-%m-%d")
@@ -2877,15 +2931,50 @@ def run_walk_forward(
                 _vix_persistence_count = 0
 
             if config.enable_regime_filter:
-                regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data, hy_oas_series=hy_oas_series, t10y3m_series=t10y3m_series)
+                regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data, hy_oas_series=hy_oas_series, t10y3m_series=t10y3m_series, copper_series=copper_series)
             else:
                 regime = RegimeState(level="unknown")
             if config.vix_smoothing and _vix_risk_off_flag:
                 regime.level = "risk_off"
 
+            # ETF ladder allocation (Phase 2B)
+            _equity_capital_frac = 1.0
+            _etf_positions = []
+            if config.enable_dynamic_risk_off:
+                _ladder_tier = compute_etf_ladder_tier(
+                    vix_ratio=_vix_ratio,
+                    copper_bearish=getattr(regime, "copper_bearish", False),
+                    config=config,
+                )
+                if _ladder_tier is not None:
+                    _alloc = ETF_LADDER_TIERS[_ladder_tier]
+                    _equity_capital_frac = _alloc["equity_frac"]
+                    logger.info("ETF ladder tier=%s equity_frac=%.2f at %s", _ladder_tier, _equity_capital_frac, reb_date)
+                    for _etf_ticker, _etf_weight in _alloc.items():
+                        if _etf_ticker == "equity_frac":
+                            continue
+                        if _etf_ticker not in hedge_prices:
+                            logger.warning("No price data for hedge ETF %s, skipping", _etf_ticker)
+                            continue
+                        _etf_price_series = hedge_prices[_etf_ticker]["close"]
+                        _etf_price_avail = _etf_price_series[_etf_price_series.index <= reb_date]
+                        _etf_price = float(_etf_price_avail.iloc[-1]) if len(_etf_price_avail) > 0 else None
+                        if _etf_price is None or pd.isna(_etf_price) or _etf_price <= 0:
+                            continue
+                        _etf_notional = capital * _etf_weight
+                        _etf_shares = _etf_notional / _etf_price
+                        _etf_positions.append(Position(
+                            ticker=_etf_ticker, direction="LONG",
+                            entry_date=reb_date,
+                            entry_price=_etf_price, shares=_etf_shares,
+                            stop_price=0.0, composite_score=0.0,
+                            flags=[f"hedge_etf:{_ladder_tier}"],
+                        ))
+
             positions = build_target_portfolio(
-                signals, universe_data, reb_date, window_config, capital, regime=regime,
+                signals, universe_data, reb_date, window_config, capital * _equity_capital_frac, regime=regime,
             )
+            positions.extend(_etf_positions)
             if not positions:
                 continue
             trades, period_pnl = _compute_daily_portfolio_returns(
@@ -3064,6 +3153,7 @@ def run_cpcv(
     vix_df = None
     hy_oas_series = None
     t10y3m_series = None
+    copper_series = None
     if config.enable_regime_filter:
         vix_df = load_vix_data(fetch_start)
         if progress_cb:
@@ -3071,9 +3161,19 @@ def run_cpcv(
         _load_sector_etf_data(fetch_start, provider)
         try:
             from quant.macro_signals import load_fred_macro_data
-            hy_oas_series, t10y3m_series = load_fred_macro_data(fetch_start)
+            hy_oas_series, t10y3m_series, copper_series = load_fred_macro_data(fetch_start)
         except Exception as e:
             logger.warning("FRED macro data load failed (continuing without): %s", e)
+
+    # Load hedge ETF price data for ETF ladder (Phase 2B)
+    hedge_prices = {}
+    if config.enable_dynamic_risk_off:
+        hedge_prices = _load_hedge_etf_data(fetch_start, config.end_date)
+        _missing_hedge = [t for t in HEDGE_ETFS if t not in hedge_prices]
+        if _missing_hedge:
+            logger.warning("Missing hedge ETF price data for: %s", _missing_hedge)
+        for _ht, _hdf in hedge_prices.items():
+            universe_data[_ht] = _hdf
 
     # ── 3. Build CPCV groups and combinations ──
     all_dates = sorted(set().union(*(df.index for df in universe_data.values())))
@@ -3345,7 +3445,7 @@ def run_cpcv(
                 _vix_persistence_count = 0
 
             if config.enable_regime_filter:
-                regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data, hy_oas_series=hy_oas_series, t10y3m_series=t10y3m_series)
+                regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data, hy_oas_series=hy_oas_series, t10y3m_series=t10y3m_series, copper_series=copper_series)
             else:
                 regime = RegimeState(level="unknown")
             if config.vix_smoothing and _vix_risk_off_flag:

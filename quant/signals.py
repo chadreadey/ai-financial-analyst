@@ -43,6 +43,7 @@ class SignalVector:
     price_momentum_score: float = 0.0  # Set by 12-1M price momentum
     insider_score: float = 0.0  # Set by standalone insider MSPR signal
     event_timing_score: float = 0.0  # Set by event timing (PEAD + catalyst proximity)
+    copper_regime_score: float = 0.0   # Set by copper macro signal (-1 to +1)
     kalshi_macro_score: float = 0.0   # Macro regime from Kalshi Fed/CPI/JOBS markets
     kalshi_event_score: float = 0.0   # Pre-earnings divergence vs Kalshi-implied prob
     price_regression_score: float = 0.0  # R²-filtered OLS trend signal [-1, +1]
