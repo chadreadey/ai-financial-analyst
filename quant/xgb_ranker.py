@@ -24,6 +24,7 @@ FEATURE_COLS = [
     "obv_trend", "earnings", "inst_flow", "sentiment",
     "quality", "price_mom", "insider", "event_timing",
     "atr_pct", "vix_level",
+    "price_regression", "arima_forecast",
 ]
 
 

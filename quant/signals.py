@@ -46,6 +46,7 @@ class SignalVector:
     copper_regime_score: float = 0.0   # Set by copper macro signal (-1 to +1)
     kalshi_macro_score: float = 0.0   # Macro regime from Kalshi Fed/CPI/JOBS markets
     kalshi_event_score: float = 0.0   # Pre-earnings divergence vs Kalshi-implied prob
+    kalshi_macro_momentum: float = 0.0  # Rate-of-change of macro modifier (velocity)
     price_regression_score: float = 0.0  # R²-filtered OLS trend signal [-1, +1]
     arima_forecast_score: float = 0.0    # ARIMA(1,1,1) forecast signal, stable regimes only [-1, +1]
     earnings_blocked: bool = False  # True if earnings within 3 days — block new entries

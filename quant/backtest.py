@@ -120,6 +120,7 @@ class BacktestConfig:
     kalshi_macro_weight: float = 0.10           # Weight of macro modifier in composite
     kalshi_event_weight: float = 0.20           # Weight of event divergence signal in composite
     kalshi_event_threshold: float = 0.20        # Min divergence to fire event signal (20pp)
+    kalshi_momentum_weight: float = 0.10        # Weight of macro momentum (velocity) — not yet applied to composite
     # Price regression signal (R²-filtered OLS trend)
     enable_regression_signal: bool = False
     regression_window: int = 60
@@ -2060,11 +2061,13 @@ def run_backtest(
         if config.enable_kalshi_signal:
             try:
                 from quant.kalshi_client import KalshiClient
-                from quant.kalshi_signal import compute_macro_modifier, compute_event_divergence
+                from quant.kalshi_signal import compute_macro_modifier, compute_event_divergence, compute_macro_momentum
                 _kalshi_client = KalshiClient()
                 _kalshi_macro = compute_macro_modifier(_kalshi_client)
+                _kalshi_momentum = compute_macro_momentum(_kalshi_client)
                 for _ticker in signals:
                     signals[_ticker].kalshi_macro_score = _kalshi_macro
+                    signals[_ticker].kalshi_macro_momentum = _kalshi_momentum
                     _earn_prob = getattr(signals[_ticker], "earnings_rank_score", 0.0)
                     # Map earnings_rank_score ([-1,1]) to probability space [0,1]
                     _our_prob = (_earn_prob + 1.0) / 2.0
@@ -2151,6 +2154,8 @@ def run_backtest(
                         "event_timing": sv.event_timing_score,
                         "atr_pct": sv.atr_regime.metadata.get("atr_pct", 0.0),
                         "vix_level": float(vix_df[vix_df.index <= reb_date].iloc[-1]["close"]) if vix_df is not None and len(vix_df[vix_df.index <= reb_date]) > 0 else 0.0,
+                        "price_regression": sv.price_regression_score,
+                        "arima_forecast": sv.arima_forecast_score,
                     })
                     feature_tickers.append(ticker)
 
@@ -2790,11 +2795,13 @@ def run_walk_forward(
             if config.enable_kalshi_signal:
                 try:
                     from quant.kalshi_client import KalshiClient
-                    from quant.kalshi_signal import compute_macro_modifier, compute_event_divergence
+                    from quant.kalshi_signal import compute_macro_modifier, compute_event_divergence, compute_macro_momentum
                     _kalshi_client = KalshiClient()
                     _kalshi_macro = compute_macro_modifier(_kalshi_client)
+                    _kalshi_momentum = compute_macro_momentum(_kalshi_client)
                     for _ticker in signals:
                         signals[_ticker].kalshi_macro_score = _kalshi_macro
+                        signals[_ticker].kalshi_macro_momentum = _kalshi_momentum
                         _earn_prob = getattr(signals[_ticker], "earnings_rank_score", 0.0)
                         # Map earnings_rank_score ([-1,1]) to probability space [0,1]
                         _our_prob = (_earn_prob + 1.0) / 2.0
@@ -2874,8 +2881,11 @@ def run_walk_forward(
                             "quality": sv.quality_score,
                             "price_mom": sv.price_momentum_score,
                             "insider": sv.insider_score,
+                            "event_timing": sv.event_timing_score,
                             "atr_pct": sv.atr_regime.metadata.get("atr_pct", 0.0),
                             "vix_level": float(vix_df[vix_df.index <= reb_date].iloc[-1]["close"]) if vix_df is not None and len(vix_df[vix_df.index <= reb_date]) > 0 else 0.0,
+                            "price_regression": sv.price_regression_score,
+                            "arima_forecast": sv.arima_forecast_score,
                         })
                         feature_tickers.append(ticker)
 
@@ -3357,11 +3367,13 @@ def run_cpcv(
             if config.enable_kalshi_signal:
                 try:
                     from quant.kalshi_client import KalshiClient
-                    from quant.kalshi_signal import compute_macro_modifier, compute_event_divergence
+                    from quant.kalshi_signal import compute_macro_modifier, compute_event_divergence, compute_macro_momentum
                     _kalshi_client = KalshiClient()
                     _kalshi_macro = compute_macro_modifier(_kalshi_client)
+                    _kalshi_momentum = compute_macro_momentum(_kalshi_client)
                     for _ticker in signals:
                         signals[_ticker].kalshi_macro_score = _kalshi_macro
+                        signals[_ticker].kalshi_macro_momentum = _kalshi_momentum
                         _earn_prob = getattr(signals[_ticker], "earnings_rank_score", 0.0)
                         # Map earnings_rank_score ([-1,1]) to probability space [0,1]
                         _our_prob = (_earn_prob + 1.0) / 2.0

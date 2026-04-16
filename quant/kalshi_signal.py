@@ -69,6 +69,38 @@ def compute_macro_modifier(
     return float(np.clip(raw * 2.0, -1.0, 1.0))
 
 
+def compute_macro_momentum(
+    client: KalshiClient,
+    lookback_periods: int = 4,
+    _date_override: Optional[str] = None,
+) -> float:
+    """Rate-of-change (velocity) of the macro modifier.
+
+    Returns current_modifier - prior_modifier, clipped to [-1, +1].
+    The prior date is lookback_periods * 30 days before today (or _date_override).
+    Returns 0.0 gracefully on any error.
+    """
+    try:
+        from datetime import datetime, timedelta
+
+        if _date_override:
+            base_date = datetime.strptime(_date_override, "%Y-%m-%d")
+        else:
+            base_date = datetime.utcnow()
+
+        prior_date = base_date - timedelta(days=lookback_periods * 30)
+        prior_date_str = prior_date.strftime("%Y-%m-%d")
+
+        current_modifier = compute_macro_modifier(client, _date_override=_date_override)
+        prior_modifier = compute_macro_modifier(client, _date_override=prior_date_str)
+
+        delta = current_modifier - prior_modifier
+        return float(np.clip(delta, -1.0, 1.0))
+    except Exception as exc:
+        logger.warning("compute_macro_momentum failed: %s", exc)
+        return 0.0
+
+
 def compute_event_divergence(
     client: KalshiClient,
     ticker: str,
