@@ -45,6 +45,8 @@ class SignalVector:
     event_timing_score: float = 0.0  # Set by event timing (PEAD + catalyst proximity)
     kalshi_macro_score: float = 0.0   # Macro regime from Kalshi Fed/CPI/JOBS markets
     kalshi_event_score: float = 0.0   # Pre-earnings divergence vs Kalshi-implied prob
+    price_regression_score: float = 0.0  # R²-filtered OLS trend signal [-1, +1]
+    arima_forecast_score: float = 0.0    # ARIMA(1,1,1) forecast signal, stable regimes only [-1, +1]
     earnings_blocked: bool = False  # True if earnings within 3 days — block new entries
     flags: list = field(default_factory=list)
 
