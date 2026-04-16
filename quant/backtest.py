@@ -571,6 +571,9 @@ def _load_hedge_etf_data(start_date: str, end_date: str) -> dict:
                     close_series = close_series.squeeze()
                 hedge_df = pd.DataFrame({"close": close_series})
                 hedge_df.index = pd.to_datetime(hedge_df.index)
+                if hedge_df.index.tz is not None:
+                    hedge_df.index = hedge_df.index.tz_localize(None)
+                hedge_df.index = hedge_df.index.normalize()
                 result[ticker] = hedge_df
         except Exception as exc:
             logger.warning("Failed to load hedge ETF %s: %s", ticker, exc)
