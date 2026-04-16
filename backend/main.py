@@ -16,6 +16,8 @@ load_dotenv(Path(project_root) / ".env")
 
 from config import settings
 
+logger = logging.getLogger(__name__)
+
 logging.basicConfig(
     format="%(levelname)s | %(name)s | %(message)s",
     level=getattr(logging, settings.log_level.upper(), logging.INFO),
@@ -38,7 +40,18 @@ if _dsn:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Start paper trading scheduler if Alpaca keys are configured
+    _scheduler = None
+    if settings.alpaca_api_key and settings.alpaca_secret_key:
+        try:
+            from backend.paper_scheduler import create_scheduler
+            _scheduler = create_scheduler(start=True)
+            logger.info("Paper trading scheduler started")
+        except Exception as exc:
+            logger.warning("Failed to start paper trading scheduler: %s", exc)
     yield
+    if _scheduler:
+        _scheduler.shutdown(wait=False)
 
 
 app = FastAPI(
