@@ -240,3 +240,52 @@ async def get_metrics():
         "total_pnl_pct": total_pnl_pct,
         "total_trades": len(returns),
     }
+
+
+# ── Alpaca integration endpoints ──────────────────────────────────
+
+from backend.alpaca_paper_client import get_alpaca_client  # noqa: E402
+
+try:
+    from backend.paper_scheduler import run_rebalance  # noqa: E402
+except ImportError:
+    run_rebalance = None  # type: ignore[assignment]
+
+
+@router.get("/account")
+async def get_alpaca_account():
+    """Return Alpaca paper account info (balance, buying power)."""
+    try:
+        client = get_alpaca_client()
+        return client.get_account()
+    except EnvironmentError:
+        return {"error": "Alpaca not configured"}
+    except Exception as exc:
+        logger.warning("Failed to get Alpaca account: %s", exc)
+        return {"error": str(exc)}
+
+
+@router.get("/orders")
+async def get_alpaca_orders():
+    """Return recent Alpaca order history."""
+    try:
+        client = get_alpaca_client()
+        orders = client.get_orders()
+        return {"orders": orders}
+    except EnvironmentError:
+        return {"orders": [], "error": "Alpaca not configured"}
+    except Exception as exc:
+        logger.warning("Failed to get Alpaca orders: %s", exc)
+        return {"orders": [], "error": str(exc)}
+
+
+@router.post("/rebalance")
+async def trigger_rebalance(body: dict = None):
+    """Trigger a manual rebalance. Optionally pass {"tickers": ["AAPL", "MSFT"]}."""
+    try:
+        tickers = (body or {}).get("tickers")
+        result = run_rebalance(target_tickers=tickers)
+        return result
+    except Exception as exc:
+        logger.error("Rebalance failed: %s", exc, exc_info=True)
+        return {"status": "error", "error": str(exc)}
