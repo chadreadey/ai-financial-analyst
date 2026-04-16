@@ -51,3 +51,24 @@ def test_dynamic_risk_off_disabled_returns_none():
     cfg = BacktestConfig(vix_smoothing=True, enable_dynamic_risk_off=False)
     tier = compute_etf_ladder_tier(vix_ratio=2.0, copper_bearish=False, config=cfg)
     assert tier is None
+
+
+def test_tier_boundary_at_1_5_is_moderate():
+    """Exactly 1.5 equals vix_ratio_threshold so it is NOT mild — it becomes moderate."""
+    tier = compute_etf_ladder_tier(vix_ratio=1.5, copper_bearish=False, config=_cfg())
+    assert tier == "moderate"
+
+
+def test_tier_boundary_at_2_0_is_severe():
+    tier = compute_etf_ladder_tier(vix_ratio=2.0, copper_bearish=False, config=_cfg())
+    assert tier == "severe"
+
+
+def test_tier_boundary_at_3_0_is_severe_without_copper():
+    tier = compute_etf_ladder_tier(vix_ratio=3.0, copper_bearish=False, config=_cfg())
+    assert tier == "severe"
+
+
+def test_vix_ratio_none_returns_none():
+    tier = compute_etf_ladder_tier(vix_ratio=None, copper_bearish=False, config=_cfg())
+    assert tier is None
