@@ -2856,6 +2856,7 @@ def run_cpcv(
         # Iterate test rebalance dates
         for i, reb_date in enumerate(safe_test_dates[:-1]):
             next_reb = safe_test_dates[i + 1]
+            _xgb_active = False
             signals = compute_signals_at_date(universe_data, reb_date, config.lookback_days)
             if not signals:
                 continue
@@ -2996,19 +2997,20 @@ def run_cpcv(
                     logger.warning("Kalshi signal injection failed: %s", _exc)
 
             # ── Cross-sectional normalization barrier ──
-            from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
-            from quant.scoring import reclassify
-            signals = normalize_signals_cross_sectionally(signals, make_volatility_tier_fn(signals))
-            for sv in signals.values():
-                sv.composite_score = compute_normalized_composite(sv)
-                if config.enable_kalshi_signal:
-                    sv.composite_score = float(np.clip(
-                        sv.composite_score
-                        + sv.kalshi_macro_score * config.kalshi_macro_weight
-                        + sv.kalshi_event_score * config.kalshi_event_weight,
-                        -1.0, 1.0,
-                    ))
-                reclassify(sv)
+            if not _xgb_active:
+                from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
+                from quant.scoring import reclassify
+                signals = normalize_signals_cross_sectionally(signals, make_volatility_tier_fn(signals))
+                for sv in signals.values():
+                    sv.composite_score = compute_normalized_composite(sv)
+                    if config.enable_kalshi_signal:
+                        sv.composite_score = float(np.clip(
+                            sv.composite_score
+                            + sv.kalshi_macro_score * config.kalshi_macro_weight
+                            + sv.kalshi_event_score * config.kalshi_event_weight,
+                            -1.0, 1.0,
+                        ))
+                    reclassify(sv)
 
             if config.enable_fomc_proximity:
                 vix_now = None
