@@ -39,3 +39,9 @@ pydantic-settings>=2.0
 
 # Observability
 sentry-sdk[fastapi]>=2.0
+
+# Alpaca paper trading
+alpaca-py>=0.28.0
+
+# Scheduling
+APScheduler>=3.10.4
