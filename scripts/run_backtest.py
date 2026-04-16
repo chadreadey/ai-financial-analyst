@@ -156,6 +156,10 @@ def main():
                         help="Enable FOMC proximity risk premium (Lucca-Moench drift)")
     parser.add_argument("--fomc-boost", type=float, default=0.15,
                         help="FOMC proximity boost when VIX > 20 (default: 0.15)")
+    parser.add_argument("--enable-kalshi", action="store_true",
+                        help="Enable Kalshi prediction market signals (macro modifier + earnings divergence)")
+    parser.add_argument("--kalshi-event-threshold", type=float, default=0.20,
+                        help="Minimum divergence (0-1) to fire Kalshi event signal. Default 0.20.")
     parser.add_argument("--max-per-sector", type=int, default=0,
                         help="Max positions per GICS sector (0=disabled, 2-3 recommended for wide universe)")
     parser.add_argument("--enable-fundamentals", action="store_true",
@@ -249,6 +253,8 @@ def main():
         news_sentiment_weight=args.sentiment_weight,
         enable_fomc_proximity=args.enable_fomc,
         fomc_high_vix_boost=args.fomc_boost,
+        enable_kalshi_signal=args.enable_kalshi,
+        kalshi_event_threshold=args.kalshi_event_threshold,
         max_per_sector=args.max_per_sector,
         enable_fundamentals=args.enable_fundamentals,
         fundamentals_weight=args.fundamentals_weight,
