@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class BacktestConfig:
     """All tunable knobs for a quant backtest run."""
-    tickers: list[str]
+    tickers: list[str] = None  # type: ignore[assignment]
     start_date: str = "2016-01-01"          # 10 years back from ~2026
     end_date: str = ""                       # defaults to today
     rebalance_freq: str = "monthly"          # "weekly" or "monthly"
@@ -63,6 +63,12 @@ class BacktestConfig:
     # Enhanced regime detection
     vix_caution_threshold: float = 28.0       # VIX above this = cautious (P90 of VIX distribution)
     vix_risk_off_threshold: float = 35.0      # VIX above this = risk-off (P95, extreme spikes only)
+    # VIX smoothing — replaces raw threshold with ratio vs 50d SMA
+    vix_smoothing: bool = False
+    vix_sma_window: int = 50
+    vix_ratio_threshold: float = 1.5       # ratio to trigger risk-off
+    vix_reentry_threshold: float = 1.2     # hysteresis: must drop below to re-enter risk-on
+    vix_persistence_periods: int = 2       # consecutive rebalances above threshold to confirm
     enable_death_golden_cross: bool = True     # SPY 50/200 SMA cross detection
     golden_cross_boost: float = 0.10           # lower long threshold by this during golden cross
     # TimesFM overlay (DEPRECATED — prefer LSTM)
@@ -508,13 +514,16 @@ def load_vix_data(start_date: str) -> Optional[pd.DataFrame]:
 @dataclass
 class RegimeState:
     """Rich regime information for portfolio construction."""
-    level: str          # "risk_off", "bearish", "cautious", "bullish", "strong_bull"
+    level: str = "bullish"  # "risk_off", "bearish", "cautious", "bullish", "strong_bull"
     vix: Optional[float] = None
     sma_cross: Optional[str] = None  # "death_cross", "golden_cross", or None
     spy_vs_sma200: Optional[str] = None  # "above" or "below"
     sizing_scalar: float = 1.0  # position sizing multiplier
     turbulence: Optional[float] = None  # Mahalanobis distance (sector decorrelation)
     macro_signal: Optional[object] = None  # MacroRegimeSignal from quant/macro_signals.py
+    vix_ratio: Optional[float] = None
+    vix_persistence_count: int = 0
+    copper_bearish: bool = False
 
 
 # ── Turbulence Index ─────────────────────────────────────────────────
@@ -595,6 +604,44 @@ def compute_turbulence(
     diff = r_today - mu
     turbulence = float(diff @ cov_inv @ diff)
     return round(turbulence, 2)
+
+
+def _compute_vix_regime(
+    vix_series: pd.Series,
+    current_vix: float,
+    config: "BacktestConfig",
+    prev_persistence_count: int = 0,
+) -> tuple:
+    """
+    Compute VIX-based regime flags.
+
+    Returns: (vix_ratio, risk_off, cautious)
+      vix_ratio: VIX / 50d SMA, or None if smoothing disabled or insufficient data
+      risk_off: True if risk-off should activate
+      cautious: True if cautious (between reentry and risk-off threshold)
+    """
+    if not config.vix_smoothing:
+        risk_off = current_vix >= config.vix_risk_off_threshold
+        cautious = current_vix >= getattr(config, "vix_caution_threshold", 20)
+        return None, risk_off, cautious
+
+    min_obs = max(config.vix_sma_window // 2, 25)
+    if vix_series is None or len(vix_series) < min_obs:
+        risk_off = current_vix >= config.vix_risk_off_threshold
+        cautious = risk_off
+        return None, risk_off, cautious
+
+    sma = float(vix_series.tail(config.vix_sma_window).mean())
+    if sma <= 0:
+        return None, False, False
+
+    ratio = current_vix / sma
+
+    persistence_met = prev_persistence_count >= (config.vix_persistence_periods - 1)
+    risk_off = ratio >= config.vix_ratio_threshold and persistence_met
+    cautious = ratio >= config.vix_reentry_threshold
+
+    return ratio, risk_off, cautious
 
 
 def detect_regime(
