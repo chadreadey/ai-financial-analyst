@@ -160,6 +160,16 @@ def main():
                         help="Enable Kalshi prediction market signals (macro modifier + earnings divergence)")
     parser.add_argument("--kalshi-event-threshold", type=float, default=0.20,
                         help="Minimum divergence (0-1) to fire Kalshi event signal. Default 0.20.")
+    parser.add_argument("--enable-regression", action="store_true",
+                        help="Enable R²-filtered OLS price regression signal")
+    parser.add_argument("--regression-window", type=int, default=60,
+                        help="Lookback window (days) for OLS regression. Default 60.")
+    parser.add_argument("--regression-r2-threshold", type=float, default=0.6,
+                        help="Minimum R² to emit a non-zero regression score. Default 0.6.")
+    parser.add_argument("--enable-arima", action="store_true",
+                        help="Enable ARIMA short-term forecast signal (disabled in high-vol regimes)")
+    parser.add_argument("--arima-vol-threshold", type=float, default=0.25,
+                        help="Annualised vol ceiling above which ARIMA score is zeroed. Default 0.25.")
     parser.add_argument("--max-per-sector", type=int, default=0,
                         help="Max positions per GICS sector (0=disabled, 2-3 recommended for wide universe)")
     parser.add_argument("--enable-fundamentals", action="store_true",
@@ -255,6 +265,11 @@ def main():
         fomc_high_vix_boost=args.fomc_boost,
         enable_kalshi_signal=args.enable_kalshi,
         kalshi_event_threshold=args.kalshi_event_threshold,
+        enable_regression_signal=args.enable_regression,
+        regression_window=args.regression_window,
+        regression_r2_threshold=args.regression_r2_threshold,
+        enable_arima_signal=args.enable_arima,
+        arima_vol_threshold=args.arima_vol_threshold,
         max_per_sector=args.max_per_sector,
         enable_fundamentals=args.enable_fundamentals,
         fundamentals_weight=args.fundamentals_weight,

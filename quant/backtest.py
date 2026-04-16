@@ -113,6 +113,13 @@ class BacktestConfig:
     kalshi_macro_weight: float = 0.10           # Weight of macro modifier in composite
     kalshi_event_weight: float = 0.20           # Weight of event divergence signal in composite
     kalshi_event_threshold: float = 0.20        # Min divergence to fire event signal (20pp)
+    # Price regression signal (R²-filtered OLS trend)
+    enable_regression_signal: bool = False
+    regression_window: int = 60
+    regression_r2_threshold: float = 0.6
+    # ARIMA short-term forecast signal (stable vol regimes only)
+    enable_arima_signal: bool = False
+    arima_vol_threshold: float = 0.25
     # Sector-diversified selection (wide scan, concentrated picks)
     max_per_sector: int = 3               # max positions from any single GICS sector
     min_score_gap: float = 0.0            # min score above universe median to enter (0 = disabled)
@@ -1894,6 +1901,35 @@ def run_backtest(
             except Exception as _exc:
                 logger.warning("Kalshi signal injection failed: %s", _exc)
 
+        # Price regression signal (R²-filtered OLS trend)
+        if config.enable_regression_signal:
+            try:
+                from quant.regression_signal import compute_price_regression_scores
+                _reg_scores = compute_price_regression_scores(
+                    universe_data, reb_date,
+                    window=config.regression_window,
+                    r2_threshold=config.regression_r2_threshold,
+                )
+                for _ticker, _score in _reg_scores.items():
+                    if _ticker in signals:
+                        signals[_ticker].price_regression_score = _score
+            except Exception as _exc:
+                logger.warning("Regression signal injection failed: %s", _exc)
+
+        # ARIMA short-term forecast signal (stable regimes only)
+        if config.enable_arima_signal:
+            try:
+                from quant.arima_signal import compute_arima_forecast_scores
+                _arima_scores = compute_arima_forecast_scores(
+                    universe_data, reb_date,
+                    vol_threshold=config.arima_vol_threshold,
+                )
+                for _ticker, _score in _arima_scores.items():
+                    if _ticker in signals:
+                        signals[_ticker].arima_forecast_score = _score
+            except Exception as _exc:
+                logger.warning("ARIMA signal injection failed: %s", _exc)
+
         # ── Cross-sectional normalization barrier ──
         # Group by volatility tier (not sector) to preserve sector momentum
         from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
@@ -2525,6 +2561,35 @@ def run_walk_forward(
                 except Exception as _exc:
                     logger.warning("Kalshi signal injection failed: %s", _exc)
 
+            # Price regression signal (R²-filtered OLS trend)
+            if config.enable_regression_signal:
+                try:
+                    from quant.regression_signal import compute_price_regression_scores
+                    _reg_scores = compute_price_regression_scores(
+                        universe_data, reb_date,
+                        window=config.regression_window,
+                        r2_threshold=config.regression_r2_threshold,
+                    )
+                    for _ticker, _score in _reg_scores.items():
+                        if _ticker in signals:
+                            signals[_ticker].price_regression_score = _score
+                except Exception as _exc:
+                    logger.warning("Regression signal injection failed: %s", _exc)
+
+            # ARIMA short-term forecast signal (stable regimes only)
+            if config.enable_arima_signal:
+                try:
+                    from quant.arima_signal import compute_arima_forecast_scores
+                    _arima_scores = compute_arima_forecast_scores(
+                        universe_data, reb_date,
+                        vol_threshold=config.arima_vol_threshold,
+                    )
+                    for _ticker, _score in _arima_scores.items():
+                        if _ticker in signals:
+                            signals[_ticker].arima_forecast_score = _score
+                except Exception as _exc:
+                    logger.warning("ARIMA signal injection failed: %s", _exc)
+
             # ── Cross-sectional normalization barrier ──
             from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
             from quant.scoring import reclassify
@@ -2995,6 +3060,35 @@ def run_cpcv(
                         )
                 except Exception as _exc:
                     logger.warning("Kalshi signal injection failed: %s", _exc)
+
+            # Price regression signal (R²-filtered OLS trend)
+            if config.enable_regression_signal:
+                try:
+                    from quant.regression_signal import compute_price_regression_scores
+                    _reg_scores = compute_price_regression_scores(
+                        universe_data, reb_date,
+                        window=config.regression_window,
+                        r2_threshold=config.regression_r2_threshold,
+                    )
+                    for _ticker, _score in _reg_scores.items():
+                        if _ticker in signals:
+                            signals[_ticker].price_regression_score = _score
+                except Exception as _exc:
+                    logger.warning("Regression signal injection failed: %s", _exc)
+
+            # ARIMA short-term forecast signal (stable regimes only)
+            if config.enable_arima_signal:
+                try:
+                    from quant.arima_signal import compute_arima_forecast_scores
+                    _arima_scores = compute_arima_forecast_scores(
+                        universe_data, reb_date,
+                        vol_threshold=config.arima_vol_threshold,
+                    )
+                    for _ticker, _score in _arima_scores.items():
+                        if _ticker in signals:
+                            signals[_ticker].arima_forecast_score = _score
+                except Exception as _exc:
+                    logger.warning("ARIMA signal injection failed: %s", _exc)
 
             # ── Cross-sectional normalization barrier ──
             if not _xgb_active:

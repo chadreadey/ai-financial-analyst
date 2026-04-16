@@ -84,6 +84,8 @@ SIGNAL_FIELDS = [
     ("price_momentum_score", None),
     ("insider_score", None),
     ("event_timing_score", None),
+    ("price_regression_score", None),
+    ("arima_forecast_score", None),
 ]
 
 # 8 signal fields (7 active + sector_momentum zeroed).
@@ -99,6 +101,8 @@ DEFAULT_COMPOSITE_WEIGHTS = {
     "price_momentum_score": 0.10,
     "insider_score": 0.10,
     "event_timing_score": 0.00,  # PEAD data is sparse — distorts cross-sectional normalization. Better as a post-ranking filter than a composite signal.
+    "price_regression_score": 0.10,  # R²-filtered OLS trend (sparse — 0.0 when R² < 0.6)
+    "arima_forecast_score": 0.05,    # ARIMA forecast (0.0 in high-vol regimes)
 }
 
 
