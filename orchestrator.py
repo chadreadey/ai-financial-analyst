@@ -244,6 +244,24 @@ def _auto_paper_trade(ticker: str, structured: dict) -> None:
     except Exception as exc:
         logger.warning("Auto-paper-trade failed for %s: %s", ticker, exc)
 
+    # Submit to Alpaca paper trading if keys are configured
+    if settings.alpaca_api_key and settings.alpaca_secret_key:
+        try:
+            from backend.alpaca_paper_client import get_alpaca_client
+            _alpaca = get_alpaca_client()
+            _side = "buy" if direction == "LONG" else "sell"
+            _order = _alpaca.submit_market_order(
+                symbol=ticker,
+                qty=settings.paper_default_qty,
+                side=_side,
+            )
+            logger.info(
+                "Auto-paper-trade: Alpaca order %s %s %s qty=%d status=%s",
+                _order["order_id"], _side, ticker, settings.paper_default_qty, _order["status"],
+            )
+        except Exception as _alpaca_exc:
+            logger.warning("Auto-paper-trade: Alpaca order failed for %s: %s", ticker, _alpaca_exc)
+
 
 class Orchestrator:
     """
