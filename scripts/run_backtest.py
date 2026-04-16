@@ -138,6 +138,16 @@ def main():
                         help="VIX threshold for cautious regime / reduced sizing (default: 20)")
     parser.add_argument("--vix-risk-off", type=float, default=28.0,
                         help="VIX threshold for risk-off / no new longs (default: 28)")
+    parser.add_argument("--vix-smoothing", action="store_true", default=False,
+                        help="Use smoothed VIX ratio instead of raw threshold")
+    parser.add_argument("--vix-sma-window", type=int, default=50,
+                        help="VIX SMA window for smoothed ratio (default: 50)")
+    parser.add_argument("--vix-ratio-threshold", type=float, default=1.5,
+                        help="VIX/SMA ratio to trigger risk-off when smoothing enabled (default: 1.5)")
+    parser.add_argument("--vix-reentry-threshold", type=float, default=1.2,
+                        help="VIX/SMA ratio for cautious zone (default: 1.2)")
+    parser.add_argument("--vix-persistence-periods", type=int, default=2,
+                        help="Periods ratio must stay elevated before risk-off triggers (default: 2)")
     parser.add_argument("--no-cross-detection", action="store_true",
                         help="Disable death/golden cross detection (enabled by default)")
     parser.add_argument("--short-min-signals", type=int, default=3,
@@ -253,6 +263,11 @@ def main():
         enable_regime_filter=regime_on,
         vix_caution_threshold=args.vix_caution,
         vix_risk_off_threshold=args.vix_risk_off,
+        vix_smoothing=args.vix_smoothing,
+        vix_sma_window=args.vix_sma_window,
+        vix_ratio_threshold=args.vix_ratio_threshold,
+        vix_reentry_threshold=args.vix_reentry_threshold,
+        vix_persistence_periods=args.vix_persistence_periods,
         enable_death_golden_cross=cross_on,
         short_min_bearish_signals=args.short_min_signals,
         enable_ic_calibration=ic_on,

@@ -3245,10 +3245,30 @@ def run_cpcv(
                 if fomc_boost > 0:
                     signals = apply_fomc_boost(signals, fomc_boost)
 
+            # VIX smoothed regime detection
+            _vix_now_for_regime = None
+            if vix_df is not None:
+                _vix_avail_r = vix_df[vix_df.index <= reb_date]
+                if len(_vix_avail_r) > 0:
+                    _vix_now_for_regime = float(_vix_avail_r.iloc[-1]["close"])
+            _vix_series_slice = vix_df["close"].loc[:reb_date] if vix_df is not None and not vix_df.empty else pd.Series(dtype=float)
+            _vix_ratio, _vix_risk_off_flag, _vix_cautious_flag = _compute_vix_regime(
+                _vix_series_slice,
+                current_vix=_vix_now_for_regime or 0.0,
+                config=config,
+                prev_persistence_count=_vix_persistence_count,
+            )
+            if _vix_ratio is not None and _vix_ratio >= config.vix_ratio_threshold:
+                _vix_persistence_count += 1
+            else:
+                _vix_persistence_count = 0
+
             if config.enable_regime_filter:
                 regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data, hy_oas_series=hy_oas_series, t10y3m_series=t10y3m_series)
             else:
                 regime = RegimeState(level="unknown")
+            if config.vix_smoothing and _vix_risk_off_flag:
+                regime.level = "risk_off"
 
             # Use fresh capital per combination (no carry-over between
             # non-contiguous test groups — per CPCV methodology)
