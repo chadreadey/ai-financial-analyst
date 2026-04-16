@@ -67,3 +67,28 @@ def test_event_divergence_clipped_to_unit_interval():
     client.get_markets.return_value = [{"ticker": "EARN-AAPL", "yes_prob": 0.01}]
     score = compute_event_divergence(client, ticker="AAPL", our_prob_beat=1.0, threshold=0.20)
     assert -1.0 <= score <= 1.0
+
+
+def test_macro_modifier_yes_prob_none_treated_as_neutral():
+    """yes_prob=None market should not crash and should use neutral 0.5."""
+    client = MagicMock()
+    client.get_markets.return_value = [{"ticker": "FED-TEST", "yes_prob": None}]
+    # Should not raise; returns some value in [-1, 1]
+    score = compute_macro_modifier(client)
+    assert -1.0 <= score <= 1.0
+
+
+def test_macro_modifier_client_exception_returns_zero():
+    """If all series fail, macro modifier returns 0.0."""
+    client = MagicMock()
+    client.get_markets.side_effect = ConnectionError("network down")
+    score = compute_macro_modifier(client)
+    assert score == 0.0
+
+
+def test_event_divergence_yes_prob_none_returns_zero():
+    """yes_prob=None market → treat as no market → return 0.0."""
+    client = MagicMock()
+    client.get_markets.return_value = [{"ticker": "EARN-AAPL-Q126", "yes_prob": None}]
+    score = compute_event_divergence(client, ticker="AAPL", our_prob_beat=0.80)
+    assert score == 0.0

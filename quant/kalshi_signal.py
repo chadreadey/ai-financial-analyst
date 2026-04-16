@@ -52,7 +52,7 @@ def compute_macro_modifier(
             continue
 
         market = max(markets, key=lambda m: m.get("volume", 0))
-        yes_prob = market.get("yes_prob", 0.5)
+        yes_prob = market.get("yes_prob")
         if yes_prob is None:
             yes_prob = 0.5
 
@@ -76,21 +76,25 @@ def compute_event_divergence(
     threshold: float = 0.20,
     _date_override: Optional[str] = None,
 ) -> float:
-    markets = _find_earn_market(client, ticker, _date_override)
-    if not markets:
+    try:
+        markets = _find_earn_market(client, ticker, _date_override)
+        if not markets:
+            return 0.0
+
+        kalshi_prob = markets[0].get("yes_prob")
+        if kalshi_prob is None:
+            return 0.0
+
+        divergence = our_prob_beat - kalshi_prob
+
+        if abs(divergence) < threshold:
+            return 0.0
+
+        raw = math.tanh(divergence * 3.0)
+        return float(np.clip(raw, -1.0, 1.0))
+    except Exception as exc:
+        logger.warning("Event divergence computation failed for %s: %s", ticker, exc)
         return 0.0
-
-    kalshi_prob = markets[0].get("yes_prob", 0.5)
-    if kalshi_prob is None:
-        return 0.0
-
-    divergence = our_prob_beat - kalshi_prob
-
-    if abs(divergence) < threshold:
-        return 0.0
-
-    raw = math.tanh(divergence * 3.0)
-    return float(np.clip(raw, -1.0, 1.0))
 
 
 def _find_earn_market(
@@ -110,4 +114,5 @@ def _find_earn_market(
         if ticker_upper in m.get("ticker", "").upper()
         or ticker_upper in m.get("event_ticker", "").upper()
     ]
+    matching.sort(key=lambda m: m.get("volume", 0), reverse=True)
     return matching
