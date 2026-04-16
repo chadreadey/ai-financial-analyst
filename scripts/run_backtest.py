@@ -35,7 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-from quant.backtest import BacktestConfig, run_backtest, run_walk_forward, run_cpcv
+from quant.backtest import BacktestConfig, HorizonConfig, run_backtest, run_walk_forward, run_cpcv
 from quant.universe import get_universe
 
 
@@ -222,6 +222,9 @@ def main():
                         help="CPCV: max combinations (0=all, N=random sample with seed=42)")
     parser.add_argument("--output", default="",
                         help="Save full results to JSON file")
+    parser.add_argument("--horizon", choices=["monthly", "weekly", "event_driven", "hybrid"], default="monthly", help="Rebalance frequency. WARNING: weekly historically produces Sharpe ~0.02.")
+    parser.add_argument("--event-entry-days", type=int, default=5)
+    parser.add_argument("--event-exit-days", type=int, default=3)
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="Verbose logging")
 
@@ -299,6 +302,12 @@ def main():
     if args.walk_forward:
         config.train_months = args.train_months
         config.test_months = args.test_months
+
+    horizon_config = HorizonConfig(
+        mode=args.horizon,
+        event_entry_days_before=args.event_entry_days,
+        event_exit_days_after=args.event_exit_days,
+    )
 
     t0 = time.time()
 

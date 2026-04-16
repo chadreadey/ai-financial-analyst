@@ -136,6 +136,49 @@ class BacktestConfig:
             self.end_date = datetime.now().strftime("%Y-%m-%d")
 
 
+@dataclass
+class HorizonConfig:
+    """
+    Controls rebalance frequency and event-driven overlay cadence.
+
+    Modes:
+      monthly      — month-start rebalances (default; best Sharpe on this universe)
+      weekly       — every N business days (WARNING: historically Sharpe ~0.02)
+      event_driven — enter N days before earnings, exit N days after (monthly stub until earnings calendar wired)
+      hybrid       — monthly base + event-driven overlays
+    """
+    mode: str = "monthly"
+    weekly_rebalance_days: int = 5
+    event_entry_days_before: int = 5
+    event_exit_days_after: int = 3
+    hybrid_base: str = "monthly"
+    hybrid_overlay: bool = True
+
+
+def _generate_rebalance_dates(
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    horizon: HorizonConfig,
+) -> pd.DatetimeIndex:
+    """Return sorted rebalance dates for the given horizon mode."""
+    if horizon.mode == "monthly":
+        return pd.date_range(start, end, freq="MS")
+    elif horizon.mode == "weekly":
+        return pd.date_range(start, end, freq=f"{horizon.weekly_rebalance_days}B")
+    elif horizon.mode == "event_driven":
+        # Stub: returns monthly until earnings calendar integration is complete.
+        logger.warning("event_driven horizon uses monthly stub until earnings calendar is wired")
+        return pd.date_range(start, end, freq="MS")
+    elif horizon.mode == "hybrid":
+        base = _generate_rebalance_dates(start, end, HorizonConfig(mode=horizon.hybrid_base))
+        event = _generate_rebalance_dates(start, end, HorizonConfig(mode="event_driven"))
+        return base.union(event).sort_values()
+    else:
+        raise ValueError(
+            f"Unknown horizon mode: {horizon.mode!r}. Valid: monthly, weekly, event_driven, hybrid"
+        )
+
+
 # ── Data loading ───────────────────────────────────────────────────────
 
 _PRICE_CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", ".price_cache")
@@ -508,6 +551,30 @@ def load_vix_data(start_date: str) -> Optional[pd.DataFrame]:
     except Exception as exc:
         logger.warning("Failed to fetch VIX: %s", exc)
         return None
+
+
+def _load_hedge_etf_data(start_date: str, end_date: str) -> dict:
+    """Load price series for hedge ETFs (TLT, GLD, IEFA, UUP, BIL).
+
+    Returns a dict mapping ticker -> pd.DataFrame with a 'close' column
+    (compatible with universe_data format used by _compute_daily_portfolio_returns).
+    """
+    import yfinance as yf
+    result = {}
+    for ticker in HEDGE_ETFS:
+        try:
+            df = yf.download(ticker, start=start_date, end=end_date,
+                             auto_adjust=True, progress=False)
+            if not df.empty:
+                close_series = df["Close"]
+                if hasattr(close_series, "squeeze"):
+                    close_series = close_series.squeeze()
+                hedge_df = pd.DataFrame({"close": close_series})
+                hedge_df.index = pd.to_datetime(hedge_df.index)
+                result[ticker] = hedge_df
+        except Exception as exc:
+            logger.warning("Failed to load hedge ETF %s: %s", ticker, exc)
+    return result
 
 
 # ── Regime detection ───────────────────────────────────────────────────
@@ -1781,6 +1848,20 @@ def run_backtest(
             hy_oas_series, t10y3m_series = load_fred_macro_data(fetch_start)
         except Exception as e:
             logger.warning("FRED macro data load failed (continuing without): %s", e)
+
+    # Load hedge ETF price data for ETF ladder (Phase 2B)
+    hedge_prices = {}
+    if config.enable_dynamic_risk_off:
+        if progress_cb:
+            progress_cb("Loading hedge ETF data for risk-off ladder...")
+        hedge_prices = _load_hedge_etf_data(fetch_start, config.end_date)
+        _missing_hedge = [t for t in HEDGE_ETFS if t not in hedge_prices]
+        if _missing_hedge:
+            logger.warning("Missing hedge ETF price data for: %s", _missing_hedge)
+        # Inject hedge ETF DataFrames into universe_data so _compute_daily_portfolio_returns
+        # can compute returns for hedge positions
+        for _ht, _hdf in hedge_prices.items():
+            universe_data[_ht] = _hdf
 
     # ── 2. Generate rebalance dates ───────────────────────────────
     # Use the union of all trading dates
