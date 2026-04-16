@@ -1873,6 +1873,27 @@ def run_backtest(
                     signals[ticker].event_timing_score = escore
                     signals[ticker].earnings_blocked = emeta.get("earnings_blocked", False)
 
+        # Kalshi signals (macro modifier + event divergence)
+        if config.enable_kalshi_signal:
+            try:
+                from quant.kalshi_client import KalshiClient
+                from quant.kalshi_signal import compute_macro_modifier, compute_event_divergence
+                _kalshi_client = KalshiClient()
+                _kalshi_macro = compute_macro_modifier(_kalshi_client)
+                for _ticker in signals:
+                    signals[_ticker].kalshi_macro_score = _kalshi_macro
+                    _earn_prob = getattr(signals[_ticker], "earnings_rank_score", 0.0)
+                    # Map earnings_rank_score ([-1,1]) to probability space [0,1]
+                    _our_prob = (_earn_prob + 1.0) / 2.0
+                    signals[_ticker].kalshi_event_score = compute_event_divergence(
+                        _kalshi_client,
+                        ticker=_ticker,
+                        our_prob_beat=_our_prob,
+                        threshold=config.kalshi_event_threshold,
+                    )
+            except Exception as _exc:
+                logger.warning("Kalshi signal injection failed: %s", _exc)
+
         # ── Cross-sectional normalization barrier ──
         # Group by volatility tier (not sector) to preserve sector momentum
         from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
@@ -1938,6 +1959,13 @@ def run_backtest(
         if not _xgb_active:
             for sv in signals.values():
                 sv.composite_score = compute_normalized_composite(sv)
+                if config.enable_kalshi_signal:
+                    sv.composite_score = float(np.clip(
+                        sv.composite_score
+                        + sv.kalshi_macro_score * config.kalshi_macro_weight
+                        + sv.kalshi_event_score * config.kalshi_event_weight,
+                        -1.0, 1.0,
+                    ))
                 reclassify(sv)
 
         # FOMC proximity risk premium (after all signal blends, before regime)
@@ -2476,6 +2504,27 @@ def run_walk_forward(
                         signals[ticker].event_timing_score = escore
                         signals[ticker].earnings_blocked = emeta.get("earnings_blocked", False)
 
+            # Kalshi signals (macro modifier + event divergence)
+            if config.enable_kalshi_signal:
+                try:
+                    from quant.kalshi_client import KalshiClient
+                    from quant.kalshi_signal import compute_macro_modifier, compute_event_divergence
+                    _kalshi_client = KalshiClient()
+                    _kalshi_macro = compute_macro_modifier(_kalshi_client)
+                    for _ticker in signals:
+                        signals[_ticker].kalshi_macro_score = _kalshi_macro
+                        _earn_prob = getattr(signals[_ticker], "earnings_rank_score", 0.0)
+                        # Map earnings_rank_score ([-1,1]) to probability space [0,1]
+                        _our_prob = (_earn_prob + 1.0) / 2.0
+                        signals[_ticker].kalshi_event_score = compute_event_divergence(
+                            _kalshi_client,
+                            ticker=_ticker,
+                            our_prob_beat=_our_prob,
+                            threshold=config.kalshi_event_threshold,
+                        )
+                except Exception as _exc:
+                    logger.warning("Kalshi signal injection failed: %s", _exc)
+
             # ── Cross-sectional normalization barrier ──
             from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
             from quant.scoring import reclassify
@@ -2535,6 +2584,13 @@ def run_walk_forward(
             if not _xgb_active:
                 for sv in signals.values():
                     sv.composite_score = compute_normalized_composite(sv)
+                    if config.enable_kalshi_signal:
+                        sv.composite_score = float(np.clip(
+                            sv.composite_score
+                            + sv.kalshi_macro_score * config.kalshi_macro_weight
+                            + sv.kalshi_event_score * config.kalshi_event_weight,
+                            -1.0, 1.0,
+                        ))
                     reclassify(sv)
 
             # FOMC proximity risk premium
@@ -2918,12 +2974,40 @@ def run_cpcv(
                         signals[ticker].event_timing_score = escore
                         signals[ticker].earnings_blocked = emeta.get("earnings_blocked", False)
 
+            # Kalshi signals (macro modifier + event divergence)
+            if config.enable_kalshi_signal:
+                try:
+                    from quant.kalshi_client import KalshiClient
+                    from quant.kalshi_signal import compute_macro_modifier, compute_event_divergence
+                    _kalshi_client = KalshiClient()
+                    _kalshi_macro = compute_macro_modifier(_kalshi_client)
+                    for _ticker in signals:
+                        signals[_ticker].kalshi_macro_score = _kalshi_macro
+                        _earn_prob = getattr(signals[_ticker], "earnings_rank_score", 0.0)
+                        # Map earnings_rank_score ([-1,1]) to probability space [0,1]
+                        _our_prob = (_earn_prob + 1.0) / 2.0
+                        signals[_ticker].kalshi_event_score = compute_event_divergence(
+                            _kalshi_client,
+                            ticker=_ticker,
+                            our_prob_beat=_our_prob,
+                            threshold=config.kalshi_event_threshold,
+                        )
+                except Exception as _exc:
+                    logger.warning("Kalshi signal injection failed: %s", _exc)
+
             # ── Cross-sectional normalization barrier ──
             from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
             from quant.scoring import reclassify
             signals = normalize_signals_cross_sectionally(signals, make_volatility_tier_fn(signals))
             for sv in signals.values():
                 sv.composite_score = compute_normalized_composite(sv)
+                if config.enable_kalshi_signal:
+                    sv.composite_score = float(np.clip(
+                        sv.composite_score
+                        + sv.kalshi_macro_score * config.kalshi_macro_weight
+                        + sv.kalshi_event_score * config.kalshi_event_weight,
+                        -1.0, 1.0,
+                    ))
                 reclassify(sv)
 
             if config.enable_fomc_proximity:
