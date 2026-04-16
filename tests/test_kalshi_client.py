@@ -58,6 +58,19 @@ def test_get_markets_caches_to_disk(client, tmp_path):
     assert result == []
 
 
+import requests as _requests
+
+@resp_mock.activate
+def test_get_markets_returns_empty_on_network_error(client):
+    resp_mock.add(
+        resp_mock.GET,
+        f"{BASE}/markets",
+        body=_requests.exceptions.ConnectionError(),
+    )
+    result = client.get_markets(series_ticker="FED")
+    assert result == []
+
+
 def test_get_series_for_equity_returns_earn_markets(client, tmp_path):
     # Preload cache with a fake EARN-AAPL market
     cache_file = tmp_path / "EARN_2026-04-15.json"

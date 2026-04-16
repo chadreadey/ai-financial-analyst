@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import tempfile
 from datetime import date
 from typing import Any, Optional
 
@@ -42,14 +43,19 @@ class KalshiClient:
         cache_path = os.path.join(self._cache_dir, cache_key)
 
         if os.path.exists(cache_path):
-            with open(cache_path) as f:
-                return json.load(f)
+            try:
+                with open(cache_path) as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, OSError):
+                logger.warning("Kalshi cache corrupt, re-fetching: %s", cache_path)
 
         raw = self._fetch_markets(series_ticker=series_ticker, status=status)
         markets = [self._enrich(m) for m in raw]
 
-        with open(cache_path, "w") as f:
+        tmp = cache_path + ".tmp"
+        with open(tmp, "w") as f:
             json.dump(markets, f)
+        os.replace(tmp, cache_path)
 
         return markets
 
@@ -62,8 +68,11 @@ class KalshiClient:
         cache_path = os.path.join(self._cache_dir, cache_key)
 
         if os.path.exists(cache_path):
-            with open(cache_path) as f:
-                return json.load(f)
+            try:
+                with open(cache_path) as f:
+                    return json.load(f)
+            except (json.JSONDecodeError, OSError):
+                logger.warning("Kalshi cache corrupt, re-fetching: %s", cache_path)
 
         params = {"event_ticker": event_ticker, "status": "open", "limit": 50}
         try:
@@ -75,8 +84,10 @@ class KalshiClient:
             return []
 
         markets = [self._enrich(m) for m in raw]
-        with open(cache_path, "w") as f:
+        tmp = cache_path + ".tmp"
+        with open(tmp, "w") as f:
             json.dump(markets, f)
+        os.replace(tmp, cache_path)
         return markets
 
     def _fetch_markets(self, series_ticker: str, status: str) -> list[dict]:
@@ -93,5 +104,6 @@ class KalshiClient:
     def _enrich(m: dict) -> KalshiMarket:
         """Add yes_prob (0-1 float) derived from yes_bid (0-100 int)."""
         m = dict(m)
-        m["yes_prob"] = m.get("yes_bid", 0) / 100.0
+        yes_bid = m.get("yes_bid")
+        m["yes_prob"] = yes_bid / 100.0 if yes_bid is not None else None
         return m
