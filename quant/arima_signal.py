@@ -47,10 +47,10 @@ def compute_arima_forecast_score(
         return 0.0
 
     recent = prices.iloc[-(lookback + horizon):-horizon]
-    log_prices = np.log(recent.values.astype(float))
-
-    if np.any(np.isnan(log_prices)) or np.any(log_prices <= 0):
+    raw = recent.values.astype(float)
+    if np.any(np.isnan(raw)) or np.any(raw <= 0):
         return 0.0
+    log_prices = np.log(raw)
 
     vol_window = log_prices[-20:]
     if len(vol_window) < 2:

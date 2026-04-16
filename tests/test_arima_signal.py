@@ -55,6 +55,23 @@ def test_arima_clips_to_unit_interval():
     assert -1.0 <= score <= 1.0, f"Score {score} out of [-1, 1]"
 
 
+def test_arima_nan_prices_returns_zero():
+    """Price series containing NaN must return 0.0 without raising."""
+    prices = pd.Series([100.0, 101.0, np.nan] + [102.0] * 70)
+    score = compute_arima_forecast_score(prices, lookback=60, horizon=5, vol_threshold=1.0)
+    assert score == 0.0, f"Expected 0.0 for NaN prices, got {score}"
+
+
+def test_arima_constant_prices_returns_zero_or_valid():
+    """Constant price series may cause ARIMA to fail — must return 0.0, not raise."""
+    prices = pd.Series([100.0] * 75)
+    score = compute_arima_forecast_score(prices, lookback=60, horizon=5, vol_threshold=1.0)
+    # Constant prices may pass vol gate (zero vol < 1.0) but ARIMA may fail to fit
+    # Either 0.0 (fit failure) or a valid float in [-1, 1] is acceptable
+    assert isinstance(score, float)
+    assert -1.0 <= score <= 1.0, f"Score {score} out of bounds"
+
+
 def test_arima_scores_wrapper_returns_dict():
     """Wrapper must return dict; high-vol ticker gated to 0.0."""
     import datetime
