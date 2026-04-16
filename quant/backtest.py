@@ -69,6 +69,7 @@ class BacktestConfig:
     vix_ratio_threshold: float = 1.5       # ratio to trigger risk-off
     vix_reentry_threshold: float = 1.2     # hysteresis: must drop below to re-enter risk-on
     vix_persistence_periods: int = 2       # consecutive rebalances above threshold to confirm
+    enable_dynamic_risk_off: bool = False  # Phase 2A: ETF ladder replaces binary cash switch
     enable_death_golden_cross: bool = True     # SPY 50/200 SMA cross detection
     golden_cross_boost: float = 0.10           # lower long threshold by this during golden cross
     # TimesFM overlay (DEPRECATED — prefer LSTM)
@@ -802,6 +803,43 @@ FOMC_DATES = [
     "2027-07-28", "2027-09-22", "2027-10-27", "2027-12-15",
 ]
 _FOMC_TIMESTAMPS = sorted(pd.Timestamp(d) for d in FOMC_DATES)
+
+
+ETF_LADDER_TIERS: dict = {
+    "mild":     {"TLT": 0.20, "GLD": 0.05, "equity_frac": 0.75},
+    "moderate": {"TLT": 0.40, "GLD": 0.10, "equity_frac": 0.50},
+    "severe":   {"TLT": 0.30, "GLD": 0.15, "IEFA": 0.10, "UUP": 0.05, "equity_frac": 0.40},
+    "crisis":   {"TLT": 0.50, "GLD": 0.20, "IEFA": 0.15, "BIL": 0.15, "equity_frac": 0.00},
+}
+
+HEDGE_ETFS = ["TLT", "GLD", "IEFA", "UUP", "BIL"]
+
+
+def compute_etf_ladder_tier(
+    vix_ratio,
+    copper_bearish: bool,
+    config,
+) -> "Optional[str]":
+    """
+    Return ETF ladder tier name, or None if full equity is appropriate.
+
+    Requires config.enable_dynamic_risk_off=True and a non-None vix_ratio.
+    """
+    if not config.enable_dynamic_risk_off or vix_ratio is None:
+        return None
+
+    reentry = config.vix_reentry_threshold  # 1.2 default
+    if vix_ratio < reentry:
+        return None
+    elif vix_ratio < config.vix_ratio_threshold:  # 1.2–1.5 → mild
+        return "mild"
+    elif vix_ratio < 2.0:
+        return "moderate"
+    elif vix_ratio < 3.0:
+        return "severe"
+    else:
+        # Crisis requires copper confirmation
+        return "crisis" if copper_bearish else "severe"
 
 
 def compute_fomc_proximity_boost(
@@ -1788,6 +1826,7 @@ def run_backtest(
                           for name, ics in ic_history.items()}
         logger.info("IC-calibrated weights: %s (mean ICs: %s)", calibrated_weights, ic_history_log)
 
+    _vix_persistence_count = 0
     for i, reb_date in enumerate(rebalance_dates[:-1]):
         next_reb = rebalance_dates[i + 1]
 
@@ -2064,11 +2103,32 @@ def run_backtest(
             if fomc_boost > 0:
                 signals = apply_fomc_boost(signals, fomc_boost)
 
+        # VIX smoothed regime detection
+        _vix_now_for_regime = None
+        if vix_df is not None:
+            _vix_avail_r = vix_df[vix_df.index <= reb_date]
+            if len(_vix_avail_r) > 0:
+                _vix_now_for_regime = float(_vix_avail_r.iloc[-1]["close"])
+        _vix_series_slice = vix_df["close"].loc[:reb_date] if vix_df is not None and not vix_df.empty else pd.Series(dtype=float)
+        _vix_ratio, _vix_risk_off_flag, _vix_cautious_flag = _compute_vix_regime(
+            _vix_series_slice,
+            current_vix=_vix_now_for_regime or 0.0,
+            config=config,
+            prev_persistence_count=_vix_persistence_count,
+        )
+        if _vix_ratio is not None and _vix_ratio >= config.vix_ratio_threshold:
+            _vix_persistence_count += 1
+        else:
+            _vix_persistence_count = 0
+
         # Detect market regime for short filtering + position sizing
         if config.enable_regime_filter:
             regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data, hy_oas_series=hy_oas_series, t10y3m_series=t10y3m_series)
         else:
             regime = RegimeState(level="unknown")
+        # Override regime level when VIX smoothing is enabled and risk-off triggered
+        if config.vix_smoothing and _vix_risk_off_flag:
+            regime.level = "risk_off"
 
         # Build target portfolio
         positions = build_target_portfolio(
@@ -2454,6 +2514,7 @@ def run_walk_forward(
         window_trades = []
         window_pnl = pd.Series(dtype=float)
 
+        _vix_persistence_count = 0
         for i, reb_date in enumerate(rebalance_dates[:-1]):
             next_reb = rebalance_dates[i + 1]
             signals = compute_signals_at_date(universe_data, reb_date, config.lookback_days)
@@ -2716,10 +2777,30 @@ def run_walk_forward(
                 if fomc_boost > 0:
                     signals = apply_fomc_boost(signals, fomc_boost)
 
+            # VIX smoothed regime detection
+            _vix_now_for_regime = None
+            if vix_df is not None:
+                _vix_avail_r = vix_df[vix_df.index <= reb_date]
+                if len(_vix_avail_r) > 0:
+                    _vix_now_for_regime = float(_vix_avail_r.iloc[-1]["close"])
+            _vix_series_slice = vix_df["close"].loc[:reb_date] if vix_df is not None and not vix_df.empty else pd.Series(dtype=float)
+            _vix_ratio, _vix_risk_off_flag, _vix_cautious_flag = _compute_vix_regime(
+                _vix_series_slice,
+                current_vix=_vix_now_for_regime or 0.0,
+                config=config,
+                prev_persistence_count=_vix_persistence_count,
+            )
+            if _vix_ratio is not None and _vix_ratio >= config.vix_ratio_threshold:
+                _vix_persistence_count += 1
+            else:
+                _vix_persistence_count = 0
+
             if config.enable_regime_filter:
                 regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data, hy_oas_series=hy_oas_series, t10y3m_series=t10y3m_series)
             else:
                 regime = RegimeState(level="unknown")
+            if config.vix_smoothing and _vix_risk_off_flag:
+                regime.level = "risk_off"
 
             positions = build_target_portfolio(
                 signals, universe_data, reb_date, window_config, capital, regime=regime,
@@ -2965,6 +3046,7 @@ def run_cpcv(
         combo_daily_pnl = pd.Series(dtype=float)
         combo_trades = []
 
+        _vix_persistence_count = 0
         # Iterate test rebalance dates
         for i, reb_date in enumerate(safe_test_dates[:-1]):
             next_reb = safe_test_dates[i + 1]
