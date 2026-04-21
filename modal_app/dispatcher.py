@@ -5,11 +5,14 @@ Responsibilities:
 
   1. Resolve universe + build a `BacktestConfig`.
   2. Stamp the run: UUID, `config_hash`, `git_sha`.
-  3. Build the CPCV panel LOCALLY (using cached price CSVs → fast).
-  4. Upload panel to the Modal Volume.
-  5. Generate all CPCV combinations; optionally sample `max_combos`.
-  6. Dispatch via `CPCVWorker.run_combo.map(...)`.
-  7. Stream results into a `CPCVResult` and print a leaderboard.
+  3. Persist a `queued` → `running` row to SQLite (and Supabase if enabled).
+  4. Build the CPCV panel LOCALLY (using cached price CSVs → fast).
+  5. Upload panel to the Modal Volume.
+  6. Generate all CPCV combinations; optionally sample `max_combos`.
+  7. Dispatch via `CPCVWorker.run_combo.map(...)`.
+  8. Stream results into a `CPCVResult`, dual-writing combos + trades +
+     events as each completes.
+  9. Finalize the run row (status/metrics) and print a leaderboard.
 
 Returns a Python dict suitable for pickling to `runs/{run_id}.pkl`.
 """
@@ -22,7 +25,24 @@ import uuid
 from dataclasses import asdict
 from typing import Any, Optional
 
+from backend import cpcv_sqlite, supabase_backtest
+from modal_app.events import (
+    emit_event,
+    EVENT_COMBO_COMPLETED,
+    EVENT_COMBO_FAILED,
+    EVENT_COMBO_SKIPPED,
+    EVENT_RUN_COMPLETED,
+    EVENT_RUN_DEGRADED,
+    EVENT_RUN_FAILED,
+    EVENT_RUN_STARTED,
+)
+
 logger = logging.getLogger(__name__)
+
+
+# Buffer combos + trades before flushing to Supabase (SQLite flushes per-combo
+# since writes are local + WAL). Keeps HTTP round-trips to ~1 per 50 combos.
+_SUPABASE_COMBO_FLUSH = 50
 
 
 def _build_combo_specs(
@@ -30,6 +50,8 @@ def _build_combo_specs(
     panel_key: str,
     combos: list,
     config_dict: dict,
+    config_hash: str,
+    git_sha: str,
 ) -> list[dict]:
     """Shape the per-combo inputs Modal will fan out."""
     return [
@@ -40,9 +62,69 @@ def _build_combo_specs(
             "train_indices": list(train),
             "test_indices": list(test),
             "config_json": config_dict,
+            "config_hash": config_hash,
+            "git_sha": git_sha,
         }
         for idx, (train, test) in enumerate(combos)
     ]
+
+
+def _combo_result_to_row(run_id: str, out: dict, status: str) -> dict:
+    """Build a cpcv_combinations row from a worker result dict."""
+    return {
+        "run_id": run_id,
+        "combo_idx": int(out.get("combo_idx", -1)),
+        "status": status,
+        "train_indices": out.get("train_groups"),
+        "test_indices": out.get("test_groups"),
+        "oos_sharpe": out.get("oos_sharpe"),
+        "return_pct": out.get("return_pct"),
+        "n_trades": out.get("n_trades"),
+        "n_test_dates": out.get("n_test_dates"),
+        "elapsed_seconds": out.get("elapsed_seconds"),
+        "git_sha": out.get("git_sha"),
+        "error": out.get("error"),
+    }
+
+
+def _combo_trades_to_rows(run_id: str, combo_idx: int, trades: list[dict]) -> list[dict]:
+    """Expand a combo's trade list into cpcv_trades rows."""
+    rows = []
+    for trade_idx, t in enumerate(trades or []):
+        rows.append({
+            "run_id": run_id,
+            "combo_idx": combo_idx,
+            "trade_idx": trade_idx,
+            "ticker": t.get("ticker"),
+            "direction": t.get("direction"),
+            "entry_date": t.get("entry_date"),
+            "exit_date": t.get("exit_date"),
+            "entry_price": t.get("entry_price"),
+            "exit_price": t.get("exit_price"),
+            "pnl_dollar": t.get("pnl_dollar"),
+            "pnl_pct": t.get("pnl_pct"),
+            "holding_days": t.get("holding_days"),
+            "exit_reason": t.get("exit_reason"),
+            "composite_score": t.get("composite_score"),
+            "regime_at_entry": t.get("regime_at_entry"),
+            "signals_at_entry_json": t.get("signals_at_entry"),
+            "flags_json": t.get("flags"),
+        })
+    return rows
+
+
+def _capture_sentry(run_id: str, config_hash: str, combo_idx: Optional[int], message: str) -> None:
+    """Best-effort Sentry capture with run/combo tags. No-op if sentry uninit."""
+    try:
+        import sentry_sdk
+        with sentry_sdk.push_scope() as scope:
+            scope.set_tag("run_id", run_id)
+            scope.set_tag("config_hash", config_hash)
+            if combo_idx is not None:
+                scope.set_tag("combo_idx", combo_idx)
+            sentry_sdk.capture_message(message, level="error")
+    except Exception:
+        pass
 
 
 def dispatch_cpcv(
@@ -77,6 +159,28 @@ def dispatch_cpcv(
                 len(config.tickers), n_groups, n_test_groups, max_combos)
 
     config_dict = asdict(config)
+
+    # Persist `queued` row before panel build so crashes are observable.
+    run_row = {
+        "run_id": run_id,
+        "config_hash": cfg_hash,
+        "git_sha": git_sha,
+        "status": "queued",
+        "universe": _infer_universe_label(config),
+        "n_groups": n_groups,
+        "n_test_groups": n_test_groups,
+        "n_combinations": None,
+        "config_json": config_dict,
+        "started_at": time.time(),
+    }
+    cpcv_sqlite.upsert_run(run_row)
+    supabase_backtest.upsert_run(_supabase_run_row(run_row))
+    emit_event(run_id, EVENT_RUN_STARTED, {
+        "n_groups": n_groups,
+        "n_test_groups": n_test_groups,
+        "tickers": config.tickers[:20],
+        "n_tickers": len(config.tickers),
+    })
 
     t_panel = time.time()
     if local:
@@ -114,8 +218,75 @@ def dispatch_cpcv(
         n_combinations=len(combos),
     )
 
+    # Flip status to running now that combos are resolved. Update n_combinations.
+    cpcv_sqlite.patch_run(run_id, {"status": "running", "n_combinations": len(combos)})
+    supabase_backtest.patch_run(run_id, {"status": "running", "n_combinations": len(combos)})
+
     t_fanout = time.time()
     failures: list[dict] = []
+    supabase_combo_buffer: list[dict] = []
+
+    def _handle_combo_result(out: dict) -> None:
+        """Persist one combo + its trades, emit an event, update aggregates.
+        Mutates `result`, `failures`, and `supabase_combo_buffer` in the enclosing scope.
+        """
+        status = out.get("status", "complete")
+        combo_idx = int(out.get("combo_idx", -1))
+
+        if status == "skipped":
+            result.n_combinations_skipped += 1
+            combo_row = _combo_result_to_row(run_id, out, "skipped")
+            cpcv_sqlite.insert_combinations_batch([combo_row])
+            supabase_combo_buffer.append(combo_row)
+            emit_event(run_id, EVENT_COMBO_SKIPPED, {
+                "skip_reason": out.get("skip_reason"),
+            }, combo_idx=combo_idx)
+            return
+
+        if status == "error":
+            failures.append(out)
+            combo_row = _combo_result_to_row(run_id, out, "error")
+            cpcv_sqlite.insert_combinations_batch([combo_row])
+            supabase_combo_buffer.append(combo_row)
+            emit_event(run_id, EVENT_COMBO_FAILED, {
+                "error": out.get("error"),
+                "traceback": out.get("traceback", "")[:1000],
+            }, combo_idx=combo_idx)
+            _capture_sentry(run_id, cfg_hash, combo_idx,
+                            f"CPCV combo failed: {out.get('error')}")
+            return
+
+        result.oos_sharpes.append(out["oos_sharpe"])
+        result.combination_details.append(out)
+        result.n_combinations_completed += 1
+
+        combo_row = _combo_result_to_row(run_id, out, "complete")
+        cpcv_sqlite.insert_combinations_batch([combo_row])
+        supabase_combo_buffer.append(combo_row)
+
+        trades = out.get("trades") or []
+        if trades:
+            trade_rows = _combo_trades_to_rows(run_id, combo_idx, trades)
+            cpcv_sqlite.insert_trades_batch(trade_rows)
+            supabase_backtest.insert_trades_batch(trade_rows)
+
+        emit_event(run_id, EVENT_COMBO_COMPLETED, {
+            "oos_sharpe": out.get("oos_sharpe"),
+            "return_pct": out.get("return_pct"),
+            "n_trades": out.get("n_trades"),
+            "elapsed_seconds": out.get("elapsed_seconds"),
+        }, combo_idx=combo_idx)
+
+        # Flush buffered combo rows to Supabase when threshold reached.
+        if len(supabase_combo_buffer) >= _SUPABASE_COMBO_FLUSH:
+            supabase_backtest.insert_combinations_batch(supabase_combo_buffer)
+            supabase_combo_buffer.clear()
+
+        completed = result.n_combinations_completed
+        if completed % 25 == 0 and result.oos_sharpes:
+            sorted_sharpes = sorted(result.oos_sharpes)
+            median = float(sorted_sharpes[len(sorted_sharpes) // 2])
+            logger.info("%d combos complete  median_oos_sharpe=%.3f", completed, median)
 
     if local:
         from quant.backtest import _run_single_cpcv_combo
@@ -130,19 +301,26 @@ def dispatch_cpcv(
                     combo_idx=idx,
                     config=config,
                 )
-                if out is None:
-                    result.n_combinations_skipped += 1
-                    continue
-                out["status"] = "complete"
-                result.oos_sharpes.append(out["oos_sharpe"])
-                result.combination_details.append(out)
-                result.n_combinations_completed += 1
             except Exception as exc:
-                failures.append({"combo_idx": idx, "error": f"{type(exc).__name__}: {exc}"})
+                err_out = {
+                    "combo_idx": idx,
+                    "status": "error",
+                    "error": f"{type(exc).__name__}: {exc}",
+                }
+                _handle_combo_result(err_out)
+                continue
+
+            if out is None:
+                _handle_combo_result({"combo_idx": idx, "status": "skipped",
+                                      "skip_reason": "no_trades_or_sharpe"})
+                continue
+            out["status"] = "complete"
+            out.setdefault("git_sha", git_sha)
+            _handle_combo_result(out)
     else:
         from modal_app.app import app
         from modal_app.functions.cpcv_combo import CPCVWorker
-        specs = _build_combo_specs(run_id, panel_key, combos, config_dict)
+        specs = _build_combo_specs(run_id, panel_key, combos, config_dict, cfg_hash, git_sha)
         logger.info("Dispatching %d combos to Modal CPCVWorker.run_combo.map()", len(specs))
 
         with app.run():
@@ -154,26 +332,19 @@ def dispatch_cpcv(
                 order_outputs=False,
             ):
                 if isinstance(out, Exception):
-                    failures.append({"combo_idx": -1, "error": f"{type(out).__name__}: {out}"})
+                    err_out = {
+                        "combo_idx": -1,
+                        "status": "error",
+                        "error": f"{type(out).__name__}: {out}",
+                    }
+                    _handle_combo_result(err_out)
                     continue
+                _handle_combo_result(out)
 
-                status = out.get("status")
-                idx = int(out.get("combo_idx", -1))
-                if status == "skipped":
-                    result.n_combinations_skipped += 1
-                    continue
-                if status == "error":
-                    failures.append(out)
-                    continue
-                result.oos_sharpes.append(out["oos_sharpe"])
-                result.combination_details.append(out)
-                result.n_combinations_completed += 1
-
-                completed = len(result.oos_sharpes)
-                if completed % 25 == 0:
-                    logger.info("%d/%d combos complete  median_oos_sharpe=%.3f",
-                                completed, len(specs),
-                                float(sorted(result.oos_sharpes)[len(result.oos_sharpes)//2]))
+    # Final flush of buffered combos to Supabase.
+    if supabase_combo_buffer:
+        supabase_backtest.insert_combinations_batch(supabase_combo_buffer)
+        supabase_combo_buffer.clear()
 
     elapsed = time.time() - t_fanout
     result.elapsed_seconds = round(elapsed, 1)
@@ -210,10 +381,64 @@ def dispatch_cpcv(
         "panel_key": panel_key,
     }
 
+    final_patch = {
+        "status": result.status,
+        "n_completed": result.n_combinations_completed,
+        "n_skipped": result.n_combinations_skipped,
+        "n_failed": n_failed,
+        "median_oos_sharpe": summary["oos_sharpe_median"],
+        "oos_sharpe_min": summary["oos_sharpe_min"],
+        "oos_sharpe_max": summary["oos_sharpe_max"],
+        "pbo": summary["pbo"],
+        "deflated_sharpe": summary["deflated_sharpe"],
+        "error": result.error,
+        "finished_at": time.time(),
+    }
+    cpcv_sqlite.patch_run(run_id, final_patch)
+    supabase_backtest.patch_run(run_id, final_patch)
+
+    terminal_event = (
+        EVENT_RUN_DEGRADED if result.status == "degraded"
+        else EVENT_RUN_FAILED if result.status == "failed"
+        else EVENT_RUN_COMPLETED
+    )
+    emit_event(run_id, terminal_event, {
+        "n_completed": result.n_combinations_completed,
+        "n_skipped": result.n_combinations_skipped,
+        "n_failed": n_failed,
+        "median_oos_sharpe": summary["oos_sharpe_median"],
+        "elapsed_seconds": result.elapsed_seconds,
+    })
+
     if print_leaderboard:
         _print_leaderboard(result, summary)
 
     return summary
+
+
+def _infer_universe_label(config) -> Optional[str]:
+    """Best-effort name for `cpcv_runs.universe` from the ticker set.
+
+    Matches the CLI's `--universe` flag values when possible so the dedup
+    UI can filter. Falls back to a ticker count for custom sets.
+    """
+    try:
+        from quant.universe import LIQUID_10, LIQUID_20, LIQUID_50
+        tickers = set(config.tickers)
+        for label, members in [("liquid_10", LIQUID_10),
+                               ("liquid_20", LIQUID_20),
+                               ("liquid_50", LIQUID_50)]:
+            if tickers == set(members):
+                return label
+    except Exception:
+        pass
+    return f"custom_{len(config.tickers)}"
+
+
+def _supabase_run_row(row: dict) -> dict:
+    """Shape a run row for Supabase (drop `started_at` so Postgres defaults)."""
+    out = {k: v for k, v in row.items() if k != "started_at"}
+    return out
 
 
 def _print_leaderboard(result, summary: dict, top_n: int = 10) -> None:

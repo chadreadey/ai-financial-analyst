@@ -309,3 +309,14 @@ I'll provide the exact SQL and the `supabase/` directory — user handles creden
 
 - 2026-04-20: Plan created. Waiting for PR #4 to merge before creating `modal-backtesting` branch.
 - 2026-04-20: Dirty tree cleaned: DCF multiples calibration committed to `frontend-overhaul` (2 commits), `.gitignore` tightened, `claude/elated-haslett` worktree + branch removed (fully superseded by main).
+- 2026-04-20: Session 1 shipped (commit `49a058e`). 500-combo CPCV on Modal in 4m51s (target <15 min). Local + Modal parity confirmed.
+- 2026-04-21: Session 2a shipped. CPCV result → SQLite + Supabase (graceful no-op when creds absent) dual-write, per-trade records with full `SignalVector` + regime, structured event stream. Verified end-to-end: Modal 10-combo run wrote 1 cpcv_runs + 10 cpcv_combinations + 1,652 cpcv_trades (all with signals) + 12 cpcv_events. `regime_at_entry` correctly populated ("strong_bull" for NVDA entries in 2023).
+- Session 2b deferred to keep 2a scope tight (≈90 min):
+  - `POST /backtest/modal` FastAPI endpoint + 5 GET endpoints (`dispatch_cpcv` wraps blocking `with app.run():`; needs `Function.spawn_map()` refactor before Railway can use it)
+  - Modal-side panel build (`build_panel_remote`) so FastAPI dispatch doesn't depend on local `.price_cache/`
+  - Railway git-SHA env var hook in `capture_git_sha`
+  - Stale-run sweeper (`status='running' AND started_at < now() - 2h` → `failed`)
+  - Split Supabase secret from admin secret in Modal (security isolation)
+  - Settings-driven flush intervals (`modal_backtest_flush_combos`, `modal_trade_snapshot_top_n`)
+  - Read-path helpers (`find_runs_by_config_hash`, `get_run_detail`, etc. — only needed by Session 3 frontend)
+- Session 2a user action pending: create Supabase project + apply `supabase/migrations/0001_backtest_tables.sql` + set `SUPABASE_URL`/`SUPABASE_SERVICE_KEY`/`ENABLE_SUPABASE_HISTORY=true` in `.env` and Railway env. After that, re-running any CPCV sweep will dual-write to Supabase automatically (no code changes).

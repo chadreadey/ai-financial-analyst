@@ -1602,6 +1602,40 @@ class TradeRecord:
     composite_score: float
     holding_days: int
     flags: list = field(default_factory=list)
+    # Optional attribution context (populated by CPCV path for Modal persistence).
+    # Kept Optional so the run_backtest / walk_forward paths remain unchanged.
+    signals_at_entry: Optional[dict] = None
+    regime_at_entry: Optional[str] = None
+
+    def to_json_dict(self) -> dict:
+        """JSON-safe dict for Supabase / SQLite persistence.
+
+        Coerces any Timestamp-ish fields to ISO strings and ensures nested
+        signal/regime payloads are plain dicts.
+        """
+        def _iso(v):
+            if v is None:
+                return None
+            if hasattr(v, "isoformat"):
+                return v.isoformat()[:10]
+            return str(v)
+
+        return {
+            "ticker": self.ticker,
+            "direction": self.direction,
+            "entry_date": _iso(self.entry_date),
+            "entry_price": float(self.entry_price) if self.entry_price is not None else None,
+            "exit_date": _iso(self.exit_date),
+            "exit_price": float(self.exit_price) if self.exit_price is not None else None,
+            "pnl_pct": float(self.pnl_pct) if self.pnl_pct is not None else None,
+            "pnl_dollar": float(self.pnl_dollar) if self.pnl_dollar is not None else None,
+            "exit_reason": self.exit_reason,
+            "composite_score": float(self.composite_score) if self.composite_score is not None else None,
+            "holding_days": int(self.holding_days) if self.holding_days is not None else None,
+            "flags": list(self.flags) if self.flags else [],
+            "signals_at_entry": self.signals_at_entry,
+            "regime_at_entry": self.regime_at_entry,
+        }
 
 
 @dataclass
@@ -3432,6 +3466,15 @@ def _run_single_cpcv_combo(
         trades, period_pnl = _compute_daily_portfolio_returns(
             positions, universe_data, reb_date, next_reb, config,
         )
+        regime_level = getattr(regime, "level", None) if regime is not None else None
+        for tr in trades:
+            sv = signals.get(tr.ticker) if isinstance(signals, dict) else None
+            if sv is not None and hasattr(sv, "to_dict"):
+                try:
+                    tr.signals_at_entry = sv.to_dict()
+                except Exception:
+                    tr.signals_at_entry = None
+            tr.regime_at_entry = regime_level
         combo_trades.extend(trades)
         if len(period_pnl) > 0:
             combo_daily_pnl = pd.concat([combo_daily_pnl, period_pnl])
@@ -3456,6 +3499,7 @@ def _run_single_cpcv_combo(
         "n_trades": n_trades,
         "oos_sharpe": oos_sharpe,
         "return_pct": combo_return,
+        "trades": [tr.to_json_dict() for tr in combo_trades],
     }
 
 
