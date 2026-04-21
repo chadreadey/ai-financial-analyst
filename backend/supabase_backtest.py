@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Any, Iterable, Optional
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -65,6 +66,7 @@ def _post(table: str, rows: list[dict], prefer: str = "return=minimal") -> bool:
     """
     if not rows:
         return True
+    rows = [_coerce_timestamps(r) for r in rows]
     data = json.dumps(rows, default=_json_default).encode("utf-8")
     req = Request(_rest_url(table), data=data, headers=_headers(prefer), method="POST")
     try:
@@ -80,6 +82,7 @@ def _patch(table: str, filter_query: dict, patch: dict) -> bool:
     if not is_enabled() or not patch:
         return False
     qs = urlencode(filter_query)
+    patch = _coerce_timestamps(patch)
     data = json.dumps(patch, default=_json_default).encode("utf-8")
     req = Request(
         f"{_rest_url(table)}?{qs}",
@@ -102,6 +105,26 @@ def _json_default(v):
     if hasattr(v, "item"):
         return v.item()
     return str(v)
+
+
+# Column names that Postgres stores as TIMESTAMPTZ. Callers often pass Unix
+# floats (convenient for SQLite) which PostgREST rejects with HTTP 400. We
+# coerce them at the client boundary so every writer stays simple.
+_TIMESTAMP_COLUMNS = frozenset({"started_at", "finished_at", "updated_at", "created_at"})
+
+
+def _coerce_timestamps(row: dict) -> dict:
+    """Return a copy of `row` with known TIMESTAMPTZ columns as ISO 8601 strings."""
+    out = dict(row)
+    for col in _TIMESTAMP_COLUMNS:
+        v = out.get(col)
+        if v is None or isinstance(v, str):
+            continue
+        if isinstance(v, (int, float)):
+            out[col] = datetime.fromtimestamp(float(v), tz=timezone.utc).isoformat()
+        elif hasattr(v, "isoformat"):
+            out[col] = v.isoformat()
+    return out
 
 
 # ── backtest_runs ─────────────────────────────────────────────────────────
