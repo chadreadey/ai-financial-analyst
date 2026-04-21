@@ -292,13 +292,13 @@ I'll provide the exact SQL and the `supabase/` directory — user handles creden
 - [ ] Provide user the SQL to apply and the env-var checklist
 
 ### Session 3
-- [ ] `NewBacktestDialog.tsx` Modal toggle
-- [ ] Update `RunSelector` columns + config-hash dedup pill
-- [ ] New route `/backtest/runs/:runId` + page
-- [ ] New route `/backtest/runs/:runId/combos/:comboIdx` + page
-- [ ] Live event polling hook `useBacktestEvents(runId)`
-- [ ] Trade log component with expandable SignalVector row
-- [ ] End-to-end click-through test plan in the PR
+- [x] `NewBacktestDialog.tsx` Modal toggle (CPCV knobs surface when Modal mode picked)
+- [x] Modal runs panel with status filter, source indicator, and config-hash dedup pill (`×N`)
+- [x] New route `/backtest/modal/runs/:runId` + `ModalRunDetailPage` (summary KPIs + Combinations/Events/Config tabs)
+- [x] New route `/backtest/modal/runs/:runId/combos/:comboIdx` + `ModalComboDetailPage` (trade log + stats + CSV export)
+- [x] Live event polling hook (`useModalRunEvents`, `useModalRun`, `useModalCombinations`) with visibility-aware pause + active-run-only polling
+- [x] Trade log component with expandable SignalVector row — `extractSignalScores` supports both the canonical `{signal_vector: {name: {score, ...}}}` shape and legacy flat-number shape
+- [x] End-to-end click-through smoke: Vite dev → dispatch via UI → auto-navigate to detail page → events tab updates live → combo drill-down expanded to show 7 signal scores + composite from a real AAPL +96.8% trade
 
 ### PR
 - [ ] Open `modal-backtesting → main` with summary grouping all three sessions + acceptance-criteria checklist
@@ -321,7 +321,19 @@ I'll provide the exact SQL and the `supabase/` directory — user handles creden
   - Stale-run sweeper in both stores (`status='running' AND started_at < now() - 2h` → `failed`), called opportunistically on every `GET /runs` list.
   - Settings: `modal_backtest_flush_combos` (default 50), `modal_trade_snapshot_top_n` (0 = snapshot all).
   - Verified: POST → event stream polling → GET detail returns `complete` with 3 combos; all 7 GETs exercised via `TestClient` against the Supabase-backed reader.
-- Still deferred (move to follow-up once Session 3 frontend exists or Railway cold-starts become painful):
-  - Modal-side panel build (`build_panel_remote`) — FastAPI dispatch currently builds the panel in-process on Railway, which needs the price cache seeded there (works fine today because the nightly worker writes the shared warehouse DB).
+- 2026-04-21: Session 3 shipped. Frontend drill-down wired to the Session 2b endpoints:
+  - `frontend/src/api/types.ts` + `client.ts` extended with `ModalRun|Combination|Trade|Event|Kickoff` types and `dispatchModalRun` + 7 GET methods.
+  - `frontend/src/hooks/useModalBacktests.ts` — `useModalRuns`, `useModalRun`, `useModalCombinations`, `useModalRunEvents`, `useModalComboTrades`, `useDispatchModalRun`. All pollers are visibility-aware (skip when tab hidden) and stop polling once the run reaches a terminal status.
+  - `NewBacktestDialog` gained a Modal/Legacy mode toggle. Modal mode exposes universe (liquid_10/20/50), date range, N/k, max-combos cap, purge/embargo months, and seed. `BacktestPage` navigates to the new run detail page on dispatch.
+  - `ModalRunsPanel` lists runs with config-hash dedup pill (`×N`), status filter pills, source indicator, and all summary metrics (median OOS sharpe, PBO, DSR, combos progress, runtime).
+  - `ModalRunDetailPage` — summary KPIs + 3 tabs (Combinations with click-to-sort + click-through per combo, live Events with payload JSON, Config with reproducibility hashes + full config JSON).
+  - `ModalComboDetailPage` — train/test groups, gate badges, per-combo trade stats (win rate, avg %, total $), ticker filter, CSV export, and expandable per-trade SignalVector breakdown (handles nested `{signal_vector: {rsi: {score, ...}}}` shape + legacy flat map).
+  - Shared helpers in `components/backtest/modal-format.tsx`: `StatusBadge`, `extractSignalScores`, `formatDateTime/Duration/Num/Pct`, `shortHash`, `signedClass`.
+  - Build: `tsc -b` clean, `vite build` clean (362 kB gzipped, within norms for a single-page dashboard).
+  - Smoke (live Supabase source): listed 3 prior runs with dedup pill, drilled into the `liquid_10` 30-combo sweep, sorted by OOS Sharpe, clicked combo #7 (Sharpe 1.06), expanded AAPL +96.8% trade → saw SMA_TREND +1.000 / HIGH_52W +0.953 / BOLLINGER_PCTB -0.623 / RSI -0.583 / OBV_TREND +0.401 / composite 0.113. Dispatched a fresh POST via the dialog, auto-navigated to the new run detail, saw `run_started` + `run_failed` events stream in; failure payload rendered `{"error":"No module named 'modal'"}` (expected: no Modal on dev host).
+
+- Still deferred:
+  - Modal-side panel build (`build_panel_remote`) — FastAPI dispatch still builds the panel in-process on Railway, relying on the nightly warehouse seed.
   - Splitting Supabase secret from the admin secret in Modal (security isolation — not urgent while both are service-role).
   - Opportunistic `_trade_snapshot_top_n` filtering in `_handle_combo_result` (setting exists, not yet read).
+  - Legacy `/backtest/history` run selector on the Legacy tab still uses the old SQLite backtest_runs table; a future follow-up could unify it with the Modal reader once the legacy flow is decommissioned.

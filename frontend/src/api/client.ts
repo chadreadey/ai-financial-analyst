@@ -154,4 +154,93 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(tickers ? { tickers } : {}),
     }),
+
+  // ── Modal CPCV backtests ─────────────────────────────────────────────
+  listModalRuns: (params: {
+    status?: import("./types").ModalRunStatus;
+    config_hash?: string;
+    limit?: number;
+    offset?: number;
+  } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.status) qs.set("status", params.status);
+    if (params.config_hash) qs.set("config_hash", params.config_hash);
+    if (params.limit != null) qs.set("limit", String(params.limit));
+    if (params.offset != null) qs.set("offset", String(params.offset));
+    return request<{ source: string; runs: import("./types").ModalRun[]; count: number }>(
+      `/api/backtest/modal/runs?${qs}`
+    );
+  },
+
+  getModalRun: (runId: string) =>
+    request<import("./types").ModalRun>(`/api/backtest/modal/runs/${runId}`),
+
+  listModalRunsByConfigHash: (configHash: string, limit: number = 20) =>
+    request<{ config_hash: string; runs: import("./types").ModalRun[]; count: number }>(
+      `/api/backtest/modal/runs/by-config-hash/${encodeURIComponent(configHash)}?limit=${limit}`
+    ),
+
+  getModalRunCombinations: (runId: string, params: {
+    order_by?: "oos_sharpe" | "combo_idx" | "return_pct" | "n_trades";
+    descending?: boolean;
+    limit?: number;
+    offset?: number;
+  } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.order_by) qs.set("order_by", params.order_by);
+    if (params.descending != null) qs.set("descending", String(params.descending));
+    if (params.limit != null) qs.set("limit", String(params.limit));
+    if (params.offset != null) qs.set("offset", String(params.offset));
+    return request<{
+      run_id: string;
+      combinations: import("./types").ModalCombination[];
+      count: number;
+    }>(`/api/backtest/modal/runs/${runId}/combinations?${qs}`);
+  },
+
+  getModalComboTrades: (runId: string, comboIdx: number, params: {
+    ticker?: string;
+    limit?: number;
+    offset?: number;
+  } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.ticker) qs.set("ticker", params.ticker);
+    if (params.limit != null) qs.set("limit", String(params.limit));
+    if (params.offset != null) qs.set("offset", String(params.offset));
+    return request<{
+      run_id: string;
+      combo_idx: number;
+      trades: import("./types").ModalTrade[];
+      count: number;
+    }>(`/api/backtest/modal/runs/${runId}/combinations/${comboIdx}/trades?${qs}`);
+  },
+
+  getModalRunTrades: (runId: string, params: { ticker?: string; limit?: number; offset?: number } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.ticker) qs.set("ticker", params.ticker);
+    if (params.limit != null) qs.set("limit", String(params.limit));
+    if (params.offset != null) qs.set("offset", String(params.offset));
+    return request<{
+      run_id: string;
+      trades: import("./types").ModalTrade[];
+      count: number;
+    }>(`/api/backtest/modal/runs/${runId}/trades?${qs}`);
+  },
+
+  getModalRunEvents: (runId: string, params: { after_id?: number; limit?: number } = {}) => {
+    const qs = new URLSearchParams();
+    if (params.after_id != null) qs.set("after_id", String(params.after_id));
+    if (params.limit != null) qs.set("limit", String(params.limit));
+    return request<{
+      run_id: string;
+      events: import("./types").ModalEvent[];
+      count: number;
+    }>(`/api/backtest/modal/runs/${runId}/events?${qs}`);
+  },
+
+  dispatchModalRun: (body: import("./types").ModalRunRequest) =>
+    request<import("./types").ModalRunKickoff>("/api/backtest/modal", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };

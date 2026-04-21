@@ -224,3 +224,118 @@ export interface RebalanceResult {
   opened: string[];
   errors: string[];
 }
+
+// ── Modal CPCV backtest types ────────────────────────────────────────────
+
+export type ModalRunStatus = "queued" | "running" | "complete" | "degraded" | "failed";
+
+export interface ModalRun {
+  run_id: string;
+  config_hash: string;
+  git_sha: string;
+  status: ModalRunStatus;
+  universe: string | null;
+  n_groups: number | null;
+  n_test_groups: number | null;
+  n_combinations: number | null;
+  n_completed: number;
+  n_skipped: number;
+  n_failed: number;
+  median_oos_sharpe: number | null;
+  oos_sharpe_min: number | null;
+  oos_sharpe_max: number | null;
+  pbo: number | null;
+  deflated_sharpe: number | null;
+  config_json: Record<string, any>;
+  metrics_json: Record<string, any> | null;
+  error: string | null;
+  modal_call_id: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ModalCombination {
+  run_id: string;
+  combo_idx: number;
+  status: "complete" | "skipped" | "error";
+  train_indices: number[] | null;
+  test_indices: number[] | null;
+  oos_sharpe: number | null;
+  return_pct: number | null;
+  n_trades: number | null;
+  n_test_dates: number | null;
+  elapsed_seconds: number | null;
+  git_sha: string | null;
+  error: string | null;
+  gates_json: Record<string, any> | null;
+  created_at: string | null;
+}
+
+export interface ModalTrade {
+  run_id: string;
+  combo_idx: number;
+  trade_idx: number;
+  ticker: string;
+  direction: "LONG" | "SHORT";
+  entry_date: string;
+  exit_date: string | null;
+  entry_price: number | null;
+  exit_price: number | null;
+  pnl_dollar: number | null;
+  pnl_pct: number | null;
+  holding_days: number | null;
+  exit_reason: string | null;
+  composite_score: number | null;
+  regime_at_entry: string | null;
+  /**
+   * Full SignalVector snapshot taken at entry. Shape is the TradeRecord
+   * payload serialised by `quant/backtest.py::TradeRecord.to_json_dict`:
+   * `{ flags: string[], actionable: bool, signal_vector: { [signal]: { score: number, detail?: string, ... } } }`.
+   * Some older rows persisted only the flat score map — callers should
+   * tolerate both shapes via the helper in `modal-format.tsx`.
+   */
+  signals_at_entry_json: Record<string, any> | null;
+  flags_json: string[] | Record<string, any> | null;
+  created_at: string | null;
+}
+
+export type ModalEventKind =
+  | "run_started"
+  | "run_completed"
+  | "run_failed"
+  | "run_degraded"
+  | "combo_started"
+  | "combo_completed"
+  | "combo_failed"
+  | "combo_skipped";
+
+export interface ModalEvent {
+  id: number;
+  run_id: string;
+  kind: ModalEventKind;
+  combo_idx: number | null;
+  payload: Record<string, any> | null;
+  created_at: string | null;
+}
+
+export interface ModalRunKickoff {
+  run_id: string;
+  config_hash: string;
+  git_sha: string;
+  status: "queued";
+}
+
+export interface ModalRunRequest {
+  tickers?: string[];
+  universe?: "liquid_10" | "liquid_20" | "liquid_50" | string;
+  start_date?: string;
+  end_date?: string;
+  n_groups?: number;
+  n_test_groups?: number;
+  purge_months?: number;
+  embargo_months?: number;
+  max_combos?: number;
+  seed?: number;
+  local?: boolean;
+}
