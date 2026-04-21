@@ -34,6 +34,48 @@ _COMBO_CHUNK = 500
 _TRADE_CHUNK = 2000
 _HTTP_TIMEOUT = 15.0
 
+# Explicit column projections — never use select=* in bulk reads.
+_RUNS_COLS = (
+    "run_id,config_hash,git_sha,status,universe,"
+    "n_groups,n_test_groups,n_combinations,"
+    "n_completed,n_skipped,n_failed,"
+    "median_oos_sharpe,oos_sharpe_min,oos_sharpe_max,"
+    "pbo,deflated_sharpe,config_json,metrics_json,"
+    "error,modal_call_id,started_at,finished_at,updated_at"
+)
+_COMBO_COLS = (
+    "run_id,combo_idx,status,train_indices,test_indices,"
+    "oos_sharpe,return_pct,n_trades,n_test_dates,"
+    "elapsed_seconds,git_sha,error,gates_json,created_at"
+)
+# signals_at_entry_json intentionally excluded — use get_trade_detail for drill-down.
+_TRADE_COLS_LIST = (
+    "run_id,combo_idx,trade_idx,ticker,direction,"
+    "entry_date,exit_date,entry_price,exit_price,"
+    "pnl_dollar,pnl_pct,holding_days,exit_reason,"
+    "composite_score,regime_at_entry,flags_json,created_at"
+)
+_TRADE_COLS_DETAIL = _TRADE_COLS_LIST + ",signals_at_entry_json"
+_EVENT_COLS = "id,run_id,kind,combo_idx,payload,created_at"
+
+import os
+import pathlib
+
+_FAILED_BATCH_LOG = pathlib.Path(
+    os.environ.get("SUPABASE_FAILED_BATCH_LOG", "/tmp/supabase_failed_batches.jsonl")
+)
+
+
+def _append_failed_batch(table: str, rows: list[dict]) -> None:
+    """Append a failed batch to a local JSONL for manual replay."""
+    try:
+        with _FAILED_BATCH_LOG.open("a") as fh:
+            fh.write(json.dumps({"table": table, "rows": rows,
+                                 "ts": datetime.now(timezone.utc).isoformat()},
+                                default=_json_default) + "\n")
+    except Exception as exc:
+        logger.error("Could not write failed batch to %s: %s", _FAILED_BATCH_LOG, exc)
+
 
 def is_enabled() -> bool:
     return (
@@ -75,6 +117,7 @@ def _post(table: str, rows: list[dict], prefer: str = "return=minimal") -> bool:
             return True
     except Exception as exc:  # noqa: BLE001
         logger.warning("supabase POST %s failed (%d rows): %s", table, len(rows), exc)
+        _append_failed_batch(table, rows)
         return False
 
 
@@ -141,8 +184,29 @@ def upsert_run(row: dict) -> bool:
     return _post("backtest_runs", [row], prefer="resolution=merge-duplicates,return=minimal")
 
 
+# Columns patch_run is allowed to touch. Matches the allowlist enforced by
+# `backend.cpcv_sqlite.patch_run` so both stores accept the same writes.
+_PATCHABLE_RUN_COLS: frozenset[str] = frozenset({
+    "config_hash", "git_sha", "status", "universe",
+    "n_groups", "n_test_groups", "n_combinations",
+    "n_completed", "n_skipped", "n_failed",
+    "median_oos_sharpe", "oos_sharpe_min", "oos_sharpe_max",
+    "pbo", "deflated_sharpe",
+    "config_json", "metrics_json", "error", "modal_call_id",
+    "started_at", "finished_at",
+})
+
+
 def patch_run(run_id: str, patch: dict) -> bool:
     """Targeted PATCH of specific columns on a backtest_runs row."""
+    if not patch:
+        return False
+    unknown = set(patch.keys()) - _PATCHABLE_RUN_COLS
+    if unknown:
+        raise ValueError(
+            f"patch_run: unknown columns {sorted(unknown)} "
+            f"(allowed: {sorted(_PATCHABLE_RUN_COLS)})"
+        )
     return _patch("backtest_runs", {"run_id": f"eq.{run_id}"}, patch)
 
 
@@ -226,7 +290,7 @@ def list_runs(
     offset: int = 0,
 ) -> Optional[list[dict]]:
     params = {
-        "select": "*",
+        "select": _RUNS_COLS,
         "order": "started_at.desc",
         "limit": limit,
         "offset": offset,
@@ -239,7 +303,7 @@ def list_runs(
 
 
 def get_run(run_id: str) -> Optional[dict]:
-    rows = _get("backtest_runs", {"run_id": f"eq.{run_id}", "select": "*", "limit": 1})
+    rows = _get("backtest_runs", {"run_id": f"eq.{run_id}", "select": _RUNS_COLS, "limit": 1})
     if rows is None:
         return None
     return rows[0] if rows else None
@@ -261,7 +325,7 @@ def get_combinations(
     direction = "desc" if descending else "asc"
     params = {
         "run_id": f"eq.{run_id}",
-        "select": "*",
+        "select": _COMBO_COLS,
         "order": f"{col}.{direction}.nullslast",
     }
     if limit is not None:
@@ -279,7 +343,7 @@ def get_trades(
 ) -> Optional[list[dict]]:
     params = {
         "run_id": f"eq.{run_id}",
-        "select": "*",
+        "select": _TRADE_COLS_LIST,
         "order": "combo_idx.asc,trade_idx.asc",
     }
     if combo_idx is not None:
@@ -292,8 +356,29 @@ def get_trades(
     return _get("backtest_trades", params)
 
 
-def sweep_stale_runs(max_age_seconds: float = 2 * 3600) -> int:
-    """Mark Supabase runs stuck in 'running' longer than `max_age_seconds` as failed.
+def get_trade_detail(
+    run_id: str,
+    combo_idx: int,
+    trade_idx: int,
+) -> Optional[dict]:
+    """Single-trade fetch including signals_at_entry_json for drill-down UI."""
+    rows = _get(
+        "backtest_trades",
+        {
+            "run_id": f"eq.{run_id}",
+            "combo_idx": f"eq.{combo_idx}",
+            "trade_idx": f"eq.{trade_idx}",
+            "select": _TRADE_COLS_DETAIL,
+            "limit": 1,
+        },
+    )
+    if rows is None:
+        return None
+    return rows[0] if rows else None
+
+
+def sweep_stale_runs(max_age_seconds: Optional[float] = None) -> int:
+    """Mark Supabase runs whose `updated_at` heartbeat is older than the cutoff failed.
 
     Mirrors `backend.cpcv_sqlite.sweep_stale_runs` so both stores converge.
     Returns a best-effort count (PostgREST doesn't give an exact rowcount
@@ -301,11 +386,13 @@ def sweep_stale_runs(max_age_seconds: float = 2 * 3600) -> int:
     """
     if not is_enabled():
         return 0
+    if max_age_seconds is None:
+        max_age_seconds = float(getattr(settings, "cpcv_stale_sweep_seconds", 30 * 60))
     cutoff = datetime.fromtimestamp(time.time() - max_age_seconds, tz=timezone.utc).isoformat()
-    # Two PostgREST filters: status=eq.running AND started_at<cutoff
+    # Two PostgREST filters: status=eq.running AND updated_at<cutoff
     qs = urlencode({
         "status": "eq.running",
-        "started_at": f"lt.{cutoff}",
+        "updated_at": f"lt.{cutoff}",
     }, safe=".,:()*")
     data = json.dumps({
         "status": "failed",
@@ -337,7 +424,7 @@ def get_events(
 ) -> Optional[list[dict]]:
     params = {
         "run_id": f"eq.{run_id}",
-        "select": "*",
+        "select": _EVENT_COLS,
         "order": "id.asc",
         "limit": limit,
     }
@@ -358,5 +445,6 @@ __all__ = [
     "find_runs_by_config_hash",
     "get_combinations",
     "get_trades",
+    "get_trade_detail",
     "get_events",
 ]

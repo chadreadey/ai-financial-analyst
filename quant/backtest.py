@@ -3256,11 +3256,17 @@ def _run_single_cpcv_combo(
     purge_months = state.purge_months
     embargo_months = state.embargo_months
 
-    # Attach XGB feature matrix to config so the existing rolling-retrain
-    # logic in the combo loop fires. State carries it so every Modal worker
-    # gets a consistent PIT-frozen matrix without re-loading from disk.
+    # Use a per-combo shallow-copied config so we never mutate the
+    # caller's BacktestConfig (future parallel local dispatch would race
+    # on `_xgb_feature_matrix`). `dataclasses.replace` returns a new
+    # instance with only the fields we override; everything else is shared
+    # by reference (`tickers` list etc.) which is safe because the
+    # rebalance loop only reads them.
+    from dataclasses import replace as _dc_replace
     if config.enable_xgb_ranker and getattr(state, "xgb_feature_matrix", None) is not None:
+        config = _dc_replace(config)
         config._xgb_feature_matrix = state.xgb_feature_matrix
+    # From here on, `config` is a combo-local copy.
 
     safe_train_dates, safe_test_dates = apply_purge_embargo(
         groups, train_indices, test_indices,
@@ -3283,6 +3289,28 @@ def _run_single_cpcv_combo(
     combo_daily_pnl = pd.Series(dtype=float)
     combo_trades = []
     _vix_persistence_count = 0
+
+    # ── PIT-safe Kalshi macro fetch (once per combo) ───────────────
+    # NOTE: `KalshiClient` returns live-at-query-time prices. In a
+    # historical backtest we treat the value as a const signal across
+    # the test window; a point-in-time Kalshi archive is tracked in
+    # quant/kalshi_signal.py TODO and blocks the leakage-free version.
+    _kalshi_macro = 0.0
+    _kalshi_momentum = 0.0
+    _kalshi_client = None
+    if config.enable_kalshi_signal:
+        try:
+            from quant.kalshi_client import KalshiClient
+            from quant.kalshi_signal import (
+                compute_macro_modifier,
+                compute_macro_momentum,
+            )
+            _kalshi_client = KalshiClient()
+            _kalshi_macro = compute_macro_modifier(_kalshi_client)
+            _kalshi_momentum = compute_macro_momentum(_kalshi_client)
+        except Exception as _exc:
+            logger.warning("Kalshi macro bootstrap failed: %s", _exc)
+            _kalshi_client = None
 
     for i, reb_date in enumerate(safe_test_dates[:-1]):
         next_reb = safe_test_dates[i + 1]
@@ -3398,13 +3426,9 @@ def _run_single_cpcv_combo(
                     signals[ticker].event_timing_score = escore
                     signals[ticker].earnings_blocked = emeta.get("earnings_blocked", False)
 
-        if config.enable_kalshi_signal:
+        if config.enable_kalshi_signal and _kalshi_client is not None:
             try:
-                from quant.kalshi_client import KalshiClient
-                from quant.kalshi_signal import compute_macro_modifier, compute_event_divergence, compute_macro_momentum
-                _kalshi_client = KalshiClient()
-                _kalshi_macro = compute_macro_modifier(_kalshi_client)
-                _kalshi_momentum = compute_macro_momentum(_kalshi_client)
+                from quant.kalshi_signal import compute_event_divergence
                 for _ticker in signals:
                     signals[_ticker].kalshi_macro_score = _kalshi_macro
                     signals[_ticker].kalshi_macro_momentum = _kalshi_momentum

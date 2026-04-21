@@ -130,8 +130,8 @@ def _ensure_schema(conn: sqlite3.Connection) -> None:
                 payload     TEXT,
                 created_at  REAL NOT NULL
             );
-            CREATE INDEX IF NOT EXISTS idx_cpcv_events_run_time
-                ON cpcv_events (run_id, created_at);
+            CREATE INDEX IF NOT EXISTS idx_cpcv_events_run_id
+                ON cpcv_events (run_id, id);
             """
         )
         conn.commit()
@@ -157,7 +157,7 @@ def _json_default(v):
 
 # ── cpcv_runs ────────────────────────────────────────────────────────────
 
-def upsert_run(row: dict) -> bool:
+def upsert_run(row: dict[str, Any]) -> bool:
     """Insert or update a cpcv_runs row (keyed by run_id)."""
     try:
         conn = _connect()
@@ -210,10 +210,30 @@ def upsert_run(row: dict) -> bool:
         return False
 
 
-def patch_run(run_id: str, patch: dict) -> bool:
+# Columns patch_run is allowed to touch. Excludes run_id (primary key)
+# and created_at (immutable). Derived from the schema at
+# `_ensure_schema` — update together when adding new columns.
+_PATCHABLE_RUN_COLS: frozenset[str] = frozenset({
+    "config_hash", "git_sha", "status", "universe",
+    "n_groups", "n_test_groups", "n_combinations",
+    "n_completed", "n_skipped", "n_failed",
+    "median_oos_sharpe", "oos_sharpe_min", "oos_sharpe_max",
+    "pbo", "deflated_sharpe",
+    "config_json", "metrics_json", "error", "modal_call_id",
+    "started_at", "finished_at",
+})
+
+
+def patch_run(run_id: str, patch: dict[str, Any]) -> bool:
     """Targeted UPDATE of specific columns on a cpcv_runs row."""
     if not patch:
         return False
+    unknown = set(patch.keys()) - _PATCHABLE_RUN_COLS
+    if unknown:
+        raise ValueError(
+            f"patch_run: unknown columns {sorted(unknown)} "
+            f"(allowed: {sorted(_PATCHABLE_RUN_COLS)})"
+        )
     try:
         conn = _connect()
         try:
@@ -235,7 +255,7 @@ def patch_run(run_id: str, patch: dict) -> bool:
 
 # ── cpcv_combinations ────────────────────────────────────────────────────
 
-def insert_combinations_batch(rows: list[dict]) -> tuple[int, int]:
+def insert_combinations_batch(rows: list[dict[str, Any]]) -> tuple[int, int]:
     if not rows:
         return (0, 0)
     try:
@@ -283,7 +303,7 @@ def insert_combinations_batch(rows: list[dict]) -> tuple[int, int]:
 
 # ── cpcv_trades ──────────────────────────────────────────────────────────
 
-def insert_trades_batch(rows: list[dict]) -> tuple[int, int]:
+def insert_trades_batch(rows: list[dict[str, Any]]) -> tuple[int, int]:
     if not rows:
         return (0, 0)
     try:
@@ -337,7 +357,7 @@ def insert_trades_batch(rows: list[dict]) -> tuple[int, int]:
 
 # ── cpcv_events ──────────────────────────────────────────────────────────
 
-def insert_event(row: dict) -> bool:
+def insert_event(row: dict[str, Any]) -> bool:
     try:
         conn = _connect()
         try:
@@ -404,6 +424,14 @@ _JSON_TRADE_COLS = {"signals_at_entry_json", "flags_json"}
 _JSON_EVENT_COLS = {"payload"}
 
 
+# Map SQLite _json suffix column names to their Supabase equivalents so
+# all callers (not just the reader facade) get consistent key names.
+_SQLITE_COL_ALIASES = {
+    "train_indices_json": "train_indices",
+    "test_indices_json": "test_indices",
+}
+
+
 def _row_to_dict(row: sqlite3.Row, json_cols: set[str]) -> dict:
     out = dict(row)
     for col in json_cols & out.keys():
@@ -413,6 +441,10 @@ def _row_to_dict(row: sqlite3.Row, json_cols: set[str]) -> dict:
                 out[col] = json.loads(v)
             except Exception:
                 pass
+    # Rename _json-suffixed cols to match Supabase column names.
+    for old, new in _SQLITE_COL_ALIASES.items():
+        if old in out:
+            out[new] = out.pop(old)
     return out
 
 
@@ -532,13 +564,15 @@ def get_events(
     return [_row_to_dict(r, _JSON_EVENT_COLS) for r in _query(sql, tuple(params))]
 
 
-def sweep_stale_runs(max_age_seconds: float = 2 * 3600) -> int:
-    """Mark any run that's been 'running' longer than `max_age_seconds` as failed.
+def sweep_stale_runs(max_age_seconds: Optional[float] = None) -> int:
+    """Mark any run whose `updated_at` heartbeat is older than the cutoff failed.
 
     Returns the number of rows marked. Called by a simple cron/sweeper or on
     FastAPI startup. Matches the same cutoff used for Supabase (orchestrator
     is responsible for mirroring the final state when it can).
     """
+    if max_age_seconds is None:
+        max_age_seconds = float(getattr(settings, "cpcv_stale_sweep_seconds", 30 * 60))
     try:
         conn = _connect()
         try:
@@ -552,7 +586,7 @@ def sweep_stale_runs(max_age_seconds: float = 2 * 3600) -> int:
                        finished_at = COALESCE(finished_at, ?),
                        updated_at = ?
                  WHERE status = 'running'
-                   AND started_at < ?
+                   AND COALESCE(updated_at, started_at) < ?
                 """,
                 (time.time(), time.time(), cutoff),
             )

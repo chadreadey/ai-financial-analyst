@@ -59,6 +59,7 @@ export function BacktestPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [dispatchError, setDispatchError] = useState<string | null>(null);
+  const [panelKey, setPanelKey] = useState(0);
 
   useEffect(() => {
     refreshHistory();
@@ -72,6 +73,7 @@ export function BacktestPage() {
     } else {
       try {
         const kickoff = await dispatchModal(sub.config);
+        setPanelKey((k) => k + 1); // triggers fresh fetch when user navigates back
         navigate(`/backtest/modal/runs/${kickoff.run_id}`);
       } catch (e: any) {
         setDispatchError(e?.message ?? "Failed to dispatch Modal run");
@@ -118,14 +120,14 @@ export function BacktestPage() {
         </Card>
       )}
 
-      <Tabs defaultValue="modal">
+      <Tabs defaultValue="legacy">
         <TabsList className="mb-3">
+          <TabsTrigger value="legacy">Walk-Forward</TabsTrigger>
           <TabsTrigger value="modal">Modal CPCV</TabsTrigger>
-          <TabsTrigger value="legacy">Legacy (in-process)</TabsTrigger>
         </TabsList>
 
         <TabsContent value="modal">
-          <ModalRunsPanel />
+          <ModalRunsPanel key={panelKey} />
         </TabsContent>
 
         <TabsContent value="legacy">

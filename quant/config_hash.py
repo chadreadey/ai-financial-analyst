@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import asdict, is_dataclass
 from typing import Any, Iterable
 
@@ -44,6 +45,14 @@ def _coerce(value: Any) -> Any:
     if isinstance(value, int):
         return int(value)
     if isinstance(value, float):
+        # Non-finite floats are not valid JSON (RFC 8259). Map to
+        # deterministic string sentinels so two configs with NaN in
+        # the same slot still hash identically, but a strict JSON
+        # consumer never sees `NaN`/`Infinity` literals.
+        if math.isnan(value):
+            return "__nan__"
+        if math.isinf(value):
+            return "__pos_inf__" if value > 0 else "__neg_inf__"
         return round(value, _FLOAT_PRECISION)
     if isinstance(value, str):
         return value
@@ -52,7 +61,12 @@ def _coerce(value: Any) -> Any:
         if isinstance(value, np.integer):
             return int(value)
         if isinstance(value, np.floating):
-            return round(float(value), _FLOAT_PRECISION)
+            v = float(value)
+            if math.isnan(v):
+                return "__nan__"
+            if math.isinf(v):
+                return "__pos_inf__" if v > 0 else "__neg_inf__"
+            return round(v, _FLOAT_PRECISION)
     except ImportError:
         pass
     if hasattr(value, "isoformat"):
@@ -112,6 +126,7 @@ def config_hash(config: Any, extra_excluded: Iterable[str] = ()) -> str:
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=True,
+        allow_nan=False,
     )
     digest = hashlib.sha256(serialized.encode("utf-8")).hexdigest()
     return f"v{CONFIG_HASH_VERSION}:{digest}"

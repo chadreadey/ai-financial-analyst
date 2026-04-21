@@ -12,11 +12,21 @@ import type {
 // Runs that are still moving — worth polling.
 const ACTIVE_STATUSES: ReadonlySet<ModalRunStatus> = new Set(["queued", "running"]);
 
+function toMessage(e: unknown, fallback: string): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  return fallback;
+}
+
 function useVisibilityInterval(
   cb: () => void | Promise<void>,
   ms: number,
   enabled: boolean,
 ): void {
+  const cbRef = useRef(cb);
+  // Keep ref current on every render — no extra effect, no dep-array change.
+  cbRef.current = cb;
+
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
@@ -24,21 +34,19 @@ function useVisibilityInterval(
       if (cancelled) return;
       if (document.visibilityState === "visible") {
         try {
-          await cb();
+          await cbRef.current();
         } catch {
-          // Swallow — the caller's error state catches the first failure;
-          // transient polling errors should not tear down the UI.
+          // Swallow transient polling errors — caller error state handles first failure.
         }
       }
     };
-    // Fire once immediately, then on interval.
     void tick();
     const handle = window.setInterval(tick, ms);
     return () => {
       cancelled = true;
       window.clearInterval(handle);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // cb is accessed via ref; only interval identity matters here.
   }, [enabled, ms]);
 }
 
@@ -66,8 +74,8 @@ export function useModalRuns(opts: UseModalRunsOptions = {}) {
       setRuns(r.runs);
       setSource(r.source);
       setError(null);
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to load Modal runs");
+    } catch (e: unknown) {
+      setError(toMessage(e, "Failed to load Modal runs"));
     } finally {
       setIsLoading(false);
     }
@@ -96,8 +104,8 @@ export function useModalRun(runId: string | undefined, pollMs: number = 3000) {
       const r = await api.getModalRun(runId);
       setRun(r);
       setError(null);
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to load run");
+    } catch (e: unknown) {
+      setError(toMessage(e, "Failed to load run"));
     } finally {
       setIsLoading(false);
     }
@@ -141,8 +149,8 @@ export function useModalCombinations(runId: string | undefined, opts: UseModalCo
       });
       setCombinations(r.combinations);
       setError(null);
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to load combinations");
+    } catch (e: unknown) {
+      setError(toMessage(e, "Failed to load combinations"));
     } finally {
       setIsLoading(false);
     }
@@ -179,16 +187,18 @@ export function useModalRunEvents(runId: string | undefined, opts: { pollMs?: nu
         lastIdRef.current = r.events[r.events.length - 1].id;
       }
       setError(null);
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to load events");
+    } catch (e: unknown) {
+      setError(toMessage(e, "Failed to load events"));
     }
   }, [runId]);
 
-  // Reset on run change.
+  // Reset cursor and events when runId changes; fetch immediately.
   useEffect(() => {
+    if (!runId) return;
     lastIdRef.current = null;
     setEvents([]);
-  }, [runId]);
+    void refresh();
+  }, [runId, refresh]);
 
   useVisibilityInterval(refresh, pollMs, !!runId && active && pollMs > 0);
 
@@ -216,8 +226,8 @@ export function useModalComboTrades(
           setTrades(r.trades);
           setError(null);
         }
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message ?? "Failed to load trades");
+      } catch (e: unknown) {
+        if (!cancelled) setError(toMessage(e, "Failed to load trades"));
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -240,8 +250,8 @@ export function useDispatchModalRun() {
     try {
       const k = await api.dispatchModalRun(req);
       return k;
-    } catch (e: any) {
-      setError(e?.message ?? "Dispatch failed");
+    } catch (e: unknown) {
+      setError(toMessage(e, "Dispatch failed"));
       throw e;
     } finally {
       setIsDispatching(false);

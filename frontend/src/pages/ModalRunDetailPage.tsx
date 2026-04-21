@@ -9,17 +9,17 @@ import {
   useModalRun,
   useModalRunEvents,
 } from "../hooks/useModalBacktests";
+import { StatusBadge } from "../components/backtest/modal-format";
 import {
-  StatusBadge,
   formatDateTime,
   formatDuration,
   formatNum,
   formatPct,
   shortHash,
   signedClass,
-} from "../components/backtest/modal-format";
+} from "../components/backtest/modal-utils";
 import { ArrowLeft, RefreshCw } from "lucide-react";
-import type { ModalCombination } from "../api/types";
+import type { ModalCombination, ModalEvent, ModalRun } from "../api/types";
 
 // Terminal statuses disable polling of combinations/events.
 const isActiveStatus = (s: string | undefined) => s === "queued" || s === "running";
@@ -29,7 +29,7 @@ export function ModalRunDetailPage() {
   const navigate = useNavigate();
   const { run, isLoading, error, refresh } = useModalRun(runId);
 
-  const active = isActiveStatus(run?.status);
+  const active = run == null ? true : isActiveStatus(run.status);
   const { combinations, isLoading: combosLoading } = useModalCombinations(runId, {
     active,
     pollMs: active ? 4000 : 0,
@@ -317,7 +317,7 @@ function ComboRow({ runId, combo }: { runId: string; combo: ModalCombination }) 
   );
 }
 
-function EventsList({ events }: { events: Array<{ id: number; kind: string; created_at: string | null; combo_idx: number | null; payload: Record<string, any> | null }> }) {
+function EventsList({ events }: { events: ModalEvent[] }) {
   if (events.length === 0) {
     return (
       <Card className="p-6 text-center">
@@ -367,7 +367,7 @@ function EventsList({ events }: { events: Array<{ id: number; kind: string; crea
   );
 }
 
-function ConfigCard({ run }: { run: { config_json: Record<string, any>; config_hash: string; git_sha: string; metrics_json: Record<string, any> | null } }) {
+function ConfigCard({ run }: { run: Pick<ModalRun, "config_json" | "config_hash" | "git_sha" | "metrics_json"> }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <Card className="p-4">

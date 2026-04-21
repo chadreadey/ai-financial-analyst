@@ -10,15 +10,15 @@ import {
   useModalComboTrades,
   useModalRun,
 } from "../hooks/useModalBacktests";
+import { StatusBadge } from "../components/backtest/modal-format";
 import {
-  StatusBadge,
   extractSignalScores,
   formatDate,
   formatNum,
   formatPct,
   shortHash,
   signedClass,
-} from "../components/backtest/modal-format";
+} from "../components/backtest/modal-utils";
 import type { ModalTrade } from "../api/types";
 
 function exportTradesCsv(runId: string, comboIdx: number, trades: ModalTrade[]) {
@@ -31,7 +31,7 @@ function exportTradesCsv(runId: string, comboIdx: number, trades: ModalTrade[]) 
   const header = keys.join(",");
   const rows = trades.map((t) =>
     keys.map((k) => {
-      const v = (t as any)[k];
+      const v = t[k as keyof ModalTrade];
       if (v == null) return "";
       const s = String(v);
       return s.includes(",") || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
@@ -53,6 +53,10 @@ export function ModalComboDetailPage() {
 
   const { run } = useModalRun(runId);
   // Pull combinations once to show the specific combo's train/test slices.
+  // TODO: replace with useModalCombination(runId, idx) once the single-combo
+  // endpoint `GET /api/backtest/modal/runs/{run_id}/combinations/{combo_idx}`
+  // is available on the backend. Do not lower `limit` until that endpoint
+  // exists — server-side filtering by combo_idx is required for correctness.
   const { combinations } = useModalCombinations(runId, {
     active: false,
     pollMs: 0,
@@ -199,7 +203,7 @@ export function ModalComboDetailPage() {
       )}
 
       {/* Trade stats */}
-      {stats && (
+      {stats ? (
         <Card className="p-4">
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <StatBox label="Total Trades" value={String(stats.total)} />
@@ -232,7 +236,11 @@ export function ModalComboDetailPage() {
             </div>
           </div>
         </Card>
-      )}
+      ) : !isLoading ? (
+        <Card className="p-4">
+          <p className="text-xs text-muted-foreground">This combination produced no trades.</p>
+        </Card>
+      ) : null}
 
       {/* Trade log */}
       {error && (
@@ -324,7 +332,7 @@ function TradeRow({ trade, tickerLink }: { trade: ModalTrade; tickerLink?: strin
   );
   const hasSignals = signals.length > 0;
   const flags: string[] = useMemo(() => {
-    const f = (trade.signals_at_entry_json as any)?.flags;
+    const f = trade.signals_at_entry_json?.flags;
     return Array.isArray(f) ? f : [];
   }, [trade.signals_at_entry_json]);
 

@@ -23,7 +23,7 @@ import random
 import time
 import uuid
 from dataclasses import asdict
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from backend import cpcv_sqlite, supabase_backtest
 from modal_app.events import (
@@ -37,7 +37,38 @@ from modal_app.events import (
     EVENT_RUN_STARTED,
 )
 
+if TYPE_CHECKING:
+    from quant.backtest import BacktestConfig
+
 logger = logging.getLogger(__name__)
+
+
+# Thread registry for in-flight background CPCV dispatches.
+# Populated by `kickoff_cpcv_background`, drained by the FastAPI
+# `lifespan` teardown in `backend/main.py`. Kept at module scope so
+# ``backend.main`` can import `active_dispatch_threads`/`dispatch_lock`
+# without importing the whole dispatcher module's heavy deps eagerly.
+import threading as _threading
+active_dispatch_threads: set[_threading.Thread] = set()
+dispatch_lock: _threading.Lock = _threading.Lock()
+
+
+def _register_thread(t: _threading.Thread) -> None:
+    with dispatch_lock:
+        active_dispatch_threads.add(t)
+
+
+def _unregister_thread(t: _threading.Thread) -> None:
+    with dispatch_lock:
+        active_dispatch_threads.discard(t)
+
+
+def snapshot_active_threads() -> list[_threading.Thread]:
+    """Return a list copy of currently-registered dispatch threads.
+    The lifespan teardown iterates this snapshot and joins each.
+    """
+    with dispatch_lock:
+        return list(active_dispatch_threads)
 
 
 # Buffer combos before flushing to Supabase (SQLite flushes per-combo since
@@ -119,22 +150,31 @@ def _combo_trades_to_rows(run_id: str, combo_idx: int, trades: list[dict]) -> li
     return rows
 
 
-def _capture_sentry(run_id: str, config_hash: str, combo_idx: Optional[int], message: str) -> None:
+def _capture_sentry(
+    run_id: str,
+    config_hash: str,
+    combo_idx: Optional[int],
+    message: str,
+    exc: Optional[BaseException] = None,
+) -> None:
     """Best-effort Sentry capture with run/combo tags. No-op if sentry uninit."""
     try:
         import sentry_sdk
-        with sentry_sdk.push_scope() as scope:
+        with sentry_sdk.new_scope() as scope:
             scope.set_tag("run_id", run_id)
             scope.set_tag("config_hash", config_hash)
             if combo_idx is not None:
                 scope.set_tag("combo_idx", combo_idx)
-            sentry_sdk.capture_message(message, level="error")
-    except Exception:
+            if exc is not None:
+                sentry_sdk.capture_exception(exc)
+            else:
+                sentry_sdk.capture_message(message, level="error")
+    except Exception:  # noqa: BLE001
         pass
 
 
 def dispatch_cpcv(
-    config,
+    config: "BacktestConfig",
     *,
     n_groups: int = 16,
     n_test_groups: int = 8,
@@ -242,7 +282,6 @@ def dispatch_cpcv(
         n_combinations=len(combos),
     )
 
-    # Flip status to running now that combos are resolved. Update n_combinations.
     cpcv_sqlite.patch_run(run_id, {"status": "running", "n_combinations": len(combos)})
     supabase_backtest.patch_run(run_id, {"status": "running", "n_combinations": len(combos)})
 
@@ -301,7 +340,6 @@ def dispatch_cpcv(
             "elapsed_seconds": out.get("elapsed_seconds"),
         }, combo_idx=combo_idx)
 
-        # Flush buffered combo rows to Supabase when threshold reached.
         if len(supabase_combo_buffer) >= _supabase_combo_flush_size():
             supabase_backtest.insert_combinations_batch(supabase_combo_buffer)
             supabase_combo_buffer.clear()
@@ -312,63 +350,72 @@ def dispatch_cpcv(
             median = float(sorted_sharpes[len(sorted_sharpes) // 2])
             logger.info("%d combos complete  median_oos_sharpe=%.3f", completed, median)
 
-    if local:
-        from quant.backtest import _run_single_cpcv_combo
-        for idx, (train, test) in enumerate(combos):
-            if idx % 10 == 0:
-                logger.info("local combo %d/%d", idx + 1, len(combos))
-            try:
-                out = _run_single_cpcv_combo(
-                    state=local_state,
-                    train_indices=train,
-                    test_indices=test,
-                    combo_idx=idx,
-                    config=config,
-                )
-            except Exception as exc:
-                err_out = {
-                    "combo_idx": idx,
-                    "status": "error",
-                    "error": f"{type(exc).__name__}: {exc}",
-                }
-                _handle_combo_result(err_out)
-                continue
-
-            if out is None:
-                _handle_combo_result({"combo_idx": idx, "status": "skipped",
-                                      "skip_reason": "no_trades_or_sharpe"})
-                continue
-            out["status"] = "complete"
-            out.setdefault("git_sha", git_sha)
-            _handle_combo_result(out)
-    else:
-        from modal_app.app import app
-        from modal_app.functions.cpcv_combo import CPCVWorker
-        specs = _build_combo_specs(run_id, panel_key, combos, config_dict, cfg_hash, git_sha)
-        logger.info("Dispatching %d combos to Modal CPCVWorker.run_combo.map()", len(specs))
-
-        with app.run():
-            worker = CPCVWorker()
-            for out in worker.run_combo.map(
-                specs,
-                return_exceptions=True,
-                wrap_returned_exceptions=False,
-                order_outputs=False,
-            ):
-                if isinstance(out, Exception):
+    try:
+        if local:
+            from quant.backtest import _run_single_cpcv_combo
+            for idx, (train, test) in enumerate(combos):
+                if idx % 10 == 0:
+                    logger.info("local combo %d/%d", idx + 1, len(combos))
+                try:
+                    out = _run_single_cpcv_combo(
+                        state=local_state,
+                        train_indices=train,
+                        test_indices=test,
+                        combo_idx=idx,
+                        config=config,
+                    )
+                except Exception as exc:
                     err_out = {
-                        "combo_idx": -1,
+                        "combo_idx": idx,
                         "status": "error",
-                        "error": f"{type(out).__name__}: {out}",
+                        "error": f"{type(exc).__name__}: {exc}",
                     }
                     _handle_combo_result(err_out)
                     continue
-                _handle_combo_result(out)
 
-    # Final flush of buffered combos to Supabase.
-    if supabase_combo_buffer:
-        supabase_backtest.insert_combinations_batch(supabase_combo_buffer)
-        supabase_combo_buffer.clear()
+                if out is None:
+                    _handle_combo_result({"combo_idx": idx, "status": "skipped",
+                                          "skip_reason": "no_trades_or_sharpe"})
+                    continue
+                out["status"] = "complete"
+                out.setdefault("git_sha", git_sha)
+                _handle_combo_result(out)
+        else:
+            from modal_app.app import app
+            from modal_app.functions.cpcv_combo import CPCVWorker
+            specs = _build_combo_specs(run_id, panel_key, combos, config_dict, cfg_hash, git_sha)
+            logger.info("Dispatching %d combos to Modal CPCVWorker.run_combo.map()", len(specs))
+
+            with app.run():
+                worker = CPCVWorker()
+                for out in worker.run_combo.map(
+                    specs,
+                    return_exceptions=True,
+                    wrap_returned_exceptions=False,
+                    order_outputs=False,
+                ):
+                    if isinstance(out, Exception):
+                        err_out = {
+                            "combo_idx": -1,
+                            "status": "error",
+                            "error": f"{type(out).__name__}: {out}",
+                        }
+                        _handle_combo_result(err_out)
+                        continue
+                    _handle_combo_result(out)
+    finally:
+        # Always flush buffered Supabase combos, even if the fan-out
+        # raises — SQLite is already up-to-date per-combo, Supabase
+        # must follow or the two stores diverge.
+        if supabase_combo_buffer:
+            try:
+                supabase_backtest.insert_combinations_batch(supabase_combo_buffer)
+            except Exception as flush_exc:  # noqa: BLE001
+                logger.warning(
+                    "final Supabase combo flush failed (%d rows, run %s): %s",
+                    len(supabase_combo_buffer), run_id, flush_exc,
+                )
+            supabase_combo_buffer.clear()
 
     elapsed = time.time() - t_fanout
     result.elapsed_seconds = round(elapsed, 1)
@@ -440,7 +487,7 @@ def dispatch_cpcv(
     return summary
 
 
-def _infer_universe_label(config) -> Optional[str]:
+def _infer_universe_label(config: "BacktestConfig") -> Optional[str]:
     """Best-effort name for `cpcv_runs.universe` from the ticker set.
 
     Matches the CLI's `--universe` flag values when possible so the dedup
@@ -459,14 +506,14 @@ def _infer_universe_label(config) -> Optional[str]:
     return f"custom_{len(config.tickers)}"
 
 
-def _supabase_run_row(row: dict) -> dict:
+def _supabase_run_row(row: dict[str, Any]) -> dict[str, Any]:
     """Shape a run row for Supabase (drop `started_at` so Postgres defaults)."""
     out = {k: v for k, v in row.items() if k != "started_at"}
     return out
 
 
 def kickoff_cpcv_background(
-    config,
+    config: "BacktestConfig",
     *,
     n_groups: int = 16,
     n_test_groups: int = 8,
@@ -476,7 +523,7 @@ def kickoff_cpcv_background(
     seed: int = 42,
     local: bool = False,
 ) -> dict[str, Any]:
-    """Kick off a CPCV dispatch on a daemon thread and return immediately.
+    """Kick off a CPCV dispatch on a background thread and return immediately.
 
     Used by the FastAPI POST endpoint: we need to return a `run_id` to the
     client before the long dispatch has even uploaded the panel. This
@@ -485,7 +532,6 @@ def kickoff_cpcv_background(
 
     Returns `{run_id, config_hash, git_sha, status}` for the response body.
     """
-    import threading
     from quant.backtest import BacktestConfig
     from quant.config_hash import config_hash as _config_hash_fn
     from quant.git_sha import capture_git_sha
@@ -537,7 +583,7 @@ def kickoff_cpcv_background(
             )
         except Exception as exc:  # noqa: BLE001
             logger.exception("background dispatch for run %s failed", run_id)
-            _capture_sentry(run_id, cfg_hash, None, f"background dispatch failed: {exc}")
+            _capture_sentry(run_id, cfg_hash, None, f"background dispatch failed: {exc}", exc=exc)
             cpcv_sqlite.patch_run(run_id, {
                 "status": "failed",
                 "error": str(exc)[:500],
@@ -549,8 +595,11 @@ def kickoff_cpcv_background(
                 "finished_at": time.time(),
             })
             emit_event(run_id, EVENT_RUN_FAILED, {"error": str(exc)[:500]})
+        finally:
+            _unregister_thread(_threading.current_thread())
 
-    thread = threading.Thread(target=_run, daemon=True, name=f"cpcv-{run_id}")
+    thread = _threading.Thread(target=_run, daemon=False, name=f"cpcv-{run_id}")
+    _register_thread(thread)
     thread.start()
 
     return {

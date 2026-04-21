@@ -146,15 +146,24 @@ class Settings(BaseSettings):
     # Number of completed combo rows to buffer before flushing to Supabase
     # (PostgREST has a ~1 MB payload cap; 50 combos is comfortably under).
     modal_backtest_flush_combos: int = 50
-    # Only persist full SignalVector snapshots for trades in this many top/
-    # bottom combos by OOS Sharpe (None = every combo). Lets big sweeps keep
-    # detailed attribution for the interesting combos without ballooning
-    # the trade table to 100k+ rows of JSONB.
-    modal_trade_snapshot_top_n: int = 0  # 0 = snapshot all
+    # Heartbeat-based stale-run detection cutoff: any `running` row whose
+    # `updated_at` is older than this is treated as wedged and flipped to
+    # `failed` by the sweeper. Default 30 min — healthy runs refresh
+    # `updated_at` on every combo write.
+    cpcv_stale_sweep_seconds: int = 30 * 60
 
     # ── Auto paper trading ────────────────────────────────────────────
     auto_paper_trade: bool = True
     auto_paper_trade_min_conviction: float = 0.40
+
+    # ── Internal service auth ────────────────────────────────────────────
+    internal_api_key: str = Field(
+        default="",
+        description=(
+            "Shared secret for internal API endpoints (backtest dispatch, etc). "
+            "Must be set in production. Generate with: python -c \"import secrets; print(secrets.token_hex(32))\""
+        ),
+    )
 
     # ── Alpaca paper trading ──────────────────────────────────────────
     alpaca_api_key: str = ""

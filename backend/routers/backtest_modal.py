@@ -7,16 +7,45 @@ so the frontend can navigate to the detail view before the run completes.
 """
 from __future__ import annotations
 
+import hmac
 import logging
+import re
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from pydantic import BaseModel, Field, field_validator
 
 from backend import backtest_reader, cpcv_sqlite, supabase_backtest
+from config import settings
 
 logger = logging.getLogger(__name__)
-router = APIRouter()
+
+
+def _require_api_key(x_api_key: str = Header(..., alias="X-API-Key")) -> None:
+    """Dependency: validates X-API-Key against INTERNAL_API_KEY env var.
+
+    Raises 403 (not 401) to avoid leaking that the endpoint exists and
+    requires auth — returning 401 would invite credential-stuffing loops.
+    Raises 500 at startup-time if the key is not configured so misconfigured
+    deployments fail loudly.
+    """
+    configured = settings.internal_api_key
+    if not configured:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Server misconfigured: INTERNAL_API_KEY not set.",
+        )
+    if not hmac.compare_digest(configured, x_api_key):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden.",
+        )
+
+
+router = APIRouter(dependencies=[Depends(_require_api_key)])
+
+
+_TICKER_RE = re.compile(r'^[A-Z]{1,5}$')
 
 
 class ModalCPCVRequest(BaseModel):
@@ -26,7 +55,11 @@ class ModalCPCVRequest(BaseModel):
     tickers/universe so the frontend can send a minimal payload with sensible
     defaults.
     """
-    tickers: Optional[list[str]] = None
+    tickers: Optional[list[str]] = Field(
+        default=None,
+        max_length=50,
+        description="Up to 50 ticker symbols. Each must match [A-Z]{1,5}.",
+    )
     universe: Optional[str] = Field(
         default=None,
         description="Named universe: liquid_10, liquid_20, liquid_50. Used when tickers is omitted.",
@@ -43,6 +76,27 @@ class ModalCPCVRequest(BaseModel):
         default=False,
         description="Run in-process instead of Modal. Useful for debugging only.",
     )
+
+    @field_validator("tickers", mode="before")
+    @classmethod
+    def validate_tickers(cls, v: object) -> object:
+        if v is None:
+            return v
+        if not isinstance(v, list):
+            raise ValueError("tickers must be a list")
+        if len(v) > 50:
+            raise ValueError(f"tickers list exceeds 50-item limit (got {len(v)})")
+        cleaned = []
+        for raw in v:
+            if not isinstance(raw, str):
+                raise ValueError(f"each ticker must be a string, got {type(raw)}")
+            t = raw.upper().strip()
+            if not _TICKER_RE.match(t):
+                raise ValueError(
+                    f"Invalid ticker {raw!r}. Must be 1-5 uppercase ASCII letters."
+                )
+            cleaned.append(t)
+        return cleaned
 
 
 class ModalCPCVKickoff(BaseModel):
@@ -65,7 +119,7 @@ async def dispatch_modal_cpcv(payload: ModalCPCVRequest) -> ModalCPCVKickoff:
 
     try:
         if payload.tickers:
-            tickers = [t.upper().strip() for t in payload.tickers if t and t.strip()]
+            tickers = list(payload.tickers)  # already validated + uppercased by the model
         else:
             from quant.universe import get_universe
             tickers = list(get_universe(payload.universe))
@@ -199,5 +253,11 @@ async def get_run_events(
     after_id: Optional[int] = Query(None, ge=0),
     limit: int = Query(200, ge=1, le=1000),
 ) -> dict[str, Any]:
-    rows = backtest_reader.get_events(run_id, after_id=after_id, limit=limit)
-    return {"run_id": run_id, "events": rows, "count": len(rows)}
+    result = backtest_reader.get_events(run_id, after_id=after_id, limit=limit)
+    rows = result["events"]
+    return {
+        "run_id": run_id,
+        "source": result["source"],
+        "events": rows,
+        "count": len(rows),
+    }

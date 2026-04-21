@@ -5,14 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useModalRuns } from "../../hooks/useModalBacktests";
 import type { ModalRun, ModalRunStatus } from "../../api/types";
+import { StatusBadge } from "./modal-format";
 import {
-  StatusBadge,
   formatDateTime,
   formatDuration,
   formatNum,
   shortHash,
   signedClass,
-} from "./modal-format";
+} from "./modal-utils";
 import { RefreshCw } from "lucide-react";
 
 const STATUS_FILTERS: Array<{ value: ModalRunStatus | ""; label: string }> = [
