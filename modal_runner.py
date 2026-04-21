@@ -120,6 +120,32 @@ def run_experiment(
 @app.function(
     image=image,
     secrets=secrets,
+    timeout=60,
+    cpu=2,
+    memory=2048,
+)
+def run_smoke_test(smoke_test_code: str) -> dict:
+    """
+    Execute a smoke-test script and return whether it passed.
+    The smoke test is short (<30s), uses a synthetic tiny dataset, asserts metrics shape.
+    """
+    import sys
+    import traceback
+    sys.path.insert(0, "/root/app")
+
+    namespace: dict = {}
+    try:
+        exec(smoke_test_code, namespace)
+        return {"status": "pass", "message": "smoke test passed"}
+    except AssertionError as e:
+        return {"status": "fail", "message": f"assertion failed: {e}", "trace": traceback.format_exc()[-2000:]}
+    except Exception as e:
+        return {"status": "error", "message": str(e), "trace": traceback.format_exc()[-2000:]}
+
+
+@app.function(
+    image=image,
+    secrets=secrets,
     timeout=1200,
     cpu=8,
     memory=16384,
