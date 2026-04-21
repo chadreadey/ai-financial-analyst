@@ -48,6 +48,7 @@ MACRO_SERIES: Dict[str, Tuple[str, str]] = {
     "VIXCLS": ("CBOE VIX", "index"),
     "T5YIE": ("5-Year Breakeven Inflation", "%"),
     "T10YIE": ("10-Year Breakeven Inflation", "%"),
+    "PCOPPUSDM": ("Copper Price USD/lb", "USD/lb"),
 }
 
 # Treasury maturities for yield curve interpolation (discount_rate.py)

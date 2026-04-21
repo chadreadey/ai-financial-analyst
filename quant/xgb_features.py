@@ -51,6 +51,10 @@ def build_feature_matrix(
         compute_insider_scores,
     )
 
+    logger.warning(
+        "price_regression and arima_forecast columns set to 0.0 in offline feature matrix build"
+        " — these are live-computed during inference"
+    )
     rows = []
     tickers = list(universe_data.keys())
 
@@ -178,6 +182,9 @@ def build_feature_matrix(
                 # Context features
                 "atr_pct": sv.atr_regime.metadata.get("atr_pct", 0.0),
                 "vix_level": vix_level or 0.0,
+                # Live-computed signals (placeholder 0.0 in offline build)
+                "price_regression": 0.0,
+                "arima_forecast": 0.0,
                 # Label
                 "fwd_21d_return": fwd_return,
             })

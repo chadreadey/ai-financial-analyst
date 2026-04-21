@@ -5,12 +5,14 @@ import { Input } from "@/components/ui/input";
 import { PaperMetricsPanel } from "../components/paper-trading/PaperMetricsPanel";
 import { OpenPositionsTable } from "../components/paper-trading/OpenPositionsTable";
 import { ClosedTradesTable } from "../components/paper-trading/ClosedTradesTable";
+import { AccountPanel } from "../components/paper-trading/AccountPanel";
+import { OrderHistoryTable } from "../components/paper-trading/OrderHistoryTable";
 import { EquityCurveChart } from "../components/charts/EquityCurveChart";
 import { usePaperTrading } from "../hooks/usePaperTrading";
-import { Plus, X } from "lucide-react";
+import { Plus, X, RefreshCw } from "lucide-react";
 
 export function PaperTradingPage() {
-  const { openPositions, closedTrades, equityCurve, metrics, isLoading, addPosition, closePosition } = usePaperTrading();
+  const { openPositions, closedTrades, equityCurve, metrics, account, orders, isLoading, isRebalancing, addPosition, closePosition, triggerRebalance } = usePaperTrading();
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ ticker: "", entry_price: "", verdict: "BUY" });
 
@@ -42,13 +44,19 @@ export function PaperTradingPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-foreground">Paper Trading</h1>
-        <Button size="sm" onClick={() => setShowAdd(!showAdd)}>
-          {showAdd ? (
-            <><X size={13} className="mr-1.5" />Cancel</>
-          ) : (
-            <><Plus size={13} className="mr-1.5" />Add Position</>
-          )}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => triggerRebalance()} disabled={isRebalancing}>
+            <RefreshCw size={13} className={`mr-1.5 ${isRebalancing ? "animate-spin" : ""}`} />
+            {isRebalancing ? "Rebalancing…" : "Rebalance"}
+          </Button>
+          <Button size="sm" onClick={() => setShowAdd(!showAdd)}>
+            {showAdd ? (
+              <><X size={13} className="mr-1.5" />Cancel</>
+            ) : (
+              <><Plus size={13} className="mr-1.5" />Add Position</>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Add position form */}
@@ -98,6 +106,9 @@ export function PaperTradingPage() {
         </Card>
       )}
 
+      {/* Alpaca account */}
+      <AccountPanel account={account} />
+
       {/* Metrics */}
       <PaperMetricsPanel metrics={metrics} />
 
@@ -118,6 +129,13 @@ export function PaperTradingPage() {
           <ClosedTradesTable trades={closedTrades} />
         </Card>
       </div>
+
+      {/* Alpaca order history */}
+      {orders.length > 0 && (
+        <Card className="p-0 overflow-hidden">
+          <OrderHistoryTable orders={orders} />
+        </Card>
+      )}
     </div>
   );
 }

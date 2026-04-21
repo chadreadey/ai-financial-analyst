@@ -141,4 +141,17 @@ export const api = {
 
   getPaperMetrics: () =>
     request<import("./types").PaperMetrics>("/api/paper-trading/metrics"),
+
+  getAlpacaAccount: (): Promise<import("./types").AlpacaAccount> =>
+    request<import("./types").AlpacaAccount>("/api/paper-trading/account"),
+
+  getAlpacaOrders: (): Promise<{ orders: import("./types").AlpacaOrder[] }> =>
+    request<{ orders: import("./types").AlpacaOrder[] }>("/api/paper-trading/orders"),
+
+  triggerRebalance: (tickers?: string[]): Promise<import("./types").RebalanceResult> =>
+    request<import("./types").RebalanceResult>("/api/paper-trading/rebalance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(tickers ? { tickers } : {}),
+    }),
 };

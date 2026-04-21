@@ -22,6 +22,19 @@ reports/
 .seeded_tickers.txt
 backtests/
 reproducibility_*.json
+backtest_bt_*.json
+backtest_wf_*.json
+phase0_*.json
+.xgb_features_*.csv
+
+# Superpowers / agent workspaces
+.superpowers/
+
+# Per-provider runtime caches
+quant/.kalshi_cache/
+
+# Jupyter notebooks (local-only by default; force-add if you want to track)
+notebooks/
 
 # Build artifacts
 *.egg-info/

@@ -40,6 +40,12 @@ class MacroRegimeSignal:
     recession_score: float = 0.0             # 0.0-1.0 composite probability
     recession_regime: str = "unknown"        # low / moderate / elevated / high
 
+    # Copper (PCOPPUSDM)
+    copper_price: Optional[float] = None
+    copper_drawdown_12m: Optional[float] = None
+    copper_regime: str = "unknown"
+    copper_score: float = 0.0
+
     # Composite
     regime_multiplier: float = 1.0           # sizing multiplier (0.25-1.0)
     regime_label: str = "unknown"            # risk_on / cautious / risk_off
@@ -55,6 +61,10 @@ class MacroRegimeSignal:
             "curve_regime": self.curve_regime,
             "recession_score": round(self.recession_score, 3),
             "recession_regime": self.recession_regime,
+            "copper_price": self.copper_price,
+            "copper_drawdown_12m": self.copper_drawdown_12m,
+            "copper_regime": self.copper_regime,
+            "copper_score": self.copper_score,
             "regime_multiplier": self.regime_multiplier,
             "regime_label": self.regime_label,
         }
@@ -69,6 +79,8 @@ class MacroRegimeSignal:
         if self.t10y3m is not None:
             lines.append(f"  Yield curve (10Y-3M): {self.t10y3m:+.2f}% ({self.curve_regime})")
         lines.append(f"  Recession probability: {self.recession_score:.0%} ({self.recession_regime})")
+        if self.copper_regime != "unknown":
+            lines.append(f"  Copper: {self.copper_regime} (drawdown {self.copper_drawdown_12m:.1%} from 12M high, score {self.copper_score:+.2f})")
         lines.append(f"  Regime: {self.regime_label} | Sizing multiplier: {self.regime_multiplier:.2f}")
         return "\n".join(lines)
 
@@ -254,6 +266,67 @@ def compute_recession_score(
     return round(score, 3), regime
 
 
+# ── Copper Signal ─────────────────────────────────────────────────────
+
+def compute_copper_signal(
+    copper_series: pd.Series,
+    as_of_date: pd.Timestamp,
+) -> tuple:
+    """
+    Compute copper regime signal from PCOPPUSDM (monthly, USD/MT).
+
+    Thresholds (IMF WP/12/278, BoC 2016-17):
+      >= -5% of 12M high  : bullish (score +0.5 to +1.0)
+      -5% to -15%         : neutral (score 0.0)
+      -15% to -25%, persistent 2+ months: bearish (score -0.5)
+      < -25%, persistent  : crisis (score -1.0)
+      Non-persistent below -15%: neutral with partial negative score
+
+    China confound: treat as confirming filter only, not standalone trigger.
+    Returns: (current_price, drawdown_from_12m_high, regime_label, score)
+    """
+    available = copper_series[copper_series.index <= as_of_date].dropna()
+    if len(available) < 13:
+        return None, None, "unknown", 0.0
+
+    current = float(available.iloc[-1])
+    prior = available.iloc[:-1]
+
+    # Point-in-time 12M trailing high (excludes current month)
+    high_12m = float(prior.iloc[-12:].max())
+    drawdown = (current - high_12m) / high_12m  # <= 0 if below high
+
+    # New 12M high
+    if current >= high_12m:
+        return current, round(drawdown, 4), "bullish", 1.0
+
+    # Persistence: check if prior month was also below -15% threshold
+    persistent = False
+    if len(prior) >= 2:
+        prior_current = float(prior.iloc[-1])
+        # Use same high_12m as point-in-time for prior month (conservative)
+        prior_high = float(prior.iloc[-12:].max()) if len(prior) >= 12 else float(prior.max())
+        prior_drawdown = (prior_current - prior_high) / prior_high
+        persistent = prior_drawdown <= -0.15
+
+    if drawdown >= -0.05:
+        regime, score = "bullish", 0.5
+    elif drawdown >= -0.15:
+        regime, score = "neutral", 0.0
+    elif drawdown >= -0.25:
+        if persistent:
+            regime, score = "bearish", -0.5
+        else:
+            regime, score = "neutral", -0.2
+    else:
+        if persistent:
+            regime, score = "crisis", -1.0
+        else:
+            regime, score = "neutral", -0.3
+
+    return current, round(drawdown, 4), regime, round(score, 3)
+
+
 # ── Composite Regime Assessment ────────────────────────────────────────
 
 def compute_macro_regime(
@@ -261,6 +334,7 @@ def compute_macro_regime(
     t10y3m_series: Optional[pd.Series],
     as_of_date: pd.Timestamp,
     vix: Optional[float] = None,
+    copper_series: Optional[pd.Series] = None,
 ) -> MacroRegimeSignal:
     """
     Compute full macro regime signal from FRED data.
@@ -315,6 +389,14 @@ def compute_macro_regime(
         signal.regime_multiplier = 1.0
         signal.regime_label = "risk_on"
 
+    # Copper signal
+    if copper_series is not None and not copper_series.empty:
+        _cu_price, _cu_dd, _cu_regime, _cu_score = compute_copper_signal(copper_series, as_of_date)
+        signal.copper_price = _cu_price
+        signal.copper_drawdown_12m = _cu_dd
+        signal.copper_regime = _cu_regime
+        signal.copper_score = _cu_score
+
     return signal
 
 
@@ -322,26 +404,27 @@ def compute_macro_regime(
 
 _hy_oas_cache: Optional[pd.Series] = None
 _t10y3m_cache: Optional[pd.Series] = None
+_copper_cache: Optional[pd.Series] = None
 
 
-def load_fred_macro_data(start_date: str = "2010-01-01") -> tuple[Optional[pd.Series], Optional[pd.Series]]:
+def load_fred_macro_data(start_date: str = "2010-01-01") -> tuple[Optional[pd.Series], Optional[pd.Series], Optional[pd.Series]]:
     """
-    Load HY OAS and 10Y-3M yield curve spread from FRED.
+    Load HY OAS, 10Y-3M yield curve spread, and copper price from FRED.
 
-    Returns (hy_oas_series, t10y3m_series) — both as pd.Series with DatetimeIndex.
+    Returns (hy_oas_series, t10y3m_series, copper_series) — all as pd.Series with DatetimeIndex.
     Returns cached data on subsequent calls.
     """
-    global _hy_oas_cache, _t10y3m_cache
+    global _hy_oas_cache, _t10y3m_cache, _copper_cache
 
-    if _hy_oas_cache is not None and _t10y3m_cache is not None:
-        return _hy_oas_cache, _t10y3m_cache
+    if _hy_oas_cache is not None and _t10y3m_cache is not None and _copper_cache is not None:
+        return _hy_oas_cache, _t10y3m_cache, _copper_cache
 
     try:
         from fred_client import get_fred_client
         client = get_fred_client()
         if client is None:
             logger.warning("No FRED API key — macro signals disabled")
-            return None, None
+            return None, None, None
 
         logger.info("Loading FRED macro data for backtest...")
         hy = client.get_series("BAMLH0A0HYM2", observation_start=start_date)
@@ -354,8 +437,18 @@ def load_fred_macro_data(start_date: str = "2010-01-01") -> tuple[Optional[pd.Se
             _t10y3m_cache = t10y3m
             logger.info("T10Y3M: %d obs, %s to %s", len(t10y3m), t10y3m.index[0].date(), t10y3m.index[-1].date())
 
-        return _hy_oas_cache, _t10y3m_cache
+        copper = pd.Series(dtype=float)
+        try:
+            raw = client.get_series("PCOPPUSDM", observation_start=start_date)
+            if raw is not None and not raw.empty:
+                copper = raw.resample("MS").last().ffill()
+                _copper_cache = copper
+                logger.info("Copper: %d obs, %s to %s", len(copper), copper.index[0].date(), copper.index[-1].date())
+        except Exception as exc:
+            logger.warning("Failed to load PCOPPUSDM: %s", exc)
+
+        return _hy_oas_cache, _t10y3m_cache, _copper_cache
 
     except Exception as e:
         logger.warning("Failed to load FRED data: %s", e)
-        return None, None
+        return None, None, None

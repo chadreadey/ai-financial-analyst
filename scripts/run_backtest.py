@@ -35,7 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-from quant.backtest import BacktestConfig, run_backtest, run_walk_forward, run_cpcv
+from quant.backtest import BacktestConfig, HorizonConfig, run_backtest, run_walk_forward, run_cpcv
 from quant.universe import get_universe
 
 
@@ -138,6 +138,16 @@ def main():
                         help="VIX threshold for cautious regime / reduced sizing (default: 20)")
     parser.add_argument("--vix-risk-off", type=float, default=28.0,
                         help="VIX threshold for risk-off / no new longs (default: 28)")
+    parser.add_argument("--vix-smoothing", action="store_true", default=False,
+                        help="Use smoothed VIX ratio instead of raw threshold")
+    parser.add_argument("--vix-sma-window", type=int, default=50,
+                        help="VIX SMA window for smoothed ratio (default: 50)")
+    parser.add_argument("--vix-ratio-threshold", type=float, default=1.5,
+                        help="VIX/SMA ratio to trigger risk-off when smoothing enabled (default: 1.5)")
+    parser.add_argument("--vix-reentry-threshold", type=float, default=1.2,
+                        help="VIX/SMA ratio for cautious zone (default: 1.2)")
+    parser.add_argument("--vix-persistence-periods", type=int, default=2,
+                        help="Periods ratio must stay elevated before risk-off triggers (default: 2)")
     parser.add_argument("--no-cross-detection", action="store_true",
                         help="Disable death/golden cross detection (enabled by default)")
     parser.add_argument("--short-min-signals", type=int, default=3,
@@ -156,6 +166,20 @@ def main():
                         help="Enable FOMC proximity risk premium (Lucca-Moench drift)")
     parser.add_argument("--fomc-boost", type=float, default=0.15,
                         help="FOMC proximity boost when VIX > 20 (default: 0.15)")
+    parser.add_argument("--enable-kalshi", action="store_true",
+                        help="Enable Kalshi prediction market signals (macro modifier + earnings divergence)")
+    parser.add_argument("--kalshi-event-threshold", type=float, default=0.20,
+                        help="Minimum divergence (0-1) to fire Kalshi event signal. Default 0.20.")
+    parser.add_argument("--enable-regression", action="store_true",
+                        help="Enable R²-filtered OLS price regression signal")
+    parser.add_argument("--regression-window", type=int, default=60,
+                        help="Lookback window (days) for OLS regression. Default 60.")
+    parser.add_argument("--regression-r2-threshold", type=float, default=0.6,
+                        help="Minimum R² to emit a non-zero regression score. Default 0.6.")
+    parser.add_argument("--enable-arima", action="store_true",
+                        help="Enable ARIMA short-term forecast signal (disabled in high-vol regimes)")
+    parser.add_argument("--arima-vol-threshold", type=float, default=0.25,
+                        help="Annualised vol ceiling above which ARIMA score is zeroed. Default 0.25.")
     parser.add_argument("--max-per-sector", type=int, default=0,
                         help="Max positions per GICS sector (0=disabled, 2-3 recommended for wide universe)")
     parser.add_argument("--enable-fundamentals", action="store_true",
@@ -198,6 +222,9 @@ def main():
                         help="CPCV: max combinations (0=all, N=random sample with seed=42)")
     parser.add_argument("--output", default="",
                         help="Save full results to JSON file")
+    parser.add_argument("--horizon", choices=["monthly", "weekly", "event_driven", "hybrid"], default="monthly", help="Rebalance frequency. WARNING: weekly historically produces Sharpe ~0.02.")
+    parser.add_argument("--event-entry-days", type=int, default=5)
+    parser.add_argument("--event-exit-days", type=int, default=3)
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="Verbose logging")
 
@@ -239,6 +266,11 @@ def main():
         enable_regime_filter=regime_on,
         vix_caution_threshold=args.vix_caution,
         vix_risk_off_threshold=args.vix_risk_off,
+        vix_smoothing=args.vix_smoothing,
+        vix_sma_window=args.vix_sma_window,
+        vix_ratio_threshold=args.vix_ratio_threshold,
+        vix_reentry_threshold=args.vix_reentry_threshold,
+        vix_persistence_periods=args.vix_persistence_periods,
         enable_death_golden_cross=cross_on,
         short_min_bearish_signals=args.short_min_signals,
         enable_ic_calibration=ic_on,
@@ -249,6 +281,13 @@ def main():
         news_sentiment_weight=args.sentiment_weight,
         enable_fomc_proximity=args.enable_fomc,
         fomc_high_vix_boost=args.fomc_boost,
+        enable_kalshi_signal=args.enable_kalshi,
+        kalshi_event_threshold=args.kalshi_event_threshold,
+        enable_regression_signal=args.enable_regression,
+        regression_window=args.regression_window,
+        regression_r2_threshold=args.regression_r2_threshold,
+        enable_arima_signal=args.enable_arima,
+        arima_vol_threshold=args.arima_vol_threshold,
         max_per_sector=args.max_per_sector,
         enable_fundamentals=args.enable_fundamentals,
         fundamentals_weight=args.fundamentals_weight,
@@ -263,6 +302,12 @@ def main():
     if args.walk_forward:
         config.train_months = args.train_months
         config.test_months = args.test_months
+
+    horizon_config = HorizonConfig(
+        mode=args.horizon,
+        event_entry_days_before=args.event_entry_days,
+        event_exit_days_after=args.event_exit_days,
+    )
 
     t0 = time.time()
 

@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class BacktestConfig:
     """All tunable knobs for a quant backtest run."""
-    tickers: list[str]
+    tickers: list[str] = None  # type: ignore[assignment]
     start_date: str = "2016-01-01"          # 10 years back from ~2026
     end_date: str = ""                       # defaults to today
     rebalance_freq: str = "monthly"          # "weekly" or "monthly"
@@ -63,6 +63,13 @@ class BacktestConfig:
     # Enhanced regime detection
     vix_caution_threshold: float = 28.0       # VIX above this = cautious (P90 of VIX distribution)
     vix_risk_off_threshold: float = 35.0      # VIX above this = risk-off (P95, extreme spikes only)
+    # VIX smoothing — replaces raw threshold with ratio vs 50d SMA
+    vix_smoothing: bool = False
+    vix_sma_window: int = 50
+    vix_ratio_threshold: float = 1.5       # ratio to trigger risk-off
+    vix_reentry_threshold: float = 1.2     # hysteresis: must drop below to re-enter risk-on
+    vix_persistence_periods: int = 2       # consecutive rebalances above threshold to confirm
+    enable_dynamic_risk_off: bool = False  # Phase 2A: ETF ladder replaces binary cash switch
     enable_death_golden_cross: bool = True     # SPY 50/200 SMA cross detection
     golden_cross_boost: float = 0.10           # lower long threshold by this during golden cross
     # TimesFM overlay (DEPRECATED — prefer LSTM)
@@ -108,6 +115,19 @@ class BacktestConfig:
     conviction_sizing: float = 0.0        # 0=equal weight, 1=fully score-proportional sizing
     enable_agent_veto: bool = False       # Path C: quantified agent veto on candidates
     agent_veto_min_flags: int = 2         # minimum veto signals to remove a candidate (2 of 3)
+    # Kalshi event prediction signals
+    enable_kalshi_signal: bool = False          # Master switch for all Kalshi signals
+    kalshi_macro_weight: float = 0.10           # Weight of macro modifier in composite
+    kalshi_event_weight: float = 0.20           # Weight of event divergence signal in composite
+    kalshi_event_threshold: float = 0.20        # Min divergence to fire event signal (20pp)
+    kalshi_momentum_weight: float = 0.10        # Weight of macro momentum (velocity) — not yet applied to composite
+    # Price regression signal (R²-filtered OLS trend)
+    enable_regression_signal: bool = False
+    regression_window: int = 60
+    regression_r2_threshold: float = 0.6
+    # ARIMA short-term forecast signal (stable vol regimes only)
+    enable_arima_signal: bool = False
+    arima_vol_threshold: float = 0.25
     # Sector-diversified selection (wide scan, concentrated picks)
     max_per_sector: int = 3               # max positions from any single GICS sector
     min_score_gap: float = 0.0            # min score above universe median to enter (0 = disabled)
@@ -115,6 +135,49 @@ class BacktestConfig:
     def __post_init__(self):
         if not self.end_date:
             self.end_date = datetime.now().strftime("%Y-%m-%d")
+
+
+@dataclass
+class HorizonConfig:
+    """
+    Controls rebalance frequency and event-driven overlay cadence.
+
+    Modes:
+      monthly      — month-start rebalances (default; best Sharpe on this universe)
+      weekly       — every N business days (WARNING: historically Sharpe ~0.02)
+      event_driven — enter N days before earnings, exit N days after (monthly stub until earnings calendar wired)
+      hybrid       — monthly base + event-driven overlays
+    """
+    mode: str = "monthly"
+    weekly_rebalance_days: int = 5
+    event_entry_days_before: int = 5
+    event_exit_days_after: int = 3
+    hybrid_base: str = "monthly"
+    hybrid_overlay: bool = True
+
+
+def _generate_rebalance_dates(
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    horizon: HorizonConfig,
+) -> pd.DatetimeIndex:
+    """Return sorted rebalance dates for the given horizon mode."""
+    if horizon.mode == "monthly":
+        return pd.date_range(start, end, freq="MS")
+    elif horizon.mode == "weekly":
+        return pd.date_range(start, end, freq=f"{horizon.weekly_rebalance_days}B")
+    elif horizon.mode == "event_driven":
+        # Stub: returns monthly until earnings calendar integration is complete.
+        logger.warning("event_driven horizon uses monthly stub until earnings calendar is wired")
+        return pd.date_range(start, end, freq="MS")
+    elif horizon.mode == "hybrid":
+        base = _generate_rebalance_dates(start, end, HorizonConfig(mode=horizon.hybrid_base))
+        event = _generate_rebalance_dates(start, end, HorizonConfig(mode="event_driven"))
+        return base.union(event).sort_values()
+    else:
+        raise ValueError(
+            f"Unknown horizon mode: {horizon.mode!r}. Valid: monthly, weekly, event_driven, hybrid"
+        )
 
 
 # ── Data loading ───────────────────────────────────────────────────────
@@ -491,18 +554,48 @@ def load_vix_data(start_date: str) -> Optional[pd.DataFrame]:
         return None
 
 
+def _load_hedge_etf_data(start_date: str, end_date: str) -> dict:
+    """Load price series for hedge ETFs (TLT, GLD, IEFA, UUP, BIL).
+
+    Returns a dict mapping ticker -> pd.DataFrame with a 'close' column
+    (compatible with universe_data format used by _compute_daily_portfolio_returns).
+    """
+    import yfinance as yf
+    result = {}
+    for ticker in HEDGE_ETFS:
+        try:
+            df = yf.download(ticker, start=start_date, end=end_date,
+                             auto_adjust=True, progress=False)
+            if not df.empty:
+                close_series = df["Close"]
+                if hasattr(close_series, "squeeze"):
+                    close_series = close_series.squeeze()
+                hedge_df = pd.DataFrame({"close": close_series})
+                hedge_df.index = pd.to_datetime(hedge_df.index)
+                if hedge_df.index.tz is not None:
+                    hedge_df.index = hedge_df.index.tz_localize(None)
+                hedge_df.index = hedge_df.index.normalize()
+                result[ticker] = hedge_df
+        except Exception as exc:
+            logger.warning("Failed to load hedge ETF %s: %s", ticker, exc)
+    return result
+
+
 # ── Regime detection ───────────────────────────────────────────────────
 
 @dataclass
 class RegimeState:
     """Rich regime information for portfolio construction."""
-    level: str          # "risk_off", "bearish", "cautious", "bullish", "strong_bull"
+    level: str = "bullish"  # "risk_off", "bearish", "cautious", "bullish", "strong_bull"
     vix: Optional[float] = None
     sma_cross: Optional[str] = None  # "death_cross", "golden_cross", or None
     spy_vs_sma200: Optional[str] = None  # "above" or "below"
     sizing_scalar: float = 1.0  # position sizing multiplier
     turbulence: Optional[float] = None  # Mahalanobis distance (sector decorrelation)
     macro_signal: Optional[object] = None  # MacroRegimeSignal from quant/macro_signals.py
+    vix_ratio: Optional[float] = None
+    vix_persistence_count: int = 0
+    copper_bearish: bool = False
 
 
 # ── Turbulence Index ─────────────────────────────────────────────────
@@ -585,6 +678,44 @@ def compute_turbulence(
     return round(turbulence, 2)
 
 
+def _compute_vix_regime(
+    vix_series: pd.Series,
+    current_vix: float,
+    config: "BacktestConfig",
+    prev_persistence_count: int = 0,
+) -> tuple:
+    """
+    Compute VIX-based regime flags.
+
+    Returns: (vix_ratio, risk_off, cautious)
+      vix_ratio: VIX / 50d SMA, or None if smoothing disabled or insufficient data
+      risk_off: True if risk-off should activate
+      cautious: True if cautious (between reentry and risk-off threshold)
+    """
+    if not config.vix_smoothing:
+        risk_off = current_vix >= config.vix_risk_off_threshold
+        cautious = current_vix >= getattr(config, "vix_caution_threshold", 20)
+        return None, risk_off, cautious
+
+    min_obs = max(config.vix_sma_window // 2, 25)
+    if vix_series is None or len(vix_series) < min_obs:
+        risk_off = current_vix >= config.vix_risk_off_threshold
+        cautious = risk_off
+        return None, risk_off, cautious
+
+    sma = float(vix_series.tail(config.vix_sma_window).mean())
+    if sma <= 0:
+        return None, False, False
+
+    ratio = current_vix / sma
+
+    persistence_met = prev_persistence_count >= (config.vix_persistence_periods - 1)
+    risk_off = ratio >= config.vix_ratio_threshold and persistence_met
+    cautious = ratio >= config.vix_reentry_threshold
+
+    return ratio, risk_off, cautious
+
+
 def detect_regime(
     benchmark_df: Optional[pd.DataFrame],
     as_of_date: pd.Timestamp,
@@ -593,6 +724,7 @@ def detect_regime(
     sector_data: Optional[dict[str, pd.DataFrame]] = None,
     hy_oas_series: Optional[pd.Series] = None,
     t10y3m_series: Optional[pd.Series] = None,
+    copper_series: Optional[pd.Series] = None,
 ) -> RegimeState:
     """
     Multi-factor regime detection: VIX + SPY SMA + death/golden cross + turbulence + macro.
@@ -689,11 +821,11 @@ def detect_regime(
     else:
         state.level = "unknown"
 
-    # Macro regime overlay (HY OAS + yield curve + recession score)
-    if hy_oas_series is not None or t10y3m_series is not None:
+    # Macro regime overlay (HY OAS + yield curve + recession score + copper)
+    if hy_oas_series is not None or t10y3m_series is not None or copper_series is not None:
         try:
             from quant.macro_signals import compute_macro_regime
-            macro = compute_macro_regime(hy_oas_series, t10y3m_series, as_of_date, state.vix)
+            macro = compute_macro_regime(hy_oas_series, t10y3m_series, as_of_date, state.vix, copper_series=copper_series)
             state.macro_signal = macro
 
             # Macro can override to more cautious levels (never less cautious)
@@ -706,6 +838,10 @@ def detect_regime(
                     state.level = "risk_off"
                 elif macro.regime_label == "cautious" and state.level in ("bullish", "strong_bull"):
                     state.level = "cautious"
+
+            # Populate copper_bearish flag from copper signal
+            _copper_regime = getattr(macro, "copper_regime", "unknown")
+            state.copper_bearish = _copper_regime in ("bearish", "crisis")
         except Exception as e:
             logger.debug("Macro regime computation failed: %s", e)
 
@@ -743,6 +879,43 @@ FOMC_DATES = [
     "2027-07-28", "2027-09-22", "2027-10-27", "2027-12-15",
 ]
 _FOMC_TIMESTAMPS = sorted(pd.Timestamp(d) for d in FOMC_DATES)
+
+
+ETF_LADDER_TIERS: dict = {
+    "mild":     {"TLT": 0.20, "GLD": 0.05, "equity_frac": 0.75},
+    "moderate": {"TLT": 0.40, "GLD": 0.10, "equity_frac": 0.50},
+    "severe":   {"TLT": 0.30, "GLD": 0.15, "IEFA": 0.10, "UUP": 0.05, "equity_frac": 0.40},
+    "crisis":   {"TLT": 0.50, "GLD": 0.20, "IEFA": 0.15, "BIL": 0.15, "equity_frac": 0.00},
+}
+
+HEDGE_ETFS = ["TLT", "GLD", "IEFA", "UUP", "BIL"]
+
+
+def compute_etf_ladder_tier(
+    vix_ratio,
+    copper_bearish: bool,
+    config,
+) -> "Optional[str]":
+    """
+    Return ETF ladder tier name, or None if full equity is appropriate.
+
+    Requires config.enable_dynamic_risk_off=True and a non-None vix_ratio.
+    """
+    if not config.enable_dynamic_risk_off or vix_ratio is None:
+        return None
+
+    reentry = config.vix_reentry_threshold  # 1.2 default
+    if vix_ratio < reentry:
+        return None
+    elif vix_ratio < config.vix_ratio_threshold:  # 1.2–1.5 → mild
+        return "mild"
+    elif vix_ratio < 2.0:
+        return "moderate"
+    elif vix_ratio < 3.0:
+        return "severe"
+    else:
+        # Crisis requires copper confirmation
+        return "crisis" if copper_bearish else "severe"
 
 
 def compute_fomc_proximity_boost(
@@ -1670,6 +1843,7 @@ def run_backtest(
     vix_df = None
     hy_oas_series = None
     t10y3m_series = None
+    copper_series = None
     if config.enable_regime_filter:
         if progress_cb:
             progress_cb("Loading VIX data...")
@@ -1678,12 +1852,26 @@ def run_backtest(
         if progress_cb:
             progress_cb("Loading sector ETFs for turbulence index...")
         _load_sector_etf_data(fetch_start, provider)
-        # Load FRED macro data for credit spread + yield curve regime signals
+        # Load FRED macro data for credit spread + yield curve + copper regime signals
         try:
             from quant.macro_signals import load_fred_macro_data
-            hy_oas_series, t10y3m_series = load_fred_macro_data(fetch_start)
+            hy_oas_series, t10y3m_series, copper_series = load_fred_macro_data(fetch_start)
         except Exception as e:
             logger.warning("FRED macro data load failed (continuing without): %s", e)
+
+    # Load hedge ETF price data for ETF ladder (Phase 2B)
+    hedge_prices = {}
+    if config.enable_dynamic_risk_off:
+        if progress_cb:
+            progress_cb("Loading hedge ETF data for risk-off ladder...")
+        hedge_prices = _load_hedge_etf_data(fetch_start, config.end_date)
+        _missing_hedge = [t for t in HEDGE_ETFS if t not in hedge_prices]
+        if _missing_hedge:
+            logger.warning("Missing hedge ETF price data for: %s", _missing_hedge)
+        # Inject hedge ETF DataFrames into universe_data so _compute_daily_portfolio_returns
+        # can compute returns for hedge positions
+        for _ht, _hdf in hedge_prices.items():
+            universe_data[_ht] = _hdf
 
     # ── 2. Generate rebalance dates ───────────────────────────────
     # Use the union of all trading dates
@@ -1729,6 +1917,7 @@ def run_backtest(
                           for name, ics in ic_history.items()}
         logger.info("IC-calibrated weights: %s (mean ICs: %s)", calibrated_weights, ic_history_log)
 
+    _vix_persistence_count = 0
     for i, reb_date in enumerate(rebalance_dates[:-1]):
         next_reb = rebalance_dates[i + 1]
 
@@ -1868,6 +2057,58 @@ def run_backtest(
                     signals[ticker].event_timing_score = escore
                     signals[ticker].earnings_blocked = emeta.get("earnings_blocked", False)
 
+        # Kalshi signals (macro modifier + event divergence)
+        if config.enable_kalshi_signal:
+            try:
+                from quant.kalshi_client import KalshiClient
+                from quant.kalshi_signal import compute_macro_modifier, compute_event_divergence, compute_macro_momentum
+                _kalshi_client = KalshiClient()
+                _kalshi_macro = compute_macro_modifier(_kalshi_client)
+                _kalshi_momentum = compute_macro_momentum(_kalshi_client)
+                for _ticker in signals:
+                    signals[_ticker].kalshi_macro_score = _kalshi_macro
+                    signals[_ticker].kalshi_macro_momentum = _kalshi_momentum
+                    _earn_prob = getattr(signals[_ticker], "earnings_rank_score", 0.0)
+                    # Map earnings_rank_score ([-1,1]) to probability space [0,1]
+                    _our_prob = (_earn_prob + 1.0) / 2.0
+                    signals[_ticker].kalshi_event_score = compute_event_divergence(
+                        _kalshi_client,
+                        ticker=_ticker,
+                        our_prob_beat=_our_prob,
+                        threshold=config.kalshi_event_threshold,
+                    )
+            except Exception as _exc:
+                logger.warning("Kalshi signal injection failed: %s", _exc)
+
+        # Price regression signal (R²-filtered OLS trend)
+        if config.enable_regression_signal:
+            try:
+                from quant.regression_signal import compute_price_regression_scores
+                _reg_scores = compute_price_regression_scores(
+                    universe_data, reb_date,
+                    window=config.regression_window,
+                    r2_threshold=config.regression_r2_threshold,
+                )
+                for _ticker, _score in _reg_scores.items():
+                    if _ticker in signals:
+                        signals[_ticker].price_regression_score = _score
+            except Exception as _exc:
+                logger.warning("Regression signal injection failed: %s", _exc)
+
+        # ARIMA short-term forecast signal (stable regimes only)
+        if config.enable_arima_signal:
+            try:
+                from quant.arima_signal import compute_arima_forecast_scores
+                _arima_scores = compute_arima_forecast_scores(
+                    universe_data, reb_date,
+                    vol_threshold=config.arima_vol_threshold,
+                )
+                for _ticker, _score in _arima_scores.items():
+                    if _ticker in signals:
+                        signals[_ticker].arima_forecast_score = _score
+            except Exception as _exc:
+                logger.warning("ARIMA signal injection failed: %s", _exc)
+
         # ── Cross-sectional normalization barrier ──
         # Group by volatility tier (not sector) to preserve sector momentum
         from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
@@ -1913,6 +2154,8 @@ def run_backtest(
                         "event_timing": sv.event_timing_score,
                         "atr_pct": sv.atr_regime.metadata.get("atr_pct", 0.0),
                         "vix_level": float(vix_df[vix_df.index <= reb_date].iloc[-1]["close"]) if vix_df is not None and len(vix_df[vix_df.index <= reb_date]) > 0 else 0.0,
+                        "price_regression": sv.price_regression_score,
+                        "arima_forecast": sv.arima_forecast_score,
                     })
                     feature_tickers.append(ticker)
 
@@ -1933,6 +2176,13 @@ def run_backtest(
         if not _xgb_active:
             for sv in signals.values():
                 sv.composite_score = compute_normalized_composite(sv)
+                if config.enable_kalshi_signal:
+                    sv.composite_score = float(np.clip(
+                        sv.composite_score
+                        + sv.kalshi_macro_score * config.kalshi_macro_weight
+                        + sv.kalshi_event_score * config.kalshi_event_weight,
+                        -1.0, 1.0,
+                    ))
                 reclassify(sv)
 
         # FOMC proximity risk premium (after all signal blends, before regime)
@@ -1948,16 +2198,72 @@ def run_backtest(
             if fomc_boost > 0:
                 signals = apply_fomc_boost(signals, fomc_boost)
 
+        # VIX smoothed regime detection
+        _vix_now_for_regime = None
+        if vix_df is not None:
+            _vix_avail_r = vix_df[vix_df.index <= reb_date]
+            if len(_vix_avail_r) > 0:
+                _vix_now_for_regime = float(_vix_avail_r.iloc[-1]["close"])
+        _vix_series_slice = vix_df["close"].loc[:reb_date] if vix_df is not None and not vix_df.empty else pd.Series(dtype=float)
+        _vix_ratio, _vix_risk_off_flag, _vix_cautious_flag = _compute_vix_regime(
+            _vix_series_slice,
+            current_vix=_vix_now_for_regime or 0.0,
+            config=config,
+            prev_persistence_count=_vix_persistence_count,
+        )
+        if _vix_ratio is not None and _vix_ratio >= config.vix_ratio_threshold:
+            _vix_persistence_count += 1
+        else:
+            _vix_persistence_count = 0
+
         # Detect market regime for short filtering + position sizing
         if config.enable_regime_filter:
-            regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data, hy_oas_series=hy_oas_series, t10y3m_series=t10y3m_series)
+            regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data, hy_oas_series=hy_oas_series, t10y3m_series=t10y3m_series, copper_series=copper_series)
         else:
             regime = RegimeState(level="unknown")
+        # Override regime level when VIX smoothing is enabled and risk-off triggered
+        if config.vix_smoothing and _vix_risk_off_flag:
+            regime.level = "risk_off"
 
-        # Build target portfolio
+        # ETF ladder allocation (Phase 2B)
+        _equity_capital_frac = 1.0
+        _etf_positions = []
+        if config.enable_dynamic_risk_off:
+            _ladder_tier = compute_etf_ladder_tier(
+                vix_ratio=_vix_ratio,
+                copper_bearish=getattr(regime, "copper_bearish", False),
+                config=config,
+            )
+            if _ladder_tier is not None:
+                _alloc = ETF_LADDER_TIERS[_ladder_tier]
+                _equity_capital_frac = _alloc["equity_frac"]
+                logger.info("ETF ladder tier=%s equity_frac=%.2f at %s", _ladder_tier, _equity_capital_frac, reb_date)
+                for _etf_ticker, _etf_weight in _alloc.items():
+                    if _etf_ticker == "equity_frac":
+                        continue
+                    if _etf_ticker not in hedge_prices:
+                        logger.warning("No price data for hedge ETF %s, skipping", _etf_ticker)
+                        continue
+                    _etf_price_series = hedge_prices[_etf_ticker]["close"]
+                    _etf_price_avail = _etf_price_series[_etf_price_series.index <= reb_date]
+                    _etf_price = float(_etf_price_avail.iloc[-1]) if len(_etf_price_avail) > 0 else None
+                    if _etf_price is None or pd.isna(_etf_price) or _etf_price <= 0:
+                        continue
+                    _etf_notional = capital * _etf_weight
+                    _etf_shares = _etf_notional / _etf_price
+                    _etf_positions.append(Position(
+                        ticker=_etf_ticker, direction="LONG",
+                        entry_date=reb_date,
+                        entry_price=_etf_price, shares=_etf_shares,
+                        stop_price=0.0, composite_score=0.0,
+                        flags=[f"hedge_etf:{_ladder_tier}"],
+                    ))
+
+        # Build target portfolio (scaled capital after ETF ladder carve-out)
         positions = build_target_portfolio(
-            signals, universe_data, reb_date, config, capital, regime=regime,
+            signals, universe_data, reb_date, config, capital * _equity_capital_frac, regime=regime,
         )
+        positions.extend(_etf_positions)
         if not positions:
             continue
 
@@ -2220,19 +2526,32 @@ def run_walk_forward(
     vix_df = None
     hy_oas_series = None
     t10y3m_series = None
+    copper_series = None
     if config.enable_regime_filter:
         vix_df = load_vix_data(fetch_start)
         if progress_cb:
             progress_cb("Loading sector ETFs for turbulence index...")
         _load_sector_etf_data(fetch_start, provider)
-        # Load FRED macro data for credit spread + yield curve regime signals
+        # Load FRED macro data for credit spread + yield curve + copper regime signals
         try:
             from quant.macro_signals import load_fred_macro_data
-            hy_oas_series, t10y3m_series = load_fred_macro_data(fetch_start)
+            hy_oas_series, t10y3m_series, copper_series = load_fred_macro_data(fetch_start)
             if hy_oas_series is not None and progress_cb:
                 progress_cb(f"FRED macro data loaded: HY OAS ({len(hy_oas_series)} obs), T10Y3M ({len(t10y3m_series) if t10y3m_series is not None else 0} obs)")
         except Exception as e:
             logger.warning("FRED macro data load failed (continuing without): %s", e)
+
+    # Load hedge ETF price data for ETF ladder (Phase 2B)
+    hedge_prices = {}
+    if config.enable_dynamic_risk_off:
+        if progress_cb:
+            progress_cb("Loading hedge ETF data for risk-off ladder...")
+        hedge_prices = _load_hedge_etf_data(fetch_start, config.end_date)
+        _missing_hedge = [t for t in HEDGE_ETFS if t not in hedge_prices]
+        if _missing_hedge:
+            logger.warning("Missing hedge ETF price data for: %s", _missing_hedge)
+        for _ht, _hdf in hedge_prices.items():
+            universe_data[_ht] = _hdf
 
     # Generate walk-forward windows
     start = datetime.strptime(config.start_date, "%Y-%m-%d")
@@ -2338,6 +2657,7 @@ def run_walk_forward(
         window_trades = []
         window_pnl = pd.Series(dtype=float)
 
+        _vix_persistence_count = 0
         for i, reb_date in enumerate(rebalance_dates[:-1]):
             next_reb = rebalance_dates[i + 1]
             signals = compute_signals_at_date(universe_data, reb_date, config.lookback_days)
@@ -2471,6 +2791,58 @@ def run_walk_forward(
                         signals[ticker].event_timing_score = escore
                         signals[ticker].earnings_blocked = emeta.get("earnings_blocked", False)
 
+            # Kalshi signals (macro modifier + event divergence)
+            if config.enable_kalshi_signal:
+                try:
+                    from quant.kalshi_client import KalshiClient
+                    from quant.kalshi_signal import compute_macro_modifier, compute_event_divergence, compute_macro_momentum
+                    _kalshi_client = KalshiClient()
+                    _kalshi_macro = compute_macro_modifier(_kalshi_client)
+                    _kalshi_momentum = compute_macro_momentum(_kalshi_client)
+                    for _ticker in signals:
+                        signals[_ticker].kalshi_macro_score = _kalshi_macro
+                        signals[_ticker].kalshi_macro_momentum = _kalshi_momentum
+                        _earn_prob = getattr(signals[_ticker], "earnings_rank_score", 0.0)
+                        # Map earnings_rank_score ([-1,1]) to probability space [0,1]
+                        _our_prob = (_earn_prob + 1.0) / 2.0
+                        signals[_ticker].kalshi_event_score = compute_event_divergence(
+                            _kalshi_client,
+                            ticker=_ticker,
+                            our_prob_beat=_our_prob,
+                            threshold=config.kalshi_event_threshold,
+                        )
+                except Exception as _exc:
+                    logger.warning("Kalshi signal injection failed: %s", _exc)
+
+            # Price regression signal (R²-filtered OLS trend)
+            if config.enable_regression_signal:
+                try:
+                    from quant.regression_signal import compute_price_regression_scores
+                    _reg_scores = compute_price_regression_scores(
+                        universe_data, reb_date,
+                        window=config.regression_window,
+                        r2_threshold=config.regression_r2_threshold,
+                    )
+                    for _ticker, _score in _reg_scores.items():
+                        if _ticker in signals:
+                            signals[_ticker].price_regression_score = _score
+                except Exception as _exc:
+                    logger.warning("Regression signal injection failed: %s", _exc)
+
+            # ARIMA short-term forecast signal (stable regimes only)
+            if config.enable_arima_signal:
+                try:
+                    from quant.arima_signal import compute_arima_forecast_scores
+                    _arima_scores = compute_arima_forecast_scores(
+                        universe_data, reb_date,
+                        vol_threshold=config.arima_vol_threshold,
+                    )
+                    for _ticker, _score in _arima_scores.items():
+                        if _ticker in signals:
+                            signals[_ticker].arima_forecast_score = _score
+                except Exception as _exc:
+                    logger.warning("ARIMA signal injection failed: %s", _exc)
+
             # ── Cross-sectional normalization barrier ──
             from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
             from quant.scoring import reclassify
@@ -2509,8 +2881,11 @@ def run_walk_forward(
                             "quality": sv.quality_score,
                             "price_mom": sv.price_momentum_score,
                             "insider": sv.insider_score,
+                            "event_timing": sv.event_timing_score,
                             "atr_pct": sv.atr_regime.metadata.get("atr_pct", 0.0),
                             "vix_level": float(vix_df[vix_df.index <= reb_date].iloc[-1]["close"]) if vix_df is not None and len(vix_df[vix_df.index <= reb_date]) > 0 else 0.0,
+                            "price_regression": sv.price_regression_score,
+                            "arima_forecast": sv.arima_forecast_score,
                         })
                         feature_tickers.append(ticker)
 
@@ -2530,6 +2905,13 @@ def run_walk_forward(
             if not _xgb_active:
                 for sv in signals.values():
                     sv.composite_score = compute_normalized_composite(sv)
+                    if config.enable_kalshi_signal:
+                        sv.composite_score = float(np.clip(
+                            sv.composite_score
+                            + sv.kalshi_macro_score * config.kalshi_macro_weight
+                            + sv.kalshi_event_score * config.kalshi_event_weight,
+                            -1.0, 1.0,
+                        ))
                     reclassify(sv)
 
             # FOMC proximity risk premium
@@ -2543,14 +2925,69 @@ def run_walk_forward(
                 if fomc_boost > 0:
                     signals = apply_fomc_boost(signals, fomc_boost)
 
+            # VIX smoothed regime detection
+            _vix_now_for_regime = None
+            if vix_df is not None:
+                _vix_avail_r = vix_df[vix_df.index <= reb_date]
+                if len(_vix_avail_r) > 0:
+                    _vix_now_for_regime = float(_vix_avail_r.iloc[-1]["close"])
+            _vix_series_slice = vix_df["close"].loc[:reb_date] if vix_df is not None and not vix_df.empty else pd.Series(dtype=float)
+            _vix_ratio, _vix_risk_off_flag, _vix_cautious_flag = _compute_vix_regime(
+                _vix_series_slice,
+                current_vix=_vix_now_for_regime or 0.0,
+                config=config,
+                prev_persistence_count=_vix_persistence_count,
+            )
+            if _vix_ratio is not None and _vix_ratio >= config.vix_ratio_threshold:
+                _vix_persistence_count += 1
+            else:
+                _vix_persistence_count = 0
+
             if config.enable_regime_filter:
-                regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data, hy_oas_series=hy_oas_series, t10y3m_series=t10y3m_series)
+                regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data, hy_oas_series=hy_oas_series, t10y3m_series=t10y3m_series, copper_series=copper_series)
             else:
                 regime = RegimeState(level="unknown")
+            if config.vix_smoothing and _vix_risk_off_flag:
+                regime.level = "risk_off"
+
+            # ETF ladder allocation (Phase 2B)
+            _equity_capital_frac = 1.0
+            _etf_positions = []
+            if config.enable_dynamic_risk_off:
+                _ladder_tier = compute_etf_ladder_tier(
+                    vix_ratio=_vix_ratio,
+                    copper_bearish=getattr(regime, "copper_bearish", False),
+                    config=config,
+                )
+                if _ladder_tier is not None:
+                    _alloc = ETF_LADDER_TIERS[_ladder_tier]
+                    _equity_capital_frac = _alloc["equity_frac"]
+                    logger.info("ETF ladder tier=%s equity_frac=%.2f at %s", _ladder_tier, _equity_capital_frac, reb_date)
+                    for _etf_ticker, _etf_weight in _alloc.items():
+                        if _etf_ticker == "equity_frac":
+                            continue
+                        if _etf_ticker not in hedge_prices:
+                            logger.warning("No price data for hedge ETF %s, skipping", _etf_ticker)
+                            continue
+                        _etf_price_series = hedge_prices[_etf_ticker]["close"]
+                        _etf_price_avail = _etf_price_series[_etf_price_series.index <= reb_date]
+                        _etf_price = float(_etf_price_avail.iloc[-1]) if len(_etf_price_avail) > 0 else None
+                        if _etf_price is None or pd.isna(_etf_price) or _etf_price <= 0:
+                            continue
+                        _etf_notional = capital * _etf_weight
+                        _etf_shares = _etf_notional / _etf_price
+                        _etf_positions.append(Position(
+                            ticker=_etf_ticker, direction="LONG",
+                            entry_date=reb_date,
+                            entry_price=_etf_price, shares=_etf_shares,
+                            stop_price=0.0, composite_score=0.0,
+                            flags=[f"hedge_etf:{_ladder_tier}"],
+                        ))
 
             positions = build_target_portfolio(
-                signals, universe_data, reb_date, window_config, capital, regime=regime,
+                signals, universe_data, reb_date, window_config, capital * _equity_capital_frac, regime=regime,
             )
+            positions.extend(_etf_positions)
             if not positions:
                 continue
             trades, period_pnl = _compute_daily_portfolio_returns(
@@ -2729,6 +3166,7 @@ def run_cpcv(
     vix_df = None
     hy_oas_series = None
     t10y3m_series = None
+    copper_series = None
     if config.enable_regime_filter:
         vix_df = load_vix_data(fetch_start)
         if progress_cb:
@@ -2736,9 +3174,19 @@ def run_cpcv(
         _load_sector_etf_data(fetch_start, provider)
         try:
             from quant.macro_signals import load_fred_macro_data
-            hy_oas_series, t10y3m_series = load_fred_macro_data(fetch_start)
+            hy_oas_series, t10y3m_series, copper_series = load_fred_macro_data(fetch_start)
         except Exception as e:
             logger.warning("FRED macro data load failed (continuing without): %s", e)
+
+    # Load hedge ETF price data for ETF ladder (Phase 2B)
+    hedge_prices = {}
+    if config.enable_dynamic_risk_off:
+        hedge_prices = _load_hedge_etf_data(fetch_start, config.end_date)
+        _missing_hedge = [t for t in HEDGE_ETFS if t not in hedge_prices]
+        if _missing_hedge:
+            logger.warning("Missing hedge ETF price data for: %s", _missing_hedge)
+        for _ht, _hdf in hedge_prices.items():
+            universe_data[_ht] = _hdf
 
     # ── 3. Build CPCV groups and combinations ──
     all_dates = sorted(set().union(*(df.index for df in universe_data.values())))
@@ -2792,9 +3240,11 @@ def run_cpcv(
         combo_daily_pnl = pd.Series(dtype=float)
         combo_trades = []
 
+        _vix_persistence_count = 0
         # Iterate test rebalance dates
         for i, reb_date in enumerate(safe_test_dates[:-1]):
             next_reb = safe_test_dates[i + 1]
+            _xgb_active = False
             signals = compute_signals_at_date(universe_data, reb_date, config.lookback_days)
             if not signals:
                 continue
@@ -2913,13 +3363,73 @@ def run_cpcv(
                         signals[ticker].event_timing_score = escore
                         signals[ticker].earnings_blocked = emeta.get("earnings_blocked", False)
 
+            # Kalshi signals (macro modifier + event divergence)
+            if config.enable_kalshi_signal:
+                try:
+                    from quant.kalshi_client import KalshiClient
+                    from quant.kalshi_signal import compute_macro_modifier, compute_event_divergence, compute_macro_momentum
+                    _kalshi_client = KalshiClient()
+                    _kalshi_macro = compute_macro_modifier(_kalshi_client)
+                    _kalshi_momentum = compute_macro_momentum(_kalshi_client)
+                    for _ticker in signals:
+                        signals[_ticker].kalshi_macro_score = _kalshi_macro
+                        signals[_ticker].kalshi_macro_momentum = _kalshi_momentum
+                        _earn_prob = getattr(signals[_ticker], "earnings_rank_score", 0.0)
+                        # Map earnings_rank_score ([-1,1]) to probability space [0,1]
+                        _our_prob = (_earn_prob + 1.0) / 2.0
+                        signals[_ticker].kalshi_event_score = compute_event_divergence(
+                            _kalshi_client,
+                            ticker=_ticker,
+                            our_prob_beat=_our_prob,
+                            threshold=config.kalshi_event_threshold,
+                        )
+                except Exception as _exc:
+                    logger.warning("Kalshi signal injection failed: %s", _exc)
+
+            # Price regression signal (R²-filtered OLS trend)
+            if config.enable_regression_signal:
+                try:
+                    from quant.regression_signal import compute_price_regression_scores
+                    _reg_scores = compute_price_regression_scores(
+                        universe_data, reb_date,
+                        window=config.regression_window,
+                        r2_threshold=config.regression_r2_threshold,
+                    )
+                    for _ticker, _score in _reg_scores.items():
+                        if _ticker in signals:
+                            signals[_ticker].price_regression_score = _score
+                except Exception as _exc:
+                    logger.warning("Regression signal injection failed: %s", _exc)
+
+            # ARIMA short-term forecast signal (stable regimes only)
+            if config.enable_arima_signal:
+                try:
+                    from quant.arima_signal import compute_arima_forecast_scores
+                    _arima_scores = compute_arima_forecast_scores(
+                        universe_data, reb_date,
+                        vol_threshold=config.arima_vol_threshold,
+                    )
+                    for _ticker, _score in _arima_scores.items():
+                        if _ticker in signals:
+                            signals[_ticker].arima_forecast_score = _score
+                except Exception as _exc:
+                    logger.warning("ARIMA signal injection failed: %s", _exc)
+
             # ── Cross-sectional normalization barrier ──
-            from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
-            from quant.scoring import reclassify
-            signals = normalize_signals_cross_sectionally(signals, make_volatility_tier_fn(signals))
-            for sv in signals.values():
-                sv.composite_score = compute_normalized_composite(sv)
-                reclassify(sv)
+            if not _xgb_active:
+                from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
+                from quant.scoring import reclassify
+                signals = normalize_signals_cross_sectionally(signals, make_volatility_tier_fn(signals))
+                for sv in signals.values():
+                    sv.composite_score = compute_normalized_composite(sv)
+                    if config.enable_kalshi_signal:
+                        sv.composite_score = float(np.clip(
+                            sv.composite_score
+                            + sv.kalshi_macro_score * config.kalshi_macro_weight
+                            + sv.kalshi_event_score * config.kalshi_event_weight,
+                            -1.0, 1.0,
+                        ))
+                    reclassify(sv)
 
             if config.enable_fomc_proximity:
                 vix_now = None
@@ -2931,16 +3441,94 @@ def run_cpcv(
                 if fomc_boost > 0:
                     signals = apply_fomc_boost(signals, fomc_boost)
 
+            # VIX smoothed regime detection
+            _vix_now_for_regime = None
+            if vix_df is not None:
+                _vix_avail_r = vix_df[vix_df.index <= reb_date]
+                if len(_vix_avail_r) > 0:
+                    _vix_now_for_regime = float(_vix_avail_r.iloc[-1]["close"])
+            _vix_series_slice = vix_df["close"].loc[:reb_date] if vix_df is not None and not vix_df.empty else pd.Series(dtype=float)
+            _vix_ratio, _vix_risk_off_flag, _vix_cautious_flag = _compute_vix_regime(
+                _vix_series_slice,
+                current_vix=_vix_now_for_regime or 0.0,
+                config=config,
+                prev_persistence_count=_vix_persistence_count,
+            )
+            if _vix_ratio is not None and _vix_ratio >= config.vix_ratio_threshold:
+                _vix_persistence_count += 1
+            else:
+                _vix_persistence_count = 0
+
             if config.enable_regime_filter:
-                regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data, hy_oas_series=hy_oas_series, t10y3m_series=t10y3m_series)
+                regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data, hy_oas_series=hy_oas_series, t10y3m_series=t10y3m_series, copper_series=copper_series)
             else:
                 regime = RegimeState(level="unknown")
+            if config.vix_smoothing and _vix_risk_off_flag:
+                regime.level = "risk_off"
+
+            # ETF ladder allocation (Phase 2B)
+            _equity_capital_frac = 1.0
+            _etf_positions = []
+            if config.enable_dynamic_risk_off:
+                _ladder_tier = compute_etf_ladder_tier(
+                    vix_ratio=_vix_ratio,
+                    copper_bearish=getattr(regime, "copper_bearish", False),
+                    config=config,
+                )
+                if _ladder_tier is not None:
+                    _alloc = ETF_LADDER_TIERS[_ladder_tier]
+                    _equity_capital_frac = _alloc["equity_frac"]
+                    logger.info(
+                        "ETF ladder tier=%s equity_frac=%.2f at %s",
+                        _ladder_tier,
+                        _equity_capital_frac,
+                        reb_date,
+                    )
+                    for _etf_ticker, _etf_weight in _alloc.items():
+                        if _etf_ticker == "equity_frac":
+                            continue
+                        if _etf_ticker not in hedge_prices:
+                            logger.warning(
+                                "No price data for hedge ETF %s, skipping", _etf_ticker
+                            )
+                            continue
+                        _etf_price_series = hedge_prices[_etf_ticker]["close"]
+                        _etf_price_avail = _etf_price_series[
+                            _etf_price_series.index <= reb_date
+                        ]
+                        _etf_price = (
+                            float(_etf_price_avail.iloc[-1])
+                            if len(_etf_price_avail) > 0
+                            else None
+                        )
+                        if _etf_price is None or pd.isna(_etf_price) or _etf_price <= 0:
+                            continue
+                        _etf_notional = config.initial_capital * _etf_weight
+                        _etf_shares = _etf_notional / _etf_price
+                        _etf_positions.append(
+                            Position(
+                                ticker=_etf_ticker,
+                                direction="LONG",
+                                entry_date=reb_date,
+                                entry_price=_etf_price,
+                                shares=_etf_shares,
+                                stop_price=0.0,
+                                composite_score=0.0,
+                                flags=[f"hedge_etf:{_ladder_tier}"],
+                            )
+                        )
 
             # Use fresh capital per combination (no carry-over between
             # non-contiguous test groups — per CPCV methodology)
             positions = build_target_portfolio(
-                signals, universe_data, reb_date, config, config.initial_capital, regime=regime,
+                signals,
+                universe_data,
+                reb_date,
+                config,
+                config.initial_capital * _equity_capital_frac,
+                regime=regime,
             )
+            positions.extend(_etf_positions)
             if not positions:
                 continue
             trades, period_pnl = _compute_daily_portfolio_returns(

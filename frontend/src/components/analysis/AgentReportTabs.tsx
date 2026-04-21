@@ -11,11 +11,31 @@ interface AgentReportTabsProps {
 
 const AGENT_ORDER = ["Synthesis", "DCF", "Risk", "Earnings", "Competitive", "Pattern", "Macro"];
 
+const AGENT_NAME_MAP: Record<string, string> = {
+  "DCF Analyst": "DCF",
+  "Risk Analyst": "Risk",
+  "Earnings Analyst": "Earnings",
+  "Competitive & Sector Analyst": "Competitive",
+  "Pattern Analyst": "Pattern",
+  "Macro Strategist": "Macro",
+  "Sector Specialist": "Sector",
+};
+
+function normalizeAgentName(raw: string): string {
+  if (AGENT_NAME_MAP[raw]) return AGENT_NAME_MAP[raw];
+  // Fallback: strip common suffixes
+  return raw.replace(/\s*(Analyst|Strategist|Specialist|Agent).*$/, "").trim();
+}
+
 export function AgentReportTabs({ synthesis, agentReports, tradeParams }: AgentReportTabsProps) {
   const reportMap: Record<string, string> = { Synthesis: synthesis };
   for (const r of agentReports) {
-    const name = r.agent_name.replace(/Agent$/, "").replace(/Specialist$/, "");
-    reportMap[name] = r.analysis;
+    // Handle both object form {agent_name, analysis} and legacy tuple [name, analysis]
+    const [rawName, analysis] = Array.isArray(r)
+      ? [r[0] as string, r[1] as string]
+      : [r.agent_name, r.analysis];
+    const name = normalizeAgentName(rawName);
+    reportMap[name] = analysis;
   }
 
   const availableTabs = AGENT_ORDER.filter((name) => reportMap[name]);

@@ -32,6 +32,7 @@ _ENRICHMENT_TASK_ORDER = (
     "macro",
     "rag",
     "fmp_extra",
+    "kalshi",
 )
 
 
@@ -1160,6 +1161,43 @@ def _task_fmp_extra(ticker: str, fmp_cache) -> Dict[str, Any]:
     }
 
 
+def _task_kalshi(ticker: str) -> Dict[str, Any]:
+    """Kalshi prediction market context (earnings beat probability + macro regime)."""
+    try:
+        from quant.kalshi_client import KalshiClient
+        from quant.kalshi_signal import _find_earn_market, compute_macro_modifier
+
+        _kc = KalshiClient()
+        _earn_markets = _find_earn_market(_kc, ticker)
+        _macro_score = compute_macro_modifier(_kc)
+        _kalshi_lines = []
+        if _earn_markets:
+            _m = _earn_markets[0]
+            _kalshi_lines.append(
+                f"Kalshi earnings market ({_m['ticker']}): "
+                f"{_m['yes_prob']:.0%} implied probability of beat."
+            )
+        _kalshi_lines.append(
+            f"Kalshi macro regime score: {_macro_score:+.2f} "
+            f"({'dovish' if _macro_score > 0 else 'hawkish'} bias from Fed/CPI/JOBS markets)."
+        )
+        kalshi_text = "\n".join(_kalshi_lines)
+        return {
+            "section_entries": [("kalshi", kalshi_text)],
+            "sources": [],
+            "warnings": [],
+            "filter_stats": {},
+        }
+    except Exception as _exc:
+        logger.debug("Kalshi enrichment skipped: %s", _exc)
+        return {
+            "section_entries": [],
+            "sources": [],
+            "warnings": [],
+            "filter_stats": {},
+        }
+
+
 def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object]:
     """
     Build optional enrichment context for downstream prompts.
@@ -1246,6 +1284,7 @@ def build_enrichment_context(ticker: str, company_name: str) -> Dict[str, object
             futures["rag"] = pool.submit(_task_rag, ticker, pre_sector)
         if fmp_cache:
             futures["fmp_extra"] = pool.submit(_task_fmp_extra, ticker, fmp_cache)
+        futures["kalshi"] = pool.submit(_task_kalshi, ticker)
 
         sector = ""
         industry = ""

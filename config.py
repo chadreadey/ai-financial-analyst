@@ -146,6 +146,13 @@ class Settings(BaseSettings):
     auto_paper_trade: bool = True
     auto_paper_trade_min_conviction: float = 0.40
 
+    # ── Alpaca paper trading ──────────────────────────────────────────
+    alpaca_api_key: str = ""
+    alpaca_secret_key: str = ""
+    alpaca_paper_base_url: str = "https://paper-api.alpaca.markets"
+    paper_default_qty: int = 10
+    paper_rebalance_cron: str = "0 9 1 * *"  # 1st of month at 9:00 AM ET
+
     # ── TimesFM (DEPRECATED — prefer LSTM) ─────────────────────────
     enable_timesfm: bool = False
     redis_url: str = ""
