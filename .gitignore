@@ -30,6 +30,12 @@ phase0_*.json
 # Superpowers / agent workspaces
 .superpowers/
 
+# Per-provider runtime caches
+quant/.kalshi_cache/
+
+# Jupyter notebooks (local-only by default; force-add if you want to track)
+notebooks/
+
 # Build artifacts
 *.egg-info/
 
