@@ -45,6 +45,9 @@ class CPCVPanel:
     n_test_groups: int
     purge_months: int
     embargo_months: int
+    # Optional — loaded by build_panel_locally when config.enable_xgb_ranker=True
+    # and a pre-built `.xgb_features_liquid_{N}.csv` exists on the orchestrator disk.
+    xgb_feature_matrix: Optional[pd.DataFrame] = None
 
 
 def build_panel_locally(
@@ -118,6 +121,34 @@ def build_panel_locally(
         trading_dates,
     )
 
+    # Optional: load XGBoost feature matrix if the ranker is enabled and
+    # a pre-built CSV exists. Shipping it in the panel makes it available
+    # to every Modal CPCV worker without re-loading from disk per container.
+    xgb_feature_matrix = None
+    if getattr(config, "enable_xgb_ranker", False):
+        from pathlib import Path
+        for candidate in [f".xgb_features_liquid_{len(config.tickers)}.csv",
+                          ".xgb_features.csv"]:
+            path = Path(candidate)
+            if path.exists():
+                try:
+                    from quant.xgb_features import load_feature_matrix
+                    xgb_feature_matrix = load_feature_matrix(str(path))
+                    xgb_feature_matrix["date"] = pd.to_datetime(xgb_feature_matrix["date"])
+                    logger.info("XGB feature matrix loaded into panel: %d rows from %s",
+                                len(xgb_feature_matrix), path)
+                except Exception as exc:
+                    logger.warning("XGB feature matrix load failed (%s): %s — XGB will be disabled for this run", path, exc)
+                break
+        if xgb_feature_matrix is None:
+            logger.warning(
+                "enable_xgb_ranker=True but no feature matrix found at "
+                ".xgb_features_liquid_%d.csv or .xgb_features.csv — "
+                "run scripts/run_xgb_test.py --rebuild-features first. "
+                "XGB will be a no-op this run.",
+                len(config.tickers),
+            )
+
     return CPCVPanel(
         run_id=run_id,
         universe_data=universe_data,
@@ -134,6 +165,7 @@ def build_panel_locally(
         n_test_groups=n_test_groups,
         purge_months=purge_months,
         embargo_months=embargo_months,
+        xgb_feature_matrix=xgb_feature_matrix,
     )
 
 
@@ -161,6 +193,7 @@ def panel_to_cpcv_state(panel: CPCVPanel):
         all_rebalance_dates=panel.all_rebalance_dates,
         purge_months=panel.purge_months,
         embargo_months=panel.embargo_months,
+        xgb_feature_matrix=getattr(panel, "xgb_feature_matrix", None),
     )
 
 

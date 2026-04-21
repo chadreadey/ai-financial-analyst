@@ -21,7 +21,11 @@ logger = logging.getLogger(__name__)
     image=image,
     secrets=secrets,
     volumes={PANELS_MOUNT_PATH: panels_volume},
-    timeout=900,
+    # 30min per-combo budget: accommodates full-stack runs (WRDS + FMP + Finnhub
+    # API calls per rebalance date). Lean-stack runs (providers off) finish in
+    # 10-30s; full-stack runs with ~24 rebalance dates × ~50 tickers × network
+    # round-trips can take 5-20min. 30min leaves ~2x headroom.
+    timeout=1800,
     cpu=4,
     memory=8192,
     min_containers=0,
@@ -44,7 +48,39 @@ class CPCVWorker:
         self._git_sha = os.environ.get("MODAL_GIT_SHA", "dev")
         self._panels_cache: dict[str, object] = {}
         self._state_cache: dict[str, object] = {}
+        # Signature of the config we last initialized providers against.
+        # We re-init only when the relevant enable_* flags change within
+        # this container's lifetime (rare in practice — a container usually
+        # runs combos for one run_id = one config).
+        self._providers_signature: Optional[tuple] = None
         logger.info("CPCVWorker container ready (git_sha=%s)", self._git_sha)
+
+    @staticmethod
+    def _provider_signature(config) -> tuple:
+        """Hashable tuple of the flags that gate provider initialization."""
+        return (
+            bool(getattr(config, "enable_news_sentiment", False)),
+            bool(getattr(config, "enable_fundamentals", False)),
+            bool(getattr(config, "enable_earnings_signals", False)),
+            bool(getattr(config, "enable_institutional_flow", False)),
+            str(getattr(config, "fundamental_provider", "fmp")),
+            # Include a few tickers so a universe change doesn't silently reuse stale caches.
+            tuple(sorted(getattr(config, "tickers", []) or [])[:5]),
+        )
+
+    def _ensure_providers(self, config) -> None:
+        """Initialize module-level data-provider globals for this container.
+        Idempotent within-container; re-runs if the relevant flags change."""
+        sig = self._provider_signature(config)
+        if sig == self._providers_signature:
+            return
+        from quant.backtest import init_providers_for_config
+        initialized = init_providers_for_config(config)
+        self._providers_signature = sig
+        if initialized:
+            logger.info("CPCVWorker providers initialized: %s", initialized)
+        else:
+            logger.info("CPCVWorker providers: nothing new to initialize (flags=%s)", sig)
 
     def _load_state(self, panel_key: str):
         """Load panel + adapt to CPCVState once per container-panel pair."""
@@ -83,6 +119,7 @@ class CPCVWorker:
         try:
             state = self._load_state(panel_key)
             config = _rebuild_config(spec["config_json"])
+            self._ensure_providers(config)
             result = _run_single_cpcv_combo(
                 state=state,
                 train_indices=tuple(spec["train_indices"]),

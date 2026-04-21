@@ -1004,6 +1004,90 @@ _inst_fmp_cache = None  # FMPFundamentalCache for institutional data
 _inst_wrds_store = None  # WRDSPointInTimeStore for 13F holdings
 
 
+def init_providers_for_config(config) -> dict:
+    """Initialize module-level data-provider globals based on enabled config flags.
+
+    Idempotent: each provider global is only set if currently None AND
+    the relevant `enable_*` flag is True. Safe to call multiple times
+    (e.g. once per Modal container in CPCV workers, or once at the top
+    of run_walk_forward / run_cpcv on the orchestrator).
+
+    Returns a dict summarising what got initialized this call — useful for
+    logging and testing. Keys: finnhub, sentiment_cache, fmp_client, fmp_cache,
+    wrds_provider, inst_fmp_cache, inst_wrds_store.
+    """
+    global _finnhub_client, _sentiment_cache, _fmp_client, _fmp_cache
+    global _wrds_provider, _inst_fmp_cache, _inst_wrds_store
+
+    initialized: dict = {}
+
+    # Finnhub + sentiment disk cache (news sentiment, insider, institutional-flow supplement)
+    if config.enable_news_sentiment or config.enable_institutional_flow:
+        try:
+            from finnhub_client import FinnhubClient, SentimentDiskCache
+            if _sentiment_cache is None:
+                _sentiment_cache = SentimentDiskCache()
+                initialized["sentiment_cache"] = True
+            if _finnhub_client is None:
+                finnhub_key = os.getenv("FINNHUB_API_KEY", "").strip()
+                if finnhub_key:
+                    _finnhub_client = FinnhubClient(finnhub_key)
+                    initialized["finnhub_client"] = True
+        except Exception as exc:
+            logger.debug("finnhub init skipped: %s", exc)
+
+    # WRDS provider (needed for earnings signals AND fundamentals when provider=wrds)
+    if config.enable_fundamentals or config.enable_earnings_signals:
+        if config.fundamental_provider == "wrds" or config.enable_earnings_signals:
+            if _wrds_provider is None:
+                try:
+                    from quant.wrds_store import WRDSPointInTimeStore
+                    from quant.fundamental_provider import WRDSFundamentalProvider
+                    store = WRDSPointInTimeStore()
+                    if store.summary().get("compustat_quarterly", 0) > 0:
+                        _wrds_provider = WRDSFundamentalProvider(store)
+                        initialized["wrds_provider"] = True
+                except Exception as exc:
+                    logger.debug("wrds init skipped: %s", exc)
+
+    # FMP client + cache (fundamentals when provider=fmp, and institutional flow)
+    if (config.enable_fundamentals and config.fundamental_provider == "fmp") or config.enable_institutional_flow:
+        try:
+            if _fmp_cache is None:
+                from quant.fmp_cache import FMPFundamentalCache
+                _fmp_cache = FMPFundamentalCache()
+                initialized["fmp_cache"] = True
+            if _fmp_client is None:
+                fmp_key = os.getenv("FMP_API_KEY", "").strip()
+                if fmp_key:
+                    from fmp_client import FMPClient
+                    _fmp_client = FMPClient(fmp_key)
+                    initialized["fmp_client"] = True
+        except Exception as exc:
+            logger.debug("fmp init skipped: %s", exc)
+
+    # Institutional flow: shared FMP cache + WRDS 13F store
+    if config.enable_institutional_flow:
+        try:
+            if _inst_fmp_cache is None:
+                from quant.fmp_cache import FMPFundamentalCache
+                _inst_fmp_cache = FMPFundamentalCache()
+                initialized["inst_fmp_cache"] = True
+            if _inst_wrds_store is None and _wrds_provider is not None:
+                from quant.wrds_store import WRDSPointInTimeStore
+                store = WRDSPointInTimeStore()
+                # Quick probe — only keep if 13F data is present
+                if config.tickers:
+                    test = store.get_inst_holdings_as_of(config.tickers[0], "2099-12-31", n_quarters=1)
+                    if test:
+                        _inst_wrds_store = store
+                        initialized["inst_wrds_store"] = True
+        except Exception as exc:
+            logger.debug("institutional flow init skipped: %s", exc)
+
+    return initialized
+
+
 def _get_timesfm_model():
     """Lazy-load TimesFM model (singleton)."""
     global _timesfm_model
@@ -3135,6 +3219,10 @@ class CPCVState:
     all_rebalance_dates: pd.DatetimeIndex
     purge_months: int = 1
     embargo_months: int = 1
+    # Optional XGBoost feature matrix — if present, CPCV combo will attach
+    # it to `config._xgb_feature_matrix` so the existing XGB rolling-retrain
+    # logic fires during CPCV (previously only run_walk_forward loaded this).
+    xgb_feature_matrix: Optional[pd.DataFrame] = None
 
 
 def _run_single_cpcv_combo(
@@ -3167,6 +3255,12 @@ def _run_single_cpcv_combo(
     all_rebalance_dates = state.all_rebalance_dates
     purge_months = state.purge_months
     embargo_months = state.embargo_months
+
+    # Attach XGB feature matrix to config so the existing rolling-retrain
+    # logic in the combo loop fires. State carries it so every Modal worker
+    # gets a consistent PIT-frozen matrix without re-loading from disk.
+    if config.enable_xgb_ranker and getattr(state, "xgb_feature_matrix", None) is not None:
+        config._xgb_feature_matrix = state.xgb_feature_matrix
 
     safe_train_dates, safe_test_dates = apply_purge_embargo(
         groups, train_indices, test_indices,

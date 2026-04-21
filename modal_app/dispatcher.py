@@ -165,6 +165,14 @@ def dispatch_cpcv(
     if not config.tickers:
         raise ValueError("config.tickers is empty — resolve a universe before dispatch.")
 
+    # Ensure orchestrator-side data providers are initialized before panel build.
+    # Needed both for local=True runs (which execute combos in-process) and for
+    # panel-build steps that pull from WRDS / FMP when regime-adjacent signals fire.
+    from quant.backtest import init_providers_for_config
+    _init = init_providers_for_config(config)
+    if _init:
+        logger.info("Orchestrator providers initialized: %s", _init)
+
     if run_id is None:
         run_id = uuid.uuid4().hex[:12]
     cfg_hash = config_hash or _config_hash(config)
