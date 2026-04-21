@@ -3078,6 +3078,387 @@ def run_walk_forward(
 
 # ── CPCV validation ───────────────────────────────────────────────────
 
+
+@dataclass
+class CPCVState:
+    """Preloaded, pickleable state shared across CPCV combinations.
+
+    Built once by the dispatcher (local or Modal orchestrator), then passed
+    into `_run_single_cpcv_combo` for each (train_indices, test_indices) pair.
+    Keeping this as a dataclass (vs. a closure over `run_cpcv`'s locals)
+    makes it trivially serializable into a Modal Volume and replayed in
+    per-container workers.
+    """
+    universe_data: dict
+    benchmark_df: Optional[pd.DataFrame]
+    vix_df: Optional[pd.DataFrame]
+    hy_oas_series: Optional[pd.Series]
+    t10y3m_series: Optional[pd.Series]
+    copper_series: Optional[pd.Series]
+    hedge_prices: dict
+    trading_dates: pd.DatetimeIndex
+    groups: list
+    all_rebalance_dates: pd.DatetimeIndex
+    purge_months: int = 1
+    embargo_months: int = 1
+
+
+def _run_single_cpcv_combo(
+    state: "CPCVState",
+    train_indices,
+    test_indices,
+    combo_idx: int,
+    config: "BacktestConfig",
+) -> Optional[dict]:
+    """Run one CPCV combination.
+
+    Pure w.r.t. `state` and `config`. Module-level provider/client globals
+    (`_finnhub_client`, `_fmp_client`, `_wrds_provider`, …) are read where
+    needed — they must be initialized by the caller before fan-out.
+
+    Returns a result dict on completion, or None if the combo was skipped
+    (too few test dates after purge/embargo, or zero trades produced).
+    """
+    from quant.cpcv import apply_purge_embargo, compute_sharpe_from_returns
+
+    universe_data = state.universe_data
+    benchmark_df = state.benchmark_df
+    vix_df = state.vix_df
+    hy_oas_series = state.hy_oas_series
+    t10y3m_series = state.t10y3m_series
+    copper_series = state.copper_series
+    hedge_prices = state.hedge_prices
+    trading_dates = state.trading_dates
+    groups = state.groups
+    all_rebalance_dates = state.all_rebalance_dates
+    purge_months = state.purge_months
+    embargo_months = state.embargo_months
+
+    safe_train_dates, safe_test_dates = apply_purge_embargo(
+        groups, train_indices, test_indices,
+        all_rebalance_dates, purge_months, embargo_months,
+    )
+
+    if len(safe_test_dates) < 2:
+        return None
+
+    calibrated_weights = None
+    if config.enable_ic_calibration and len(safe_train_dates) >= config.ic_trailing_periods:
+        ic_history = compute_signal_ic(
+            universe_data, safe_train_dates,
+            config.lookback_days, forward_days=21,
+        )
+        calibrated_weights = calibrate_weights_from_ic(
+            ic_history, config.ic_trailing_periods, config.ic_shrinkage,
+        )
+
+    combo_daily_pnl = pd.Series(dtype=float)
+    combo_trades = []
+    _vix_persistence_count = 0
+
+    for i, reb_date in enumerate(safe_test_dates[:-1]):
+        next_reb = safe_test_dates[i + 1]
+        _xgb_active = False
+        signals = compute_signals_at_date(universe_data, reb_date, config.lookback_days)
+        if not signals:
+            continue
+
+        if calibrated_weights:
+            signals = apply_calibrated_weights(signals, calibrated_weights)
+
+        if config.enable_timesfm:
+            tfm_scores = compute_timesfm_scores(
+                universe_data, reb_date,
+                horizon=config.timesfm_horizon,
+                lookback=config.timesfm_lookback,
+            )
+            if tfm_scores:
+                signals = blend_timesfm_into_signals(signals, tfm_scores, config.timesfm_weight)
+
+        if config.enable_lstm and _lstm_forecaster is not None:
+            lstm_scores = compute_lstm_scores(universe_data, reb_date, _lstm_forecaster)
+            if lstm_scores:
+                signals = blend_lstm_into_signals(signals, lstm_scores, config.lstm_weight)
+
+        if config.enable_news_sentiment and (_finnhub_client is not None or _sentiment_cache is not None):
+            sent_scores = compute_sentiment_scores(
+                universe_data, reb_date, config,
+                client=_finnhub_client, disk_cache=_sentiment_cache,
+            )
+            if sent_scores:
+                signals = blend_sentiment_into_signals(signals, sent_scores, config.news_sentiment_weight)
+
+        if config.enable_fundamentals and (_fmp_client is not None or _fmp_cache is not None or _wrds_provider is not None):
+            from quant.fundamentals import compute_fundamental_scores, blend_fundamentals_into_signals
+            fund_scores = compute_fundamental_scores(
+                list(signals.keys()),
+                fmp_client=_fmp_client, fmp_cache=_fmp_cache,
+                wrds_provider=_wrds_provider,
+                as_of_date=reb_date.date() if _wrds_provider else None,
+            )
+            if fund_scores:
+                signals = blend_fundamentals_into_signals(signals, fund_scores, config.fundamentals_weight)
+
+        if config.enable_earnings_signals and _wrds_provider is not None:
+            from quant.earnings_signals import compute_earnings_signal_scores, blend_earnings_signals
+            earn_scores = compute_earnings_signal_scores(
+                list(signals.keys()), _wrds_provider,
+                as_of_date=reb_date.date(),
+            )
+            if earn_scores:
+                signals = blend_earnings_signals(signals, earn_scores, config.earnings_signal_weight)
+
+        if config.enable_institutional_flow:
+            from quant.institutional_flow import compute_institutional_flow_scores, blend_institutional_flow
+            inst_scores = compute_institutional_flow_scores(
+                list(signals.keys()),
+                as_of_date=reb_date.date(),
+                fmp_client=_fmp_client,
+                fmp_cache=_inst_fmp_cache,
+                finnhub_client=_finnhub_client,
+                finnhub_disk_cache=_sentiment_cache,
+            )
+            if inst_scores:
+                signals = blend_institutional_flow(signals, inst_scores, config.institutional_flow_weight)
+
+        if _sector_etf_data:
+            from quant.sector_momentum import compute_sector_momentum_scores
+            from quant.universe import get_sector
+            sec_mom_scores = compute_sector_momentum_scores(
+                _sector_etf_data, signals, reb_date, get_sector,
+            )
+            for ticker, mom_score in sec_mom_scores.items():
+                if ticker in signals:
+                    signals[ticker].sector_momentum_score = mom_score
+
+        if _wrds_provider is not None:
+            from quant.additional_signals import compute_quality_scores
+            quality_scores = compute_quality_scores(
+                list(signals.keys()), _wrds_provider, as_of_date=reb_date.date(),
+            )
+            for ticker, qscore in quality_scores.items():
+                if ticker in signals:
+                    signals[ticker].quality_score = qscore
+
+        from quant.additional_signals import compute_price_momentum_scores
+        mom_scores = compute_price_momentum_scores(universe_data, reb_date)
+        for ticker, mscore in mom_scores.items():
+            if ticker in signals:
+                signals[ticker].price_momentum_score = mscore
+
+        if _finnhub_client is not None or _sentiment_cache is not None:
+            from quant.additional_signals import compute_insider_scores
+            insider_scores = compute_insider_scores(
+                list(signals.keys()), reb_date,
+                finnhub_client=_finnhub_client,
+                sentiment_cache=_sentiment_cache,
+            )
+            for ticker, iscore in insider_scores.items():
+                if ticker in signals:
+                    signals[ticker].insider_score = iscore
+
+        if _wrds_provider is not None:
+            from quant.event_timing import compute_event_timing_scores
+            from quant.wrds_store import WRDSPointInTimeStore
+            _evt_store = WRDSPointInTimeStore()
+            event_scores = compute_event_timing_scores(
+                list(signals.keys()), reb_date,
+                wrds_store=_evt_store,
+            )
+            for ticker, (escore, emeta) in event_scores.items():
+                if ticker in signals:
+                    signals[ticker].event_timing_score = escore
+                    signals[ticker].earnings_blocked = emeta.get("earnings_blocked", False)
+
+        if config.enable_kalshi_signal:
+            try:
+                from quant.kalshi_client import KalshiClient
+                from quant.kalshi_signal import compute_macro_modifier, compute_event_divergence, compute_macro_momentum
+                _kalshi_client = KalshiClient()
+                _kalshi_macro = compute_macro_modifier(_kalshi_client)
+                _kalshi_momentum = compute_macro_momentum(_kalshi_client)
+                for _ticker in signals:
+                    signals[_ticker].kalshi_macro_score = _kalshi_macro
+                    signals[_ticker].kalshi_macro_momentum = _kalshi_momentum
+                    _earn_prob = getattr(signals[_ticker], "earnings_rank_score", 0.0)
+                    _our_prob = (_earn_prob + 1.0) / 2.0
+                    signals[_ticker].kalshi_event_score = compute_event_divergence(
+                        _kalshi_client,
+                        ticker=_ticker,
+                        our_prob_beat=_our_prob,
+                        threshold=config.kalshi_event_threshold,
+                    )
+            except Exception as _exc:
+                logger.warning("Kalshi signal injection failed: %s", _exc)
+
+        if config.enable_regression_signal:
+            try:
+                from quant.regression_signal import compute_price_regression_scores
+                _reg_scores = compute_price_regression_scores(
+                    universe_data, reb_date,
+                    window=config.regression_window,
+                    r2_threshold=config.regression_r2_threshold,
+                )
+                for _ticker, _score in _reg_scores.items():
+                    if _ticker in signals:
+                        signals[_ticker].price_regression_score = _score
+            except Exception as _exc:
+                logger.warning("Regression signal injection failed: %s", _exc)
+
+        if config.enable_arima_signal:
+            try:
+                from quant.arima_signal import compute_arima_forecast_scores
+                _arima_scores = compute_arima_forecast_scores(
+                    universe_data, reb_date,
+                    vol_threshold=config.arima_vol_threshold,
+                )
+                for _ticker, _score in _arima_scores.items():
+                    if _ticker in signals:
+                        signals[_ticker].arima_forecast_score = _score
+            except Exception as _exc:
+                logger.warning("ARIMA signal injection failed: %s", _exc)
+
+        if not _xgb_active:
+            from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
+            from quant.scoring import reclassify
+            signals = normalize_signals_cross_sectionally(signals, make_volatility_tier_fn(signals))
+            for sv in signals.values():
+                sv.composite_score = compute_normalized_composite(sv)
+                if config.enable_kalshi_signal:
+                    sv.composite_score = float(np.clip(
+                        sv.composite_score
+                        + sv.kalshi_macro_score * config.kalshi_macro_weight
+                        + sv.kalshi_event_score * config.kalshi_event_weight,
+                        -1.0, 1.0,
+                    ))
+                reclassify(sv)
+
+        if config.enable_fomc_proximity:
+            vix_now = None
+            if vix_df is not None:
+                vix_avail = vix_df[vix_df.index <= reb_date]
+                if len(vix_avail) > 0:
+                    vix_now = float(vix_avail.iloc[-1]["close"])
+            fomc_boost = compute_fomc_proximity_boost(reb_date, trading_dates, vix_now, config)
+            if fomc_boost > 0:
+                signals = apply_fomc_boost(signals, fomc_boost)
+
+        _vix_now_for_regime = None
+        if vix_df is not None:
+            _vix_avail_r = vix_df[vix_df.index <= reb_date]
+            if len(_vix_avail_r) > 0:
+                _vix_now_for_regime = float(_vix_avail_r.iloc[-1]["close"])
+        _vix_series_slice = vix_df["close"].loc[:reb_date] if vix_df is not None and not vix_df.empty else pd.Series(dtype=float)
+        _vix_ratio, _vix_risk_off_flag, _vix_cautious_flag = _compute_vix_regime(
+            _vix_series_slice,
+            current_vix=_vix_now_for_regime or 0.0,
+            config=config,
+            prev_persistence_count=_vix_persistence_count,
+        )
+        if _vix_ratio is not None and _vix_ratio >= config.vix_ratio_threshold:
+            _vix_persistence_count += 1
+        else:
+            _vix_persistence_count = 0
+
+        if config.enable_regime_filter:
+            regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data, hy_oas_series=hy_oas_series, t10y3m_series=t10y3m_series, copper_series=copper_series)
+        else:
+            regime = RegimeState(level="unknown")
+        if config.vix_smoothing and _vix_risk_off_flag:
+            regime.level = "risk_off"
+
+        _equity_capital_frac = 1.0
+        _etf_positions = []
+        if config.enable_dynamic_risk_off:
+            _ladder_tier = compute_etf_ladder_tier(
+                vix_ratio=_vix_ratio,
+                copper_bearish=getattr(regime, "copper_bearish", False),
+                config=config,
+            )
+            if _ladder_tier is not None:
+                _alloc = ETF_LADDER_TIERS[_ladder_tier]
+                _equity_capital_frac = _alloc["equity_frac"]
+                logger.info(
+                    "ETF ladder tier=%s equity_frac=%.2f at %s",
+                    _ladder_tier,
+                    _equity_capital_frac,
+                    reb_date,
+                )
+                for _etf_ticker, _etf_weight in _alloc.items():
+                    if _etf_ticker == "equity_frac":
+                        continue
+                    if _etf_ticker not in hedge_prices:
+                        logger.warning(
+                            "No price data for hedge ETF %s, skipping", _etf_ticker
+                        )
+                        continue
+                    _etf_price_series = hedge_prices[_etf_ticker]["close"]
+                    _etf_price_avail = _etf_price_series[
+                        _etf_price_series.index <= reb_date
+                    ]
+                    _etf_price = (
+                        float(_etf_price_avail.iloc[-1])
+                        if len(_etf_price_avail) > 0
+                        else None
+                    )
+                    if _etf_price is None or pd.isna(_etf_price) or _etf_price <= 0:
+                        continue
+                    _etf_notional = config.initial_capital * _etf_weight
+                    _etf_shares = _etf_notional / _etf_price
+                    _etf_positions.append(
+                        Position(
+                            ticker=_etf_ticker,
+                            direction="LONG",
+                            entry_date=reb_date,
+                            entry_price=_etf_price,
+                            shares=_etf_shares,
+                            stop_price=0.0,
+                            composite_score=0.0,
+                            flags=[f"hedge_etf:{_ladder_tier}"],
+                        )
+                    )
+
+        positions = build_target_portfolio(
+            signals,
+            universe_data,
+            reb_date,
+            config,
+            config.initial_capital * _equity_capital_frac,
+            regime=regime,
+        )
+        positions.extend(_etf_positions)
+        if not positions:
+            continue
+        trades, period_pnl = _compute_daily_portfolio_returns(
+            positions, universe_data, reb_date, next_reb, config,
+        )
+        combo_trades.extend(trades)
+        if len(period_pnl) > 0:
+            combo_daily_pnl = pd.concat([combo_daily_pnl, period_pnl])
+
+    oos_sharpe = None
+    n_trades = len(combo_trades)
+    combo_return = 0.0
+    if len(combo_daily_pnl) > 0:
+        combo_daily_pnl = combo_daily_pnl.groupby(combo_daily_pnl.index).sum().sort_index()
+        daily_returns = combo_daily_pnl / config.initial_capital
+        oos_sharpe = compute_sharpe_from_returns(daily_returns)
+        combo_return = round(float(combo_daily_pnl.sum() / config.initial_capital * 100), 2)
+
+    if oos_sharpe is None:
+        return None
+
+    return {
+        "combo_idx": combo_idx,
+        "train_groups": list(train_indices),
+        "test_groups": list(test_indices),
+        "n_test_dates": len(safe_test_dates),
+        "n_trades": n_trades,
+        "oos_sharpe": oos_sharpe,
+        "return_pct": combo_return,
+    }
+
+
 def run_cpcv(
     config: BacktestConfig,
     n_groups: int = 16,
@@ -3212,356 +3593,42 @@ def run_cpcv(
                     f"({n_groups} groups, {n_test_groups} test)...")
 
     # ── 4. Run each combination ──
-    # SYNC WITH run_walk_forward inner loop (lines 2051-2127)
+    # Delegates per-combo work to `_run_single_cpcv_combo` so Modal workers
+    # can invoke the same code path with identical state.
+    state = CPCVState(
+        universe_data=universe_data,
+        benchmark_df=benchmark_df,
+        vix_df=vix_df,
+        hy_oas_series=hy_oas_series,
+        t10y3m_series=t10y3m_series,
+        copper_series=copper_series,
+        hedge_prices=hedge_prices,
+        trading_dates=trading_dates,
+        groups=groups,
+        all_rebalance_dates=all_rebalance_dates,
+        purge_months=purge_months,
+        embargo_months=embargo_months,
+    )
+
     for ci, (train_indices, test_indices) in enumerate(combos):
         if progress_cb and (ci % 10 == 0 or ci == len(combos) - 1):
             progress_cb(f"CPCV combination {ci+1}/{len(combos)}")
 
-        safe_train_dates, safe_test_dates = apply_purge_embargo(
-            groups, train_indices, test_indices,
-            all_rebalance_dates, purge_months, embargo_months,
+        combo_result = _run_single_cpcv_combo(
+            state=state,
+            train_indices=train_indices,
+            test_indices=test_indices,
+            combo_idx=ci,
+            config=config,
         )
 
-        if len(safe_test_dates) < 2:
+        if combo_result is None:
             result.n_combinations_skipped += 1
             continue
 
-        # IC calibration from training dates (if enabled)
-        calibrated_weights = None
-        if config.enable_ic_calibration and len(safe_train_dates) >= config.ic_trailing_periods:
-            ic_history = compute_signal_ic(
-                universe_data, safe_train_dates,
-                config.lookback_days, forward_days=21,
-            )
-            calibrated_weights = calibrate_weights_from_ic(
-                ic_history, config.ic_trailing_periods, config.ic_shrinkage,
-            )
-
-        combo_daily_pnl = pd.Series(dtype=float)
-        combo_trades = []
-
-        _vix_persistence_count = 0
-        # Iterate test rebalance dates
-        for i, reb_date in enumerate(safe_test_dates[:-1]):
-            next_reb = safe_test_dates[i + 1]
-            _xgb_active = False
-            signals = compute_signals_at_date(universe_data, reb_date, config.lookback_days)
-            if not signals:
-                continue
-
-            if calibrated_weights:
-                signals = apply_calibrated_weights(signals, calibrated_weights)
-
-            if config.enable_timesfm:
-                tfm_scores = compute_timesfm_scores(
-                    universe_data, reb_date,
-                    horizon=config.timesfm_horizon,
-                    lookback=config.timesfm_lookback,
-                )
-                if tfm_scores:
-                    signals = blend_timesfm_into_signals(signals, tfm_scores, config.timesfm_weight)
-
-            if config.enable_lstm and _lstm_forecaster is not None:
-                lstm_scores = compute_lstm_scores(universe_data, reb_date, _lstm_forecaster)
-                if lstm_scores:
-                    signals = blend_lstm_into_signals(signals, lstm_scores, config.lstm_weight)
-
-            if config.enable_news_sentiment and (_finnhub_client is not None or _sentiment_cache is not None):
-                sent_scores = compute_sentiment_scores(
-                    universe_data, reb_date, config,
-                    client=_finnhub_client, disk_cache=_sentiment_cache,
-                )
-                if sent_scores:
-                    signals = blend_sentiment_into_signals(signals, sent_scores, config.news_sentiment_weight)
-
-            if config.enable_fundamentals and (_fmp_client is not None or _fmp_cache is not None or _wrds_provider is not None):
-                from quant.fundamentals import compute_fundamental_scores, blend_fundamentals_into_signals
-                fund_scores = compute_fundamental_scores(
-                    list(signals.keys()),
-                    fmp_client=_fmp_client, fmp_cache=_fmp_cache,
-                    wrds_provider=_wrds_provider,
-                    as_of_date=reb_date.date() if _wrds_provider else None,
-                )
-                if fund_scores:
-                    signals = blend_fundamentals_into_signals(signals, fund_scores, config.fundamentals_weight)
-
-            # Earnings signals overlay (ERM + SUE + Dispersion from WRDS IBES)
-            if config.enable_earnings_signals and _wrds_provider is not None:
-                from quant.earnings_signals import compute_earnings_signal_scores, blend_earnings_signals
-                earn_scores = compute_earnings_signal_scores(
-                    list(signals.keys()), _wrds_provider,
-                    as_of_date=reb_date.date(),
-                )
-                if earn_scores:
-                    signals = blend_earnings_signals(signals, earn_scores, config.earnings_signal_weight)
-
-            # Institutional flow overlay (FMP + Finnhub 13F ownership)
-            if config.enable_institutional_flow:
-                from quant.institutional_flow import compute_institutional_flow_scores, blend_institutional_flow
-                inst_scores = compute_institutional_flow_scores(
-                    list(signals.keys()),
-                    as_of_date=reb_date.date(),
-                    fmp_client=_fmp_client,
-                    fmp_cache=_inst_fmp_cache,
-                    finnhub_client=_finnhub_client,
-                    finnhub_disk_cache=_sentiment_cache,
-                )
-                if inst_scores:
-                    signals = blend_institutional_flow(signals, inst_scores, config.institutional_flow_weight)
-
-            # Sector momentum
-            if _sector_etf_data:
-                from quant.sector_momentum import compute_sector_momentum_scores
-                from quant.universe import get_sector
-                sec_mom_scores = compute_sector_momentum_scores(
-                    _sector_etf_data, signals, reb_date, get_sector,
-                )
-                for ticker, mom_score in sec_mom_scores.items():
-                    if ticker in signals:
-                        signals[ticker].sector_momentum_score = mom_score
-
-            # Quality / Profitability
-            if _wrds_provider is not None:
-                from quant.additional_signals import compute_quality_scores
-                quality_scores = compute_quality_scores(
-                    list(signals.keys()), _wrds_provider, as_of_date=reb_date.date(),
-                )
-                for ticker, qscore in quality_scores.items():
-                    if ticker in signals:
-                        signals[ticker].quality_score = qscore
-
-            # Price Momentum 12-1M
-            from quant.additional_signals import compute_price_momentum_scores
-            mom_scores = compute_price_momentum_scores(universe_data, reb_date)
-            for ticker, mscore in mom_scores.items():
-                if ticker in signals:
-                    signals[ticker].price_momentum_score = mscore
-
-            # Insider Activity
-            if _finnhub_client is not None or _sentiment_cache is not None:
-                from quant.additional_signals import compute_insider_scores
-                insider_scores = compute_insider_scores(
-                    list(signals.keys()), reb_date,
-                    finnhub_client=_finnhub_client,
-                    sentiment_cache=_sentiment_cache,
-                )
-                for ticker, iscore in insider_scores.items():
-                    if ticker in signals:
-                        signals[ticker].insider_score = iscore
-
-            # Event timing (PEAD from WRDS IBES)
-            if _wrds_provider is not None:
-                from quant.event_timing import compute_event_timing_scores
-                from quant.wrds_store import WRDSPointInTimeStore
-                _evt_store = WRDSPointInTimeStore()
-                event_scores = compute_event_timing_scores(
-                    list(signals.keys()), reb_date,
-                    wrds_store=_evt_store,
-                )
-                for ticker, (escore, emeta) in event_scores.items():
-                    if ticker in signals:
-                        signals[ticker].event_timing_score = escore
-                        signals[ticker].earnings_blocked = emeta.get("earnings_blocked", False)
-
-            # Kalshi signals (macro modifier + event divergence)
-            if config.enable_kalshi_signal:
-                try:
-                    from quant.kalshi_client import KalshiClient
-                    from quant.kalshi_signal import compute_macro_modifier, compute_event_divergence, compute_macro_momentum
-                    _kalshi_client = KalshiClient()
-                    _kalshi_macro = compute_macro_modifier(_kalshi_client)
-                    _kalshi_momentum = compute_macro_momentum(_kalshi_client)
-                    for _ticker in signals:
-                        signals[_ticker].kalshi_macro_score = _kalshi_macro
-                        signals[_ticker].kalshi_macro_momentum = _kalshi_momentum
-                        _earn_prob = getattr(signals[_ticker], "earnings_rank_score", 0.0)
-                        # Map earnings_rank_score ([-1,1]) to probability space [0,1]
-                        _our_prob = (_earn_prob + 1.0) / 2.0
-                        signals[_ticker].kalshi_event_score = compute_event_divergence(
-                            _kalshi_client,
-                            ticker=_ticker,
-                            our_prob_beat=_our_prob,
-                            threshold=config.kalshi_event_threshold,
-                        )
-                except Exception as _exc:
-                    logger.warning("Kalshi signal injection failed: %s", _exc)
-
-            # Price regression signal (R²-filtered OLS trend)
-            if config.enable_regression_signal:
-                try:
-                    from quant.regression_signal import compute_price_regression_scores
-                    _reg_scores = compute_price_regression_scores(
-                        universe_data, reb_date,
-                        window=config.regression_window,
-                        r2_threshold=config.regression_r2_threshold,
-                    )
-                    for _ticker, _score in _reg_scores.items():
-                        if _ticker in signals:
-                            signals[_ticker].price_regression_score = _score
-                except Exception as _exc:
-                    logger.warning("Regression signal injection failed: %s", _exc)
-
-            # ARIMA short-term forecast signal (stable regimes only)
-            if config.enable_arima_signal:
-                try:
-                    from quant.arima_signal import compute_arima_forecast_scores
-                    _arima_scores = compute_arima_forecast_scores(
-                        universe_data, reb_date,
-                        vol_threshold=config.arima_vol_threshold,
-                    )
-                    for _ticker, _score in _arima_scores.items():
-                        if _ticker in signals:
-                            signals[_ticker].arima_forecast_score = _score
-                except Exception as _exc:
-                    logger.warning("ARIMA signal injection failed: %s", _exc)
-
-            # ── Cross-sectional normalization barrier ──
-            if not _xgb_active:
-                from quant.cross_sectional import normalize_signals_cross_sectionally, compute_normalized_composite, make_volatility_tier_fn
-                from quant.scoring import reclassify
-                signals = normalize_signals_cross_sectionally(signals, make_volatility_tier_fn(signals))
-                for sv in signals.values():
-                    sv.composite_score = compute_normalized_composite(sv)
-                    if config.enable_kalshi_signal:
-                        sv.composite_score = float(np.clip(
-                            sv.composite_score
-                            + sv.kalshi_macro_score * config.kalshi_macro_weight
-                            + sv.kalshi_event_score * config.kalshi_event_weight,
-                            -1.0, 1.0,
-                        ))
-                    reclassify(sv)
-
-            if config.enable_fomc_proximity:
-                vix_now = None
-                if vix_df is not None:
-                    vix_avail = vix_df[vix_df.index <= reb_date]
-                    if len(vix_avail) > 0:
-                        vix_now = float(vix_avail.iloc[-1]["close"])
-                fomc_boost = compute_fomc_proximity_boost(reb_date, trading_dates, vix_now, config)
-                if fomc_boost > 0:
-                    signals = apply_fomc_boost(signals, fomc_boost)
-
-            # VIX smoothed regime detection
-            _vix_now_for_regime = None
-            if vix_df is not None:
-                _vix_avail_r = vix_df[vix_df.index <= reb_date]
-                if len(_vix_avail_r) > 0:
-                    _vix_now_for_regime = float(_vix_avail_r.iloc[-1]["close"])
-            _vix_series_slice = vix_df["close"].loc[:reb_date] if vix_df is not None and not vix_df.empty else pd.Series(dtype=float)
-            _vix_ratio, _vix_risk_off_flag, _vix_cautious_flag = _compute_vix_regime(
-                _vix_series_slice,
-                current_vix=_vix_now_for_regime or 0.0,
-                config=config,
-                prev_persistence_count=_vix_persistence_count,
-            )
-            if _vix_ratio is not None and _vix_ratio >= config.vix_ratio_threshold:
-                _vix_persistence_count += 1
-            else:
-                _vix_persistence_count = 0
-
-            if config.enable_regime_filter:
-                regime = detect_regime(benchmark_df, reb_date, vix_df=vix_df, config=config, sector_data=_sector_etf_data, hy_oas_series=hy_oas_series, t10y3m_series=t10y3m_series, copper_series=copper_series)
-            else:
-                regime = RegimeState(level="unknown")
-            if config.vix_smoothing and _vix_risk_off_flag:
-                regime.level = "risk_off"
-
-            # ETF ladder allocation (Phase 2B)
-            _equity_capital_frac = 1.0
-            _etf_positions = []
-            if config.enable_dynamic_risk_off:
-                _ladder_tier = compute_etf_ladder_tier(
-                    vix_ratio=_vix_ratio,
-                    copper_bearish=getattr(regime, "copper_bearish", False),
-                    config=config,
-                )
-                if _ladder_tier is not None:
-                    _alloc = ETF_LADDER_TIERS[_ladder_tier]
-                    _equity_capital_frac = _alloc["equity_frac"]
-                    logger.info(
-                        "ETF ladder tier=%s equity_frac=%.2f at %s",
-                        _ladder_tier,
-                        _equity_capital_frac,
-                        reb_date,
-                    )
-                    for _etf_ticker, _etf_weight in _alloc.items():
-                        if _etf_ticker == "equity_frac":
-                            continue
-                        if _etf_ticker not in hedge_prices:
-                            logger.warning(
-                                "No price data for hedge ETF %s, skipping", _etf_ticker
-                            )
-                            continue
-                        _etf_price_series = hedge_prices[_etf_ticker]["close"]
-                        _etf_price_avail = _etf_price_series[
-                            _etf_price_series.index <= reb_date
-                        ]
-                        _etf_price = (
-                            float(_etf_price_avail.iloc[-1])
-                            if len(_etf_price_avail) > 0
-                            else None
-                        )
-                        if _etf_price is None or pd.isna(_etf_price) or _etf_price <= 0:
-                            continue
-                        _etf_notional = config.initial_capital * _etf_weight
-                        _etf_shares = _etf_notional / _etf_price
-                        _etf_positions.append(
-                            Position(
-                                ticker=_etf_ticker,
-                                direction="LONG",
-                                entry_date=reb_date,
-                                entry_price=_etf_price,
-                                shares=_etf_shares,
-                                stop_price=0.0,
-                                composite_score=0.0,
-                                flags=[f"hedge_etf:{_ladder_tier}"],
-                            )
-                        )
-
-            # Use fresh capital per combination (no carry-over between
-            # non-contiguous test groups — per CPCV methodology)
-            positions = build_target_portfolio(
-                signals,
-                universe_data,
-                reb_date,
-                config,
-                config.initial_capital * _equity_capital_frac,
-                regime=regime,
-            )
-            positions.extend(_etf_positions)
-            if not positions:
-                continue
-            trades, period_pnl = _compute_daily_portfolio_returns(
-                positions, universe_data, reb_date, next_reb, config,
-            )
-            combo_trades.extend(trades)
-            if len(period_pnl) > 0:
-                combo_daily_pnl = pd.concat([combo_daily_pnl, period_pnl])
-
-        # Compute Sharpe for this combination
-        oos_sharpe = None
-        n_trades = len(combo_trades)
-        combo_return = 0.0
-        if len(combo_daily_pnl) > 0:
-            combo_daily_pnl = combo_daily_pnl.groupby(combo_daily_pnl.index).sum().sort_index()
-            daily_returns = combo_daily_pnl / config.initial_capital
-            oos_sharpe = compute_sharpe_from_returns(daily_returns)
-            combo_return = round(float(combo_daily_pnl.sum() / config.initial_capital * 100), 2)
-
-        if oos_sharpe is not None:
-            result.oos_sharpes.append(oos_sharpe)
-            result.combination_details.append({
-                "combo_idx": ci,
-                "train_groups": train_indices,
-                "test_groups": test_indices,
-                "n_test_dates": len(safe_test_dates),
-                "n_trades": n_trades,
-                "oos_sharpe": oos_sharpe,
-                "return_pct": combo_return,
-            })
-            result.n_combinations_completed += 1
-        else:
-            result.n_combinations_skipped += 1
+        result.oos_sharpes.append(combo_result["oos_sharpe"])
+        result.combination_details.append(combo_result)
+        result.n_combinations_completed += 1
 
     # ── 5. Compute aggregate stats ──
     result.elapsed_seconds = round(_time.time() - t0, 1)

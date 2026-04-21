@@ -45,3 +45,6 @@ alpaca-py>=0.28.0
 
 # Scheduling
 APScheduler>=3.10.4
+
+# Cloud compute (Modal backtesting fan-out)
+modal>=0.64.0
