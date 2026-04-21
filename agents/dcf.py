@@ -60,6 +60,12 @@ Justify your terminal growth rate assumption (typically 2-3% for mature companie
 5. FAIR VALUE: Derive per-share intrinsic value. Compare to current trading price \
 and state your implied upside/downside.
 
+6. MULTIPLES CALIBRATION: Cross-check your DCF fair value against sector trading multiples. \
+Most stocks trade at a premium to DCF intrinsic value. If your DCF target is materially \
+below current trading multiples, state this explicitly and provide a blended valuation \
+(e.g., 70% DCF + 30% comps) as your price target. Never ignore that markets price on \
+EV/EBITDA and P/E as primary valuation language.
+
 Format your analysis with clear sections, show your key assumptions in a table, \
 and provide a sensitivity analysis on WACC and terminal growth rate. \
 End with a clear BUY / HOLD / SELL recommendation with a price target.
@@ -107,6 +113,10 @@ Be rigorous but concise. Use actual numbers from the provided financials."""
         if data.quarterly_summary:
             parts.append(f"\n{data.quarterly_summary}")
 
+        comps_block = self._build_comps_context(data)
+        if comps_block:
+            parts.append(f"\n{comps_block}")
+
         if settings.enable_wacc_helpers:
             wacc_block = self._build_wacc_context(data)
             if wacc_block:
@@ -114,6 +124,57 @@ Be rigorous but concise. Use actual numbers from the provided financials."""
 
         self.append_enrichment_sections(parts, data)
         return "\n".join(parts)
+
+    @staticmethod
+    def _build_comps_context(data: AnalysisData) -> Optional[str]:
+        """Build a sector multiples context block from available metrics and peer data."""
+        m = data.metrics or {}
+
+        # Collect subject company multiples — check both common key naming conventions
+        multiples: list[str] = []
+        pe = m.get("pe_ratio") or m.get("pe_ttm") or m.get("trailing_pe")
+        forward_pe = m.get("forward_pe")
+        ev_ebitda = m.get("ev_to_ebitda") or m.get("ev_ebitda")
+        ps = m.get("price_to_sales") or m.get("ps_ttm") or m.get("ps_ratio")
+
+        if pe is not None:
+            multiples.append(f"  P/E (TTM):      {float(pe):.1f}x")
+        if forward_pe is not None:
+            multiples.append(f"  Forward P/E:    {float(forward_pe):.1f}x")
+        if ev_ebitda is not None:
+            multiples.append(f"  EV/EBITDA:      {float(ev_ebitda):.1f}x")
+        if ps is not None:
+            multiples.append(f"  P/S (TTM):      {float(ps):.1f}x")
+
+        # Summarize peer median multiples from the peer_comparison enrichment section
+        peer_lines: list[str] = []
+        peer_text = (data.enrichment_sections or {}).get("peer_comparison", "")
+        if peer_text:
+            import re
+            # Extract median PE and EV/EBITDA if present in the peer table text
+            for pattern, label in [
+                (r"[Mm]edian.*?P/?E[^0-9]*([0-9]+\.?[0-9]*)", "Peer Median P/E"),
+                (r"[Mm]edian.*?EV/EBITDA[^0-9]*([0-9]+\.?[0-9]*)", "Peer Median EV/EBITDA"),
+            ]:
+                m_re = re.search(pattern, peer_text)
+                if m_re:
+                    peer_lines.append(f"  {label}: {m_re.group(1)}x")
+
+        if not multiples and not peer_lines:
+            return None
+
+        lines = ["── Sector Multiples Context ──"]
+        if multiples:
+            lines.append("Subject Company:")
+            lines.extend(multiples)
+        if peer_lines:
+            lines.append("Peer Benchmarks:")
+            lines.extend(peer_lines)
+        lines.append(
+            "NOTE: Use these multiples in step 6 (MULTIPLES CALIBRATION) to cross-check"
+            " your DCF fair value. Provide a blended valuation if warranted."
+        )
+        return "\n".join(lines)
 
     @staticmethod
     def _build_wacc_context(data: AnalysisData) -> Optional[str]:
