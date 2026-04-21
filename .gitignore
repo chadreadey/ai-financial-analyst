@@ -26,6 +26,8 @@ backtest_bt_*.json
 backtest_wf_*.json
 phase0_*.json
 .xgb_features_*.csv
+# Modal CPCV run summaries (written by scripts/run_modal_cpcv.py)
+runs/
 
 # Superpowers / agent workspaces
 .superpowers/

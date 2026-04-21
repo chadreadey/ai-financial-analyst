@@ -16,6 +16,13 @@ fredapi>=0.5
 edgartools>=2.0
 scipy>=1.10
 
+# Quant modeling (required by Modal CPCV workers when signals are enabled)
+scikit-learn>=1.3.0
+xgboost>=2.0.0
+statsmodels>=0.14.0        # ARIMA signal (quant/arima_signal.py)
+filterpy>=1.4.5            # Kalman filtering in regime classifier
+pykalman>=0.9.7            # alt Kalman implementation used by some signals
+
 # Market data
 tavily-python>=0.3.0
 
@@ -45,3 +52,6 @@ alpaca-py>=0.28.0
 
 # Scheduling
 APScheduler>=3.10.4
+
+# Cloud compute (Modal backtesting fan-out)
+modal>=0.64.0
