@@ -40,9 +40,15 @@ from modal_app.events import (
 logger = logging.getLogger(__name__)
 
 
-# Buffer combos + trades before flushing to Supabase (SQLite flushes per-combo
-# since writes are local + WAL). Keeps HTTP round-trips to ~1 per 50 combos.
-_SUPABASE_COMBO_FLUSH = 50
+# Buffer combos before flushing to Supabase (SQLite flushes per-combo since
+# writes are local + WAL). Default is 50 combos per HTTP round-trip — well
+# under PostgREST's ~1 MB cap. Tunable via `settings.modal_backtest_flush_combos`.
+def _supabase_combo_flush_size() -> int:
+    try:
+        from config import settings as _s
+        return max(1, int(_s.modal_backtest_flush_combos))
+    except Exception:
+        return 50
 
 
 def _build_combo_specs(
@@ -139,8 +145,17 @@ def dispatch_cpcv(
     allow_dirty: bool = False,
     local: bool = False,
     print_leaderboard: bool = True,
+    run_id: Optional[str] = None,
+    config_hash: Optional[str] = None,
+    git_sha: Optional[str] = None,
 ) -> dict[str, Any]:
-    """End-to-end CPCV run. Returns a summary dict."""
+    """End-to-end CPCV run. Returns a summary dict.
+
+    `run_id`/`config_hash`/`git_sha` can be supplied by a caller that has
+    already written a `queued` row (e.g. the FastAPI `POST /backtest/modal`
+    kickoff, which needs to return the id to the client before dispatch
+    completes). When `None`, identity is generated here as usual.
+    """
     from quant.backtest import BacktestConfig
     from quant.config_hash import config_hash as _config_hash
     from quant.cpcv import CPCVResult, generate_cpcv_combinations
@@ -150,9 +165,10 @@ def dispatch_cpcv(
     if not config.tickers:
         raise ValueError("config.tickers is empty — resolve a universe before dispatch.")
 
-    run_id = uuid.uuid4().hex[:12]
-    cfg_hash = _config_hash(config)
-    git_sha = capture_git_sha(allow_dirty=allow_dirty)
+    if run_id is None:
+        run_id = uuid.uuid4().hex[:12]
+    cfg_hash = config_hash or _config_hash(config)
+    git_sha = git_sha or capture_git_sha(allow_dirty=allow_dirty)
 
     logger.info("Run %s | git_sha=%s | config_hash=%s", run_id, git_sha, cfg_hash)
     logger.info("Universe=%d tickers  n_groups=%d  n_test=%d  max_combos=%s",
@@ -278,7 +294,7 @@ def dispatch_cpcv(
         }, combo_idx=combo_idx)
 
         # Flush buffered combo rows to Supabase when threshold reached.
-        if len(supabase_combo_buffer) >= _SUPABASE_COMBO_FLUSH:
+        if len(supabase_combo_buffer) >= _supabase_combo_flush_size():
             supabase_backtest.insert_combinations_batch(supabase_combo_buffer)
             supabase_combo_buffer.clear()
 
@@ -439,6 +455,102 @@ def _supabase_run_row(row: dict) -> dict:
     """Shape a run row for Supabase (drop `started_at` so Postgres defaults)."""
     out = {k: v for k, v in row.items() if k != "started_at"}
     return out
+
+
+def kickoff_cpcv_background(
+    config,
+    *,
+    n_groups: int = 16,
+    n_test_groups: int = 8,
+    purge_months: int = 1,
+    embargo_months: int = 1,
+    max_combos: Optional[int] = None,
+    seed: int = 42,
+    local: bool = False,
+) -> dict[str, Any]:
+    """Kick off a CPCV dispatch on a daemon thread and return immediately.
+
+    Used by the FastAPI POST endpoint: we need to return a `run_id` to the
+    client before the long dispatch has even uploaded the panel. This
+    writes the `queued` row synchronously (so it's visible to polling GETs),
+    then spawns a thread that runs the full dispatcher.
+
+    Returns `{run_id, config_hash, git_sha, status}` for the response body.
+    """
+    import threading
+    from quant.backtest import BacktestConfig
+    from quant.config_hash import config_hash as _config_hash_fn
+    from quant.git_sha import capture_git_sha
+
+    assert isinstance(config, BacktestConfig), "config must be a BacktestConfig"
+    if not config.tickers:
+        raise ValueError("config.tickers is empty — resolve a universe before dispatch.")
+
+    run_id = uuid.uuid4().hex[:12]
+    cfg_hash = _config_hash_fn(config)
+    # `allow_dirty=True` is safe here because Railway/remote environments are
+    # handled inside capture_git_sha — the resulting SHA reflects the deployed
+    # revision (MODAL_GIT_SHA / RAILWAY_GIT_COMMIT_SHA), not a local dirty tree.
+    git_sha = capture_git_sha(allow_dirty=True)
+
+    # Write queued row synchronously so the client's immediate GET succeeds.
+    run_row = {
+        "run_id": run_id,
+        "config_hash": cfg_hash,
+        "git_sha": git_sha,
+        "status": "queued",
+        "universe": _infer_universe_label(config),
+        "n_groups": n_groups,
+        "n_test_groups": n_test_groups,
+        "n_combinations": None,
+        "config_json": asdict(config),
+        "started_at": time.time(),
+    }
+    cpcv_sqlite.upsert_run(run_row)
+    supabase_backtest.upsert_run(_supabase_run_row(run_row))
+    # NB: intentionally no EVENT_RUN_STARTED here — `dispatch_cpcv` emits its
+    # own with the full tickers/n_groups payload once it reaches the fan-out.
+
+    def _run() -> None:
+        try:
+            dispatch_cpcv(
+                config,
+                n_groups=n_groups,
+                n_test_groups=n_test_groups,
+                purge_months=purge_months,
+                embargo_months=embargo_months,
+                max_combos=max_combos,
+                seed=seed,
+                local=local,
+                print_leaderboard=False,
+                run_id=run_id,
+                config_hash=cfg_hash,
+                git_sha=git_sha,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("background dispatch for run %s failed", run_id)
+            _capture_sentry(run_id, cfg_hash, None, f"background dispatch failed: {exc}")
+            cpcv_sqlite.patch_run(run_id, {
+                "status": "failed",
+                "error": str(exc)[:500],
+                "finished_at": time.time(),
+            })
+            supabase_backtest.patch_run(run_id, {
+                "status": "failed",
+                "error": str(exc)[:500],
+                "finished_at": time.time(),
+            })
+            emit_event(run_id, EVENT_RUN_FAILED, {"error": str(exc)[:500]})
+
+    thread = threading.Thread(target=_run, daemon=True, name=f"cpcv-{run_id}")
+    thread.start()
+
+    return {
+        "run_id": run_id,
+        "config_hash": cfg_hash,
+        "git_sha": git_sha,
+        "status": "queued",
+    }
 
 
 def _print_leaderboard(result, summary: dict, top_n: int = 10) -> None:

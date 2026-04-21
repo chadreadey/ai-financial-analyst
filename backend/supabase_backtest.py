@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Any, Iterable, Optional
 from urllib.parse import urlencode
@@ -192,6 +193,159 @@ def insert_event(row: dict) -> bool:
     return _post("backtest_events", [row], prefer="return=minimal")
 
 
+# ── read-path helpers (Session 2b) ──────────────────────────────────────
+#
+# Thin PostgREST GETs. Returns `None`/[] when Supabase is disabled so callers
+# can transparently fall back to SQLite via `backend.backtest_reader`.
+
+def _get(path: str, params: Optional[dict] = None) -> Optional[list[dict]]:
+    if not is_enabled():
+        return None
+    url = _rest_url(path.split("?", 1)[0])
+    query_bits: list[str] = []
+    if "?" in path:
+        query_bits.append(path.split("?", 1)[1])
+    if params:
+        query_bits.append(urlencode(params, safe=".,:()*"))
+    if query_bits:
+        url = f"{url}?{'&'.join(query_bits)}"
+    req = Request(url, headers=_headers(), method="GET")
+    try:
+        with urlopen(req, timeout=_HTTP_TIMEOUT) as r:
+            body = r.read()
+            return json.loads(body) if body else []
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("supabase GET %s failed: %s", path, exc)
+        return None
+
+
+def list_runs(
+    status: Optional[str] = None,
+    config_hash: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> Optional[list[dict]]:
+    params = {
+        "select": "*",
+        "order": "started_at.desc",
+        "limit": limit,
+        "offset": offset,
+    }
+    if status:
+        params["status"] = f"eq.{status}"
+    if config_hash:
+        params["config_hash"] = f"eq.{config_hash}"
+    return _get("backtest_runs", params)
+
+
+def get_run(run_id: str) -> Optional[dict]:
+    rows = _get("backtest_runs", {"run_id": f"eq.{run_id}", "select": "*", "limit": 1})
+    if rows is None:
+        return None
+    return rows[0] if rows else None
+
+
+def find_runs_by_config_hash(config_hash: str, limit: int = 20) -> Optional[list[dict]]:
+    return list_runs(config_hash=config_hash, limit=limit)
+
+
+def get_combinations(
+    run_id: str,
+    order_by: str = "oos_sharpe",
+    descending: bool = True,
+    limit: Optional[int] = None,
+    offset: int = 0,
+) -> Optional[list[dict]]:
+    allowed = {"oos_sharpe", "combo_idx", "return_pct", "n_trades"}
+    col = order_by if order_by in allowed else "oos_sharpe"
+    direction = "desc" if descending else "asc"
+    params = {
+        "run_id": f"eq.{run_id}",
+        "select": "*",
+        "order": f"{col}.{direction}.nullslast",
+    }
+    if limit is not None:
+        params["limit"] = limit
+        params["offset"] = offset
+    return _get("backtest_combinations", params)
+
+
+def get_trades(
+    run_id: str,
+    combo_idx: Optional[int] = None,
+    ticker: Optional[str] = None,
+    limit: Optional[int] = None,
+    offset: int = 0,
+) -> Optional[list[dict]]:
+    params = {
+        "run_id": f"eq.{run_id}",
+        "select": "*",
+        "order": "combo_idx.asc,trade_idx.asc",
+    }
+    if combo_idx is not None:
+        params["combo_idx"] = f"eq.{combo_idx}"
+    if ticker:
+        params["ticker"] = f"eq.{ticker}"
+    if limit is not None:
+        params["limit"] = limit
+        params["offset"] = offset
+    return _get("backtest_trades", params)
+
+
+def sweep_stale_runs(max_age_seconds: float = 2 * 3600) -> int:
+    """Mark Supabase runs stuck in 'running' longer than `max_age_seconds` as failed.
+
+    Mirrors `backend.cpcv_sqlite.sweep_stale_runs` so both stores converge.
+    Returns a best-effort count (PostgREST doesn't give an exact rowcount
+    unless we ask for it, and this is a periodic cleanup so approximate is fine).
+    """
+    if not is_enabled():
+        return 0
+    cutoff = datetime.fromtimestamp(time.time() - max_age_seconds, tz=timezone.utc).isoformat()
+    # Two PostgREST filters: status=eq.running AND started_at<cutoff
+    qs = urlencode({
+        "status": "eq.running",
+        "started_at": f"lt.{cutoff}",
+    }, safe=".,:()*")
+    data = json.dumps({
+        "status": "failed",
+        "error": "stale run: no terminal event within timeout",
+        "finished_at": datetime.now(timezone.utc).isoformat(),
+    }).encode("utf-8")
+    req = Request(
+        f"{_rest_url('backtest_runs')}?{qs}",
+        data=data,
+        headers={**_headers("return=representation"), "Accept": "application/json"},
+        method="PATCH",
+    )
+    try:
+        with urlopen(req, timeout=_HTTP_TIMEOUT) as r:
+            body = r.read()
+            try:
+                return len(json.loads(body)) if body else 0
+            except Exception:
+                return 0
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("supabase sweep_stale_runs failed: %s", exc)
+        return 0
+
+
+def get_events(
+    run_id: str,
+    after_id: Optional[int] = None,
+    limit: int = 200,
+) -> Optional[list[dict]]:
+    params = {
+        "run_id": f"eq.{run_id}",
+        "select": "*",
+        "order": "id.asc",
+        "limit": limit,
+    }
+    if after_id is not None:
+        params["id"] = f"gt.{after_id}"
+    return _get("backtest_events", params)
+
+
 __all__ = [
     "is_enabled",
     "upsert_run",
@@ -199,4 +353,10 @@ __all__ = [
     "insert_combinations_batch",
     "insert_trades_batch",
     "insert_event",
+    "list_runs",
+    "get_run",
+    "find_runs_by_config_hash",
+    "get_combinations",
+    "get_trades",
+    "get_events",
 ]

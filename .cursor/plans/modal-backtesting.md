@@ -311,12 +311,17 @@ I'll provide the exact SQL and the `supabase/` directory — user handles creden
 - 2026-04-20: Dirty tree cleaned: DCF multiples calibration committed to `frontend-overhaul` (2 commits), `.gitignore` tightened, `claude/elated-haslett` worktree + branch removed (fully superseded by main).
 - 2026-04-20: Session 1 shipped (commit `49a058e`). 500-combo CPCV on Modal in 4m51s (target <15 min). Local + Modal parity confirmed.
 - 2026-04-21: Session 2a shipped. CPCV result → SQLite + Supabase (graceful no-op when creds absent) dual-write, per-trade records with full `SignalVector` + regime, structured event stream. Verified end-to-end: Modal 10-combo run wrote 1 cpcv_runs + 10 cpcv_combinations + 1,652 cpcv_trades (all with signals) + 12 cpcv_events. `regime_at_entry` correctly populated ("strong_bull" for NVDA entries in 2023).
-- Session 2b deferred to keep 2a scope tight (≈90 min):
-  - `POST /backtest/modal` FastAPI endpoint + 5 GET endpoints (`dispatch_cpcv` wraps blocking `with app.run():`; needs `Function.spawn_map()` refactor before Railway can use it)
-  - Modal-side panel build (`build_panel_remote`) so FastAPI dispatch doesn't depend on local `.price_cache/`
-  - Railway git-SHA env var hook in `capture_git_sha`
-  - Stale-run sweeper (`status='running' AND started_at < now() - 2h` → `failed`)
-  - Split Supabase secret from admin secret in Modal (security isolation)
-  - Settings-driven flush intervals (`modal_backtest_flush_combos`, `modal_trade_snapshot_top_n`)
-  - Read-path helpers (`find_runs_by_config_hash`, `get_run_detail`, etc. — only needed by Session 3 frontend)
-- Session 2a user action pending: create Supabase project + apply `supabase/migrations/0001_backtest_tables.sql` + set `SUPABASE_URL`/`SUPABASE_SERVICE_KEY`/`ENABLE_SUPABASE_HISTORY=true` in `.env` and Railway env. After that, re-running any CPCV sweep will dual-write to Supabase automatically (no code changes).
+- 2026-04-21: Supabase creds + migration applied by user. Smoke 3-combo run dual-wrote cleanly to `backtest_runs`/`backtest_combinations`/`backtest_trades`/`backtest_events`. One bug found: dispatcher sent Unix-float `finished_at` which PostgREST rejected (HTTP 400) — fixed in `backend/supabase_backtest.py::_coerce_timestamps` (commit `a625593`). 30-combo Modal fan-out sweep (liquid_10, 2020-, sampled from C(10,3)=120) completed in 53.2 s; 474 trades persisted with full SignalVector + regime.
+- 2026-04-21: Session 2b shipped (all deferred items minus Modal-side panel build and admin-secret isolation):
+  - Read-path helpers in both `backend/cpcv_sqlite.py` and `backend/supabase_backtest.py` (`list_runs`, `get_run`, `get_combinations`, `get_trades`, `get_events`, `find_runs_by_config_hash`).
+  - `backend/backtest_reader.py` unified facade prefers Supabase, falls back to SQLite with column-name normalisation.
+  - `backend/routers/backtest_modal.py` — `POST /api/backtest/modal` (kicks off in daemon thread, returns run_id immediately) + 7 GETs (runs list/detail, combinations, combo-trades, run-trades, events, by-config-hash, source).
+  - `modal_app.dispatcher.kickoff_cpcv_background` — writes `queued` row synchronously, then launches `dispatch_cpcv` on a thread with pre-seeded identity. Catches worker exceptions and marks run `failed` + fires Sentry event.
+  - `capture_git_sha` honours `RAILWAY_GIT_COMMIT_SHA` / `GIT_COMMIT_SHA` and skips dirty-tree errors when `RAILWAY_ENVIRONMENT`/`MODAL_IS_REMOTE` are set.
+  - Stale-run sweeper in both stores (`status='running' AND started_at < now() - 2h` → `failed`), called opportunistically on every `GET /runs` list.
+  - Settings: `modal_backtest_flush_combos` (default 50), `modal_trade_snapshot_top_n` (0 = snapshot all).
+  - Verified: POST → event stream polling → GET detail returns `complete` with 3 combos; all 7 GETs exercised via `TestClient` against the Supabase-backed reader.
+- Still deferred (move to follow-up once Session 3 frontend exists or Railway cold-starts become painful):
+  - Modal-side panel build (`build_panel_remote`) — FastAPI dispatch currently builds the panel in-process on Railway, which needs the price cache seeded there (works fine today because the nightly worker writes the shared warehouse DB).
+  - Splitting Supabase secret from the admin secret in Modal (security isolation — not urgent while both are service-role).
+  - Opportunistic `_trade_snapshot_top_n` filtering in `_handle_combo_result` (setting exists, not yet read).

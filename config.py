@@ -142,6 +142,16 @@ class Settings(BaseSettings):
     supabase_service_key: str = ""
     supabase_history_table: str = "analyses"
 
+    # ── Modal CPCV backtest tuning ───────────────────────────────────
+    # Number of completed combo rows to buffer before flushing to Supabase
+    # (PostgREST has a ~1 MB payload cap; 50 combos is comfortably under).
+    modal_backtest_flush_combos: int = 50
+    # Only persist full SignalVector snapshots for trades in this many top/
+    # bottom combos by OOS Sharpe (None = every combo). Lets big sweeps keep
+    # detailed attribution for the interesting combos without ballooning
+    # the trade table to 100k+ rows of JSONB.
+    modal_trade_snapshot_top_n: int = 0  # 0 = snapshot all
+
     # ── Auto paper trading ────────────────────────────────────────────
     auto_paper_trade: bool = True
     auto_paper_trade_min_conviction: float = 0.40

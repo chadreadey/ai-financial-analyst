@@ -34,9 +34,14 @@ def _run(args: list[str]) -> str:
 
 def capture_git_sha(allow_dirty: bool = False, short: bool = False) -> str:
     """Return the current git SHA, refusing on dirty tree unless allowed."""
-    env_sha = os.environ.get("MODAL_GIT_SHA", "").strip()
-    if env_sha:
-        return env_sha
+    # Preferred sources, in order:
+    #   MODAL_GIT_SHA     — baked into Modal image at deploy time
+    #   RAILWAY_GIT_COMMIT_SHA — injected by Railway at build time
+    #   GIT_COMMIT_SHA    — generic override
+    for env_var in ("MODAL_GIT_SHA", "RAILWAY_GIT_COMMIT_SHA", "GIT_COMMIT_SHA"):
+        env_sha = os.environ.get(env_var, "").strip()
+        if env_sha:
+            return env_sha[:12] if short else env_sha
 
     try:
         sha = _run(["git", "rev-parse", "HEAD"])
@@ -52,6 +57,11 @@ def capture_git_sha(allow_dirty: bool = False, short: bool = False) -> str:
         dirty_output = ""
 
     if not dirty_output:
+        return sha
+
+    # Ephemeral deploy environments (Railway, Docker) aren't git checkouts —
+    # treat that case the same as "no git" to avoid spurious dirty errors.
+    if os.environ.get("RAILWAY_ENVIRONMENT") or os.environ.get("MODAL_IS_REMOTE"):
         return sha
 
     if not allow_dirty:

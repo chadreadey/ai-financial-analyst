@@ -364,10 +364,218 @@ def insert_event(row: dict) -> bool:
         return False
 
 
+# ── read-path helpers (Session 2b) ──────────────────────────────────────
+#
+# All return plain dicts (JSON columns pre-parsed). Safe to call before any
+# write has happened — tables are created on first access.
+#
+# NB: these power the FastAPI `/api/backtest/modal/*` endpoints as a fallback
+# when Supabase is disabled, and are also used by the stale-run sweeper.
+
+_RUN_COLS = [
+    "run_id", "config_hash", "git_sha", "status", "universe",
+    "n_groups", "n_test_groups", "n_combinations",
+    "n_completed", "n_skipped", "n_failed",
+    "median_oos_sharpe", "oos_sharpe_min", "oos_sharpe_max",
+    "pbo", "deflated_sharpe",
+    "config_json", "metrics_json", "error", "modal_call_id",
+    "started_at", "finished_at", "updated_at",
+]
+
+_COMBO_COLS = [
+    "run_id", "combo_idx", "status", "train_indices_json", "test_indices_json",
+    "oos_sharpe", "return_pct", "n_trades", "n_test_dates",
+    "elapsed_seconds", "git_sha", "error", "gates_json", "created_at",
+]
+
+_TRADE_COLS = [
+    "run_id", "combo_idx", "trade_idx", "ticker", "direction",
+    "entry_date", "exit_date", "entry_price", "exit_price",
+    "pnl_dollar", "pnl_pct", "holding_days", "exit_reason",
+    "composite_score", "regime_at_entry", "signals_at_entry_json",
+    "flags_json", "created_at",
+]
+
+_EVENT_COLS = ["id", "run_id", "kind", "combo_idx", "payload", "created_at"]
+
+_JSON_RUN_COLS = {"config_json", "metrics_json"}
+_JSON_COMBO_COLS = {"train_indices_json", "test_indices_json", "gates_json"}
+_JSON_TRADE_COLS = {"signals_at_entry_json", "flags_json"}
+_JSON_EVENT_COLS = {"payload"}
+
+
+def _row_to_dict(row: sqlite3.Row, json_cols: set[str]) -> dict:
+    out = dict(row)
+    for col in json_cols & out.keys():
+        v = out[col]
+        if isinstance(v, str) and v:
+            try:
+                out[col] = json.loads(v)
+            except Exception:
+                pass
+    return out
+
+
+def _query(sql: str, params: tuple = ()) -> list[sqlite3.Row]:
+    try:
+        conn = _connect()
+        try:
+            _ensure_schema(conn)
+            conn.row_factory = sqlite3.Row
+            cur = conn.execute(sql, params)
+            return cur.fetchall()
+        finally:
+            conn.close()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("sqlite query failed (%s): %s", sql.split()[0], exc)
+        return []
+
+
+def list_runs(
+    status: Optional[str] = None,
+    config_hash: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[dict]:
+    """Most recent runs first, optionally filtered by status/config_hash."""
+    where = []
+    params: list[Any] = []
+    if status:
+        where.append("status = ?")
+        params.append(status)
+    if config_hash:
+        where.append("config_hash = ?")
+        params.append(config_hash)
+    where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+    sql = (
+        f"SELECT {', '.join(_RUN_COLS)} FROM cpcv_runs "
+        f"{where_sql} ORDER BY started_at DESC LIMIT ? OFFSET ?"
+    )
+    params.extend([limit, offset])
+    return [_row_to_dict(r, _JSON_RUN_COLS) for r in _query(sql, tuple(params))]
+
+
+def get_run(run_id: str) -> Optional[dict]:
+    rows = _query(
+        f"SELECT {', '.join(_RUN_COLS)} FROM cpcv_runs WHERE run_id = ? LIMIT 1",
+        (run_id,),
+    )
+    return _row_to_dict(rows[0], _JSON_RUN_COLS) if rows else None
+
+
+def find_runs_by_config_hash(config_hash: str, limit: int = 20) -> list[dict]:
+    return list_runs(config_hash=config_hash, limit=limit)
+
+
+def get_combinations(
+    run_id: str,
+    order_by: str = "oos_sharpe",
+    descending: bool = True,
+    limit: Optional[int] = None,
+    offset: int = 0,
+) -> list[dict]:
+    allowed = {"oos_sharpe", "combo_idx", "return_pct", "n_trades"}
+    col = order_by if order_by in allowed else "oos_sharpe"
+    direction = "DESC" if descending else "ASC"
+    sql = (
+        f"SELECT {', '.join(_COMBO_COLS)} FROM cpcv_combinations "
+        f"WHERE run_id = ? ORDER BY {col} {direction} NULLS LAST"
+    )
+    params: list[Any] = [run_id]
+    if limit is not None:
+        sql += " LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+    return [_row_to_dict(r, _JSON_COMBO_COLS) for r in _query(sql, tuple(params))]
+
+
+def get_trades(
+    run_id: str,
+    combo_idx: Optional[int] = None,
+    ticker: Optional[str] = None,
+    limit: Optional[int] = None,
+    offset: int = 0,
+) -> list[dict]:
+    where = ["run_id = ?"]
+    params: list[Any] = [run_id]
+    if combo_idx is not None:
+        where.append("combo_idx = ?")
+        params.append(combo_idx)
+    if ticker:
+        where.append("ticker = ?")
+        params.append(ticker)
+    sql = (
+        f"SELECT {', '.join(_TRADE_COLS)} FROM cpcv_trades "
+        f"WHERE {' AND '.join(where)} "
+        f"ORDER BY combo_idx ASC, trade_idx ASC"
+    )
+    if limit is not None:
+        sql += " LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+    return [_row_to_dict(r, _JSON_TRADE_COLS) for r in _query(sql, tuple(params))]
+
+
+def get_events(
+    run_id: str,
+    after_id: Optional[int] = None,
+    limit: int = 200,
+) -> list[dict]:
+    where = ["run_id = ?"]
+    params: list[Any] = [run_id]
+    if after_id is not None:
+        where.append("id > ?")
+        params.append(after_id)
+    sql = (
+        f"SELECT {', '.join(_EVENT_COLS)} FROM cpcv_events "
+        f"WHERE {' AND '.join(where)} ORDER BY id ASC LIMIT ?"
+    )
+    params.append(limit)
+    return [_row_to_dict(r, _JSON_EVENT_COLS) for r in _query(sql, tuple(params))]
+
+
+def sweep_stale_runs(max_age_seconds: float = 2 * 3600) -> int:
+    """Mark any run that's been 'running' longer than `max_age_seconds` as failed.
+
+    Returns the number of rows marked. Called by a simple cron/sweeper or on
+    FastAPI startup. Matches the same cutoff used for Supabase (orchestrator
+    is responsible for mirroring the final state when it can).
+    """
+    try:
+        conn = _connect()
+        try:
+            _ensure_schema(conn)
+            cutoff = time.time() - max_age_seconds
+            cur = conn.execute(
+                """
+                UPDATE cpcv_runs
+                   SET status = 'failed',
+                       error = COALESCE(error, 'stale run: no terminal event within timeout'),
+                       finished_at = COALESCE(finished_at, ?),
+                       updated_at = ?
+                 WHERE status = 'running'
+                   AND started_at < ?
+                """,
+                (time.time(), time.time(), cutoff),
+            )
+            conn.commit()
+            return cur.rowcount or 0
+        finally:
+            conn.close()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("sqlite sweep_stale_runs failed: %s", exc)
+        return 0
+
+
 __all__ = [
     "upsert_run",
     "patch_run",
     "insert_combinations_batch",
     "insert_trades_batch",
     "insert_event",
+    "list_runs",
+    "get_run",
+    "find_runs_by_config_hash",
+    "get_combinations",
+    "get_trades",
+    "get_events",
+    "sweep_stale_runs",
 ]

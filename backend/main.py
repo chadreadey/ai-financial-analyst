@@ -79,7 +79,7 @@ app.add_middleware(
 from backend.routers import analysis, reports, config as config_router
 from backend.routers import portfolio, news, industry
 from backend.routers import watchlist, market_data, recommendations
-from backend.routers import backtest, paper_trading
+from backend.routers import backtest, paper_trading, backtest_modal
 
 app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"])
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
@@ -91,6 +91,7 @@ app.include_router(watchlist.router, prefix="/api/watchlist", tags=["watchlist"]
 app.include_router(market_data.router, prefix="/api/market", tags=["market"])
 app.include_router(recommendations.router, prefix="/api/recommendations", tags=["recommendations"])
 app.include_router(backtest.router, prefix="/api/backtest", tags=["backtest"])
+app.include_router(backtest_modal.router, prefix="/api/backtest", tags=["backtest-modal"])
 app.include_router(paper_trading.router, prefix="/api/paper-trading", tags=["paper-trading"])
 
 
