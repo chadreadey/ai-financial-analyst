@@ -121,9 +121,37 @@ def _quarter_key(d: date) -> str:
     return f"{d.year}Q{(d.month - 1) // 3 + 1}"
 
 
-def _pit_safe_date(report_date: date, filing_lag_days: int = 45) -> date:
+# ── Point-in-time guard ───────────────────────────────────────────────
+# 13F filings have a statutory deadline of quarter-end + 45 calendar days
+# (SEC Rule 13F-1). A backtest at as_of_date must therefore NOT consume
+# any quarter-end whose filing window has not yet closed — otherwise it
+# is using data that did not exist on the trade date (look-ahead bias).
+# See `feedback_backtest_discipline` memory rule (no look-ahead).
+FILING_LAG_DAYS = 45
+
+
+def _pit_safe_date(report_date: date, filing_lag_days: int = FILING_LAG_DAYS) -> date:
     """Earliest date this data would be publicly available (point-in-time safe)."""
     return report_date + timedelta(days=filing_lag_days)
+
+
+def _is_pit_safe_quarter(
+    quarter_end_date: date,
+    as_of_date: date,
+    filing_lag_days: int = FILING_LAG_DAYS,
+) -> bool:
+    """
+    Return True iff the 13F filing window for `quarter_end_date` has closed
+    by `as_of_date` and the data may therefore be used at `as_of_date`
+    without look-ahead bias.
+
+    Example: quarter_end = 2025-03-31, filing deadline = 2025-05-15.
+      - as_of_date = 2025-04-01 → False (filings not due yet)
+      - as_of_date = 2025-05-15 → True (deadline reached)
+      - as_of_date = 2025-06-01 → True (well past deadline)
+    """
+    deadline = quarter_end_date + timedelta(days=filing_lag_days)
+    return deadline <= as_of_date
 
 
 # ── Caches ────────────────────────────────────────────────────────────
@@ -381,7 +409,11 @@ def fetch_and_score_institutional_flow(
     fmp_data = _fetch_fmp_data(ticker, fmp_client, fmp_cache)
 
     if fmp_data:
-        quarters = defaultdict(list)
+        # Bucket FMP records by quarter-end date so we can pick the latest
+        # PIT-safe quarter for `current_snapshot` and the next-latest for
+        # `prior_snapshot`.
+        quarters: dict[str, list[dict]] = defaultdict(list)
+        quarter_end_dates: dict[str, date] = {}
         for record in fmp_data:
             rec_date_str = record.get("date", "")
             if not rec_date_str:
@@ -390,38 +422,73 @@ def fetch_and_score_institutional_flow(
                 rec_date = date.fromisoformat(str(rec_date_str)[:10])
             except (ValueError, TypeError):
                 continue
-            if _pit_safe_date(rec_date, filing_lag_days) > as_of_date:
-                continue
             qkey = _quarter_key(rec_date)
             quarters[qkey].append(record)
+            # Track the latest report date seen per bucket (handles records
+            # that may carry slightly different dates within the same quarter)
+            existing = quarter_end_dates.get(qkey)
+            if existing is None or rec_date > existing:
+                quarter_end_dates[qkey] = rec_date
 
-        sorted_quarters = sorted(quarters.keys(), reverse=True)
+        # PIT GUARD: walk quarters newest → oldest and take only those whose
+        # 13F filing deadline (quarter_end + 45d) has elapsed by as_of_date.
+        # Without this guard, a backtest at as_of_date = 2025-04-01 could
+        # consume Q1 2025 data (quarter ends 2025-03-31, due ~2025-05-15)
+        # that did not exist on the trade date. Both `current_snapshot` and
+        # `prior_snapshot` (used for QoQ comparison) must be PIT-safe.
+        pit_safe_quarters: list[str] = [
+            qkey
+            for qkey in sorted(quarters.keys(), reverse=True)
+            if _is_pit_safe_quarter(
+                quarter_end_dates[qkey], as_of_date, filing_lag_days
+            )
+        ]
 
-        if len(sorted_quarters) >= 1:
-            current_snapshot = quarters[sorted_quarters[0]]
+        if len(pit_safe_quarters) >= 1:
+            current_snapshot = quarters[pit_safe_quarters[0]]
             data_source = "fmp"
-        if len(sorted_quarters) >= 2:
-            prior_snapshot = quarters[sorted_quarters[1]]
+        if len(pit_safe_quarters) >= 2:
+            prior_snapshot = quarters[pit_safe_quarters[1]]
 
     # --- Fallback: Finnhub enrichment ---
     finnhub_meta = {}
     fh_data = _fetch_finnhub_data(ticker, finnhub_client, finnhub_disk_cache)
 
-    if fh_data:
+    # PIT GUARD for Finnhub: each row carries a `filingDate` — a row only
+    # becomes public on its filingDate, so any row with filingDate > as_of_date
+    # would not have existed at the trade date. Filter those out before use.
+    # If a row has no filingDate, conservatively keep it only when its enclosing
+    # quarter (inferred via the 45-day rule from `today`'s prior quarter-end)
+    # is past — i.e. drop rows that lack a verifiable filing date but whose
+    # implicit quarter cannot be confirmed PIT-safe.
+    pit_safe_fh_data: list[dict] = []
+    for h in fh_data or []:
+        filing_str = h.get("filingDate") or h.get("filing_date") or ""
+        if filing_str:
+            try:
+                filing_d = date.fromisoformat(str(filing_str)[:10])
+            except (ValueError, TypeError):
+                # Unparseable filing date → drop (cannot verify PIT-safety)
+                continue
+            if filing_d <= as_of_date:
+                pit_safe_fh_data.append(h)
+        # Rows with no filingDate are dropped — we cannot confirm PIT safety.
+
+    if pit_safe_fh_data:
         finnhub_meta = {
-            "finnhub_n_holders": len(fh_data),
-            "finnhub_total_shares": sum(h.get("share", 0) for h in fh_data),
+            "finnhub_n_holders": len(pit_safe_fh_data),
+            "finnhub_total_shares": sum(h.get("share", 0) for h in pit_safe_fh_data),
         }
         if data_source == "fmp":
             data_source = "both"
-        elif not current_snapshot and len(fh_data) >= MIN_INSTITUTIONS:
+        elif not current_snapshot and len(pit_safe_fh_data) >= MIN_INSTITUTIONS:
             current_snapshot = [
                 {
                     "investorName": h.get("name", ""),
                     "sharesNumber": h.get("share", 0),
                     "sharesNumberChange": h.get("change", 0),
                 }
-                for h in fh_data
+                for h in pit_safe_fh_data
             ]
             data_source = "finnhub"
 
