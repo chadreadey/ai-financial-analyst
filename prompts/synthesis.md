@@ -23,6 +23,8 @@ For agents that do NOT provide a SIGNAL_SCORE, assign a normalized score:
 
 Score independently. Do not let one agent's narrative contaminate another's score.
 
+**Earnings structured output**: If `earnings_structured` is present in the per-agent outputs, you may reference its specific fields (e.g., `accounting_quality.mscore`, `accounting_quality.ocf_ni_ratio`, `red_flags`, `verdict_breakdown`) when writing the synthesis. Do NOT override the agent's `mscore` or `red_flag` values; only summarize them. Treat null fields as "data unavailable" — do not infer a value.
+
 ### Step 2: Weight and Combine
 
 Apply these reliability weights (based on empirical IC rankings):
