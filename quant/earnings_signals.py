@@ -23,6 +23,71 @@ from quant.scoring import reclassify
 logger = logging.getLogger(__name__)
 
 
+# ─────────────────────────────────────────────────────────────────────────
+# IC-weighted earnings sub-blend (audit session 2)
+# ─────────────────────────────────────────────────────────────────────────
+#
+# Source IC numbers: docs/audit/session-2/ic-summary.md
+# (194-ticker WRDS ∩ price-cache universe, 2015-2024, walk-forward).
+#
+# Per-horizon mean Spearman IC for each sub-signal:
+#                  1M       3M       6M       12M     3M t-stat   verdict
+#   ERM         +0.0277  +0.0325  +0.0518  +0.0344    +3.30   SIGNIFICANT all 4
+#   SUE         +0.0218  +0.0170  +0.0185  +0.0120    +1.35   marginal at 1M
+#   Dispersion  -0.0032  -0.0134  -0.0245  -0.0375    -0.83   NO_SIGNAL/wrong-sign
+#
+# Methodology:
+#   1. Use the **multi-horizon mean IC over 1M/3M/6M only** (skip 12M).
+#      Rationale: at 12M both Piotroski and analyst_dispersion flip sign,
+#      indicating horizon-specific noise / regime contamination — see audit
+#      doc, "12M horizon" section. Including 12M would penalize signals
+#      for noise unrelated to their cross-sectional information content.
+#         ERM:  mean over 1M/3M/6M = +0.03733
+#         SUE:  mean over 1M/3M/6M = +0.01910
+#         DISP: mean over 1M/3M/6M = -0.01370
+#
+#   2. Zero out signals whose |3M t-stat| < 1.0. Dispersion (-0.83) is
+#      zeroed; SUE (+1.35) is RIGHT-direction at every horizon and is kept
+#      with a reduced weight. (The audit's stricter |t|≥1.5 "marginal"
+#      threshold would zero SUE too — we use the looser bar so the blend
+#      preserves the second-most-informative signal rather than collapsing
+#      to a single-signal portfolio.)
+#
+#   3. Apply 50% shrinkage toward equal weight (canonical for small-sample
+#      IC estimates):
+#         w_i = 0.5 * (IC_i / sum |IC_j|) + 0.5 * (1 / N_kept)
+#      computed across the kept signals (N_kept = 2 here: ERM, SUE).
+#         ERM_raw = 0.5 * (0.03733/0.05643) + 0.5 * 0.5 = 0.5808
+#         SUE_raw = 0.5 * (0.01910/0.05643) + 0.5 * 0.5 = 0.4192
+#
+#   4. Reserve a 5% TOKEN weight for analyst_dispersion. We do NOT delete
+#      dispersion — per user direction the code path stays live so:
+#        (a) the cross-sectional pipeline doesn't break,
+#        (b) the signal can be promoted again if a regime shift makes it
+#            useful, and
+#        (c) divergence between dispersion and ERM/SUE may itself become
+#            a signal in Session 3.
+#      The 0.95/0.05 reweight on the kept-signals block:
+#         ERM_final = 0.5808 * 0.95 = 0.5517
+#         SUE_final = 0.4192 * 0.95 = 0.3983
+#         DISP_final =                0.0500
+#
+# Comparison vs prior hand-tuned weights:
+#     name                  prior   new      delta
+#     erm_weight             0.40   0.5517   +0.15
+#     sue_weight             0.35   0.3983   +0.05
+#     dispersion_weight      0.25   0.0500   -0.20
+#
+# Net effect: weight reallocates AWAY from analyst_dispersion (which has
+# wrong-sign IC at every horizon and t=-0.83 at 3M) and INTO ERM (+3.30 t,
+# strongest signal in the entire fundamental stack at 3M).
+EARNINGS_BLEND_WEIGHTS: dict[str, float] = {
+    "erm": 0.5517,
+    "sue": 0.3983,
+    "analyst_dispersion": 0.0500,
+}
+
+
 def compute_erm_score(
     ticker: str,
     provider,
@@ -263,12 +328,16 @@ def compute_earnings_signal_scores(
     tickers: list[str],
     provider,
     as_of_date: Optional[date] = None,
-    erm_weight: float = 0.40,
-    sue_weight: float = 0.35,
-    dispersion_weight: float = 0.25,
+    erm_weight: float = EARNINGS_BLEND_WEIGHTS["erm"],
+    sue_weight: float = EARNINGS_BLEND_WEIGHTS["sue"],
+    dispersion_weight: float = EARNINGS_BLEND_WEIGHTS["analyst_dispersion"],
 ) -> dict[str, tuple[float, int, dict]]:
     """
     Compute combined earnings signal for each ticker.
+
+    Default weights are IC-derived (audit session 2). See the
+    EARNINGS_BLEND_WEIGHTS docstring at the top of this module for the
+    full derivation.
 
     Returns {ticker: (combined_score, n_signals, metadata)}.
     """
