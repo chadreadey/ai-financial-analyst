@@ -75,7 +75,7 @@ export function CandidatePipeline() {
         max_synthesis_output_tokens: s.max_synthesis_output_tokens,
       });
       navigate(`/deepdive/${c.ticker}?source=portfolio&job_id=${job.job_id}`);
-    } catch (err) {
+    } catch {
       // Navigate anyway — the deep dive page can show prior history
       navigate(`/deepdive/${c.ticker}?source=portfolio`);
     } finally {
