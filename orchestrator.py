@@ -88,6 +88,46 @@ def _extract_structured_block(synthesis_text: str) -> Tuple[Optional[dict], str]
     return data, prose
 
 
+def _extract_earnings_structured(agent_text: str) -> Optional[dict]:
+    """
+    Extract the earnings agent's structured D-mode JSON block.
+
+    The earnings prompt requires a fenced JSON block (per ``prompts/earnings.md``)
+    containing ``accounting_quality``, ``earnings_trajectory``, ``red_flags``,
+    and ``verdict_breakdown``. This helper scans every fenced JSON block in the
+    output and returns the first one whose top-level keys look like the earnings
+    schema. Returns ``None`` if no matching block can be parsed.
+    """
+    if not agent_text:
+        return None
+
+    expected_keys = {
+        "accounting_quality",
+        "earnings_trajectory",
+        "red_flags",
+        "verdict_breakdown",
+    }
+
+    patterns = [
+        r"```json\s*\n(\{.*?\})\s*\n```",
+        r"```\s*\n(\{.*?\})\s*\n```",
+    ]
+    for pattern in patterns:
+        for match in re.finditer(pattern, agent_text, re.DOTALL):
+            raw = match.group(1).strip()
+            try:
+                data = json.loads(raw)
+            except (json.JSONDecodeError, ValueError):
+                sanitized = re.sub(r",\s*([}\]])", r"\1", raw)
+                try:
+                    data = json.loads(sanitized)
+                except (json.JSONDecodeError, ValueError):
+                    continue
+            if isinstance(data, dict) and expected_keys & set(data.keys()):
+                return data
+    return None
+
+
 SYNTHESIS_PROMPT_FILE = Path("prompts/synthesis.md")
 
 SECTOR_SPECIALIST_MAP: dict[str, str] = {
@@ -576,7 +616,17 @@ class Orchestrator:
         logger.info("  %s complete", agent.name)
         if progress_callback:
             progress_callback(f"Agent complete: {agent.name}", None)
-        return AgentReport(agent_name=agent.name, analysis=result)
+
+        structured: Optional[dict] = None
+        if isinstance(agent, EarningsAgent):
+            structured = _extract_earnings_structured(result)
+            if structured is None:
+                logger.warning(
+                    "Earnings agent did not emit parseable structured JSON for %s",
+                    data.ticker,
+                )
+
+        return AgentReport(agent_name=agent.name, analysis=result, structured=structured)
 
     async def run_phase1(
         self,
@@ -727,6 +777,13 @@ class Orchestrator:
                 progress_callback("All analyst waves completed", 68)
         else:
             agent_reports = await self.run_phase1(data, progress_callback=progress_callback)
+
+        # Collect the earnings agent's structured D-mode JSON (parsed in _run_agent).
+        earnings_structured: Optional[dict] = None
+        for report in agent_reports:
+            if report.agent_name == EarningsAgent.name and report.structured:
+                earnings_structured = report.structured
+                break
 
         raw_synthesis = await self.run_phase2(
             data.ticker,
@@ -885,6 +942,7 @@ class Orchestrator:
                         "agent_reports": [r.model_dump() for r in agent_reports],
                         "synthesis": synthesis,
                         "structured_verdict": structured,
+                        "earnings_structured": earnings_structured,
                         "metrics": data.metrics,
                         "enrichment_warnings": data.enrichment_warnings,
                         "enrichment_sources": data.enrichment_sources,
@@ -920,6 +978,7 @@ class Orchestrator:
             agent_reports=agent_reports,
             synthesis=synthesis,
             structured_verdict=structured,
+            earnings_structured=earnings_structured,
             metrics=data.metrics,
             enrichment_warnings=data.enrichment_warnings,
             enrichment_sources=data.enrichment_sources,

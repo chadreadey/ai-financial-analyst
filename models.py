@@ -45,6 +45,7 @@ class AnalysisData(BaseModel):
 class AgentReport(BaseModel):
     agent_name: str
     analysis: str
+    structured: Optional[dict[str, Any]] = None
 
 
 class AnalysisResult(BaseModel):
@@ -55,6 +56,7 @@ class AnalysisResult(BaseModel):
     agent_reports: list[AgentReport]
     synthesis: str
     structured_verdict: Optional[dict[str, Any]] = None
+    earnings_structured: Optional[dict[str, Any]] = None
     metrics: dict[str, Any] = Field(default_factory=dict)
     enrichment_warnings: list[str] = Field(default_factory=list)
     enrichment_sources: list[str] = Field(default_factory=list)
