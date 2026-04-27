@@ -209,6 +209,139 @@ async def get_trade_history():
     return {"trades": trades, "equity_curve": curve}
 
 
+@router.get("/positions-with-verdicts")
+async def get_positions_with_verdicts():
+    """
+    Join open paper positions with the latest agent verdict from analysis_history.
+
+    Used by the Portfolio Overview dashboard. In-process join over already-stored
+    data — no new tables, no async streaming.
+    """
+    from datetime import datetime
+
+    _ensure_tables()
+    conn = sqlite3.connect(_db_path())
+    conn.row_factory = sqlite3.Row
+    pos_rows = conn.execute("SELECT * FROM paper_positions").fetchall()
+
+    # Pull every analysis row once and pick the most recent per ticker.
+    # Cheaper than N round-trips and fine for paper trading position counts.
+    latest_by_ticker: dict[str, sqlite3.Row] = {}
+    try:
+        history_rows = conn.execute(
+            "SELECT analysis_id, ticker, run_at, verdict, conviction, "
+            "composite_score, price_target "
+            "FROM analysis_history ORDER BY run_at DESC"
+        ).fetchall()
+        for r in history_rows:
+            t = r["ticker"]
+            if t not in latest_by_ticker:
+                latest_by_ticker[t] = r
+    except sqlite3.OperationalError:
+        pass
+    conn.close()
+
+    now_ts = time.time()
+    positions = []
+    total_unrealized_pnl_pct_weighted = 0.0
+    total_equity = 0.0
+
+    for r in pos_rows:
+        ticker = r["ticker"]
+        entry = r["entry_price"]
+        direction = r["direction"] if "direction" in r.keys() else "LONG"
+        current = _fetch_current_price(ticker)
+
+        if current and entry:
+            if direction == "SHORT":
+                unrealized = round((entry - current) / entry * 100, 2)
+            else:
+                unrealized = round((current - entry) / entry * 100, 2)
+        else:
+            unrealized = None
+
+        days_held = 0
+        if r["entry_date"]:
+            try:
+                days_held = (datetime.now() - datetime.strptime(r["entry_date"], "%Y-%m-%d")).days
+            except Exception:
+                pass
+
+        # Latest verdict join
+        latest_verdict = None
+        hist = latest_by_ticker.get(ticker)
+        if hist is not None:
+            run_at = float(hist["run_at"] or 0)
+            days_stale: Optional[int] = None
+            as_of_iso = ""
+            if run_at > 0:
+                try:
+                    days_stale = max(0, int((now_ts - run_at) // 86400))
+                    as_of_iso = datetime.utcfromtimestamp(run_at).strftime("%Y-%m-%dT%H:%M:%SZ")
+                except Exception:
+                    days_stale = None
+            target = hist["price_target"] if "price_target" in hist.keys() else None
+            implied_upside_pct: Optional[float] = None
+            if target and current and current > 0:
+                try:
+                    implied_upside_pct = round((float(target) - float(current)) / float(current) * 100, 2)
+                except Exception:
+                    implied_upside_pct = None
+            latest_verdict = {
+                "analysis_id": hist["analysis_id"] or "",
+                "verdict": hist["verdict"] or "",
+                "conviction": hist["conviction"] or "",
+                "composite_score": hist["composite_score"],
+                "price_target": target,
+                "implied_upside_pct": implied_upside_pct,
+                "as_of": as_of_iso,
+                "run_at": run_at,
+                "days_stale": days_stale,
+            }
+
+        # Naive "weight by entry value" totals — Alpaca account is the truth,
+        # but we surface a quick summary even when Alpaca is offline.
+        if entry:
+            total_equity += float(entry)
+            if unrealized is not None:
+                total_unrealized_pnl_pct_weighted += float(entry) * unrealized
+
+        positions.append({
+            "ticker": ticker,
+            "entry_price": entry,
+            "entry_date": r["entry_date"] or "",
+            "current_price": current,
+            "entry_verdict": r["verdict"] or "",
+            "exit_conditions": r["exit_conditions"] or "",
+            "direction": direction,
+            "conviction_score": r["conviction_score"] if "conviction_score" in r.keys() else None,
+            "unrealized_pnl_pct": unrealized,
+            "days_held": days_held,
+            "latest_verdict": latest_verdict,
+        })
+
+    avg_unrealized_pnl_pct: Optional[float] = None
+    if total_equity > 0:
+        avg_unrealized_pnl_pct = round(total_unrealized_pnl_pct_weighted / total_equity, 2)
+
+    stale_count = sum(
+        1
+        for p in positions
+        if p["latest_verdict"] is None
+        or (p["latest_verdict"].get("days_stale") is not None and p["latest_verdict"]["days_stale"] > 7)
+    )
+
+    return {
+        "positions": positions,
+        "totals": {
+            "total_positions": len(positions),
+            "total_equity_at_entry": round(total_equity, 2),
+            "avg_unrealized_pnl_pct": avg_unrealized_pnl_pct,
+            "stale_count": stale_count,
+        },
+    }
+
+
 @router.get("/metrics")
 async def get_metrics():
     _ensure_tables()
