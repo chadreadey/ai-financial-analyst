@@ -157,4 +157,9 @@ export const api = {
 
   getPortfolioOverview: () =>
     request<import("./types").PortfolioOverviewResponse>("/api/paper-trading/positions-with-verdicts"),
+
+  getPortfolioCandidates: (limit: number = 20) =>
+    request<import("./types").PortfolioCandidatesResponse>(
+      `/api/portfolio/candidates?limit=${limit}`
+    ),
 };

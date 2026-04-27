@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { PaperMetricsPanel } from "../components/paper-trading/PaperMetricsPanel";
 import { PositionsWithVerdictsTable } from "../components/paper-trading/PositionsWithVerdictsTable";
 import { PortfolioOverviewStrip } from "../components/paper-trading/PortfolioOverviewStrip";
+import { CandidatePipeline } from "../components/paper-trading/CandidatePipeline";
 import { ClosedTradesTable } from "../components/paper-trading/ClosedTradesTable";
 import { AccountPanel } from "../components/paper-trading/AccountPanel";
 import { OrderHistoryTable } from "../components/paper-trading/OrderHistoryTable";
@@ -139,13 +140,20 @@ export function PaperTradingPage() {
         </Card>
       )}
 
-      {/* Positions with current agent verdicts */}
-      <Card className="p-0 overflow-hidden">
-        <PositionsWithVerdictsTable
-          positions={overview.positions}
-          onClose={handleClosePosition}
-        />
-      </Card>
+      {/* Main grid: positions+verdicts (left), candidate pipeline (right) */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="xl:col-span-2">
+          <Card className="p-0 overflow-hidden">
+            <PositionsWithVerdictsTable
+              positions={overview.positions}
+              onClose={handleClosePosition}
+            />
+          </Card>
+        </div>
+        <div>
+          <CandidatePipeline />
+        </div>
+      </div>
 
       {/* Closed trades */}
       <Card className="p-0 overflow-hidden">

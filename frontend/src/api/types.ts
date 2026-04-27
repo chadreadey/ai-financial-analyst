@@ -262,3 +262,24 @@ export interface PortfolioOverviewResponse {
   positions: PositionWithVerdict[];
   totals: PortfolioOverviewTotals;
 }
+
+export interface CandidateSignal {
+  name: string;
+  score: number;
+}
+
+export interface PortfolioCandidate {
+  ticker: string;
+  composite_score: number;
+  composite_direction: string;
+  actionable: boolean;
+  top_signals: CandidateSignal[];
+  cached_at: string;
+}
+
+export interface PortfolioCandidatesResponse {
+  candidates: PortfolioCandidate[];
+  cached_at: string;
+  universe: string;
+  errors: string[];
+}
