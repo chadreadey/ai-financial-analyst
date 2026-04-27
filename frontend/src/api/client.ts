@@ -154,4 +154,7 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(tickers ? { tickers } : {}),
     }),
+
+  getPortfolioOverview: () =>
+    request<import("./types").PortfolioOverviewResponse>("/api/paper-trading/positions-with-verdicts"),
 };

@@ -3,29 +3,38 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PaperMetricsPanel } from "../components/paper-trading/PaperMetricsPanel";
-import { OpenPositionsTable } from "../components/paper-trading/OpenPositionsTable";
+import { PositionsWithVerdictsTable } from "../components/paper-trading/PositionsWithVerdictsTable";
+import { PortfolioOverviewStrip } from "../components/paper-trading/PortfolioOverviewStrip";
 import { ClosedTradesTable } from "../components/paper-trading/ClosedTradesTable";
 import { AccountPanel } from "../components/paper-trading/AccountPanel";
 import { OrderHistoryTable } from "../components/paper-trading/OrderHistoryTable";
 import { EquityCurveChart } from "../components/charts/EquityCurveChart";
 import { usePaperTrading } from "../hooks/usePaperTrading";
+import { usePortfolioOverview } from "../hooks/usePortfolioOverview";
 import { Plus, X, RefreshCw } from "lucide-react";
 
 export function PaperTradingPage() {
-  const { openPositions, closedTrades, equityCurve, metrics, account, orders, isLoading, isRebalancing, addPosition, closePosition, triggerRebalance } = usePaperTrading();
+  const { closedTrades, equityCurve, metrics, account, orders, isLoading, isRebalancing, addPosition, closePosition, triggerRebalance } = usePaperTrading();
+  const overview = usePortfolioOverview();
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ ticker: "", entry_price: "", verdict: "BUY" });
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     const price = parseFloat(form.entry_price);
     if (!form.ticker.trim() || isNaN(price)) return;
-    addPosition({
+    await addPosition({
       ticker: form.ticker.toUpperCase(),
       entry_price: price,
       verdict: form.verdict,
     });
+    overview.refresh();
     setForm({ ticker: "", entry_price: "", verdict: "BUY" });
     setShowAdd(false);
+  };
+
+  const handleClosePosition = async (ticker: string, exitPrice: number, reason: string) => {
+    await closePosition(ticker, exitPrice, reason);
+    overview.refresh();
   };
 
   if (isLoading) {
@@ -106,6 +115,16 @@ export function PaperTradingPage() {
         </Card>
       )}
 
+      {/* Portfolio overview strip — live verdict counts */}
+      <PortfolioOverviewStrip totals={overview.totals} />
+      {overview.error && (
+        <Card className="p-3 border-[--negative]/30">
+          <div className="text-xs text-[--negative]">
+            Failed to load portfolio overview: {overview.error}
+          </div>
+        </Card>
+      )}
+
       {/* Alpaca account */}
       <AccountPanel account={account} />
 
@@ -120,15 +139,18 @@ export function PaperTradingPage() {
         </Card>
       )}
 
-      {/* Tables */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <Card className="p-0 overflow-hidden">
-          <OpenPositionsTable positions={openPositions} onClose={closePosition} />
-        </Card>
-        <Card className="p-0 overflow-hidden">
-          <ClosedTradesTable trades={closedTrades} />
-        </Card>
-      </div>
+      {/* Positions with current agent verdicts */}
+      <Card className="p-0 overflow-hidden">
+        <PositionsWithVerdictsTable
+          positions={overview.positions}
+          onClose={handleClosePosition}
+        />
+      </Card>
+
+      {/* Closed trades */}
+      <Card className="p-0 overflow-hidden">
+        <ClosedTradesTable trades={closedTrades} />
+      </Card>
 
       {/* Alpaca order history */}
       {orders.length > 0 && (
