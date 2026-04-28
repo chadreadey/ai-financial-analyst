@@ -52,7 +52,17 @@ class BacktestConfig:
     ic_trailing_periods: int = 12            # trailing rebalance periods for IC computation
     ic_shrinkage: float = 0.90              # shrinkage toward equal weights (0=pure IC, 1=equal)
     max_long_positions: int = 10
-    max_short_positions: int = 10
+    # AUDIT 2026-04-28 (Session 4 long-only ship): default flipped 10 → 0.
+    # Walk-forward on the 495-ticker WRDS-∩-price-cache universe showed
+    # max_short_positions=0 dominates max_short_positions=10 across every
+    # metric (Sharpe 1.30 → 1.41, Sortino 1.79 → 1.97, alpha tied, MaxDD
+    # tighter) and across 6 of 8 years including bear 2022. The short
+    # side is net-negative in this composite architecture on this universe.
+    # Long-only with cash buffer is the production stance until a separate,
+    # better-suited short universe is sourced.
+    # See docs/audit/session-3/v4-qmj-long-only-results.json and the
+    # project_short_universe_direction memory for context.
+    max_short_positions: int = 0
     transaction_cost_bps: float = 10.0       # 10bps round-trip
     execution_delay_days: int = 1            # no same-day fills
     stop_loss_atr_mult: float = 2.0          # stop at 2x ATR
