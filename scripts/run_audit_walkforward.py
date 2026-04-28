@@ -116,6 +116,68 @@ EARNINGS_WEIGHT_CONFIGS: dict[str, dict[str, float]] = {
 }
 
 
+# ── Session 3 composite-level reweight configs ──────────────────────────
+#
+# v3-* configs override the entire DEFAULT_COMPOSITE_WEIGHTS dict (post the
+# 2026-04-28 production change that zeroed insider_score). These test
+# "does an aggressive composite-level reweight produce better aggregate
+# alpha than the current production weights?" + investigate the bull-year
+# drag observed in the v0/v2/v2-no-insider results.
+#
+# All v3 configs use the v2 (IC-derived) earnings sub-blend for the
+# earnings_rank_score component.
+COMPOSITE_WEIGHT_CONFIGS: dict[str, dict[str, float]] = {
+    # v3-IC-tilted: aggressively up-weight the IC-measured signals
+    # (earnings_rank, quality_score) and down-weight unmeasured ones
+    # (sentiment, regression, arima). Insider stays at 0.
+    "v3-ic-tilted": {
+        "obv_trend": 0.15,
+        "earnings_rank_score": 0.40,        # boosted — ERM/SUE both significant
+        "institutional_flow_score": 0.10,   # no measured IC; retained at moderate
+        "sentiment_score": 0.025,           # no measured IC; reduced
+        "sector_momentum_score": 0.0,       # already 0
+        "quality_score": 0.25,              # boosted — significant at 1M
+        "price_momentum_score": 0.05,       # near-zero IC; reduced
+        "insider_score": 0.0,               # wrong-sign IC (RISK-2)
+        "event_timing_score": 0.0,          # already 0
+        "price_regression_score": 0.025,    # no IC; very sparse
+        "arima_forecast_score": 0.0,        # no IC; very sparse
+    },
+    # v3-no-noise: zero out the unmeasured signals (sentiment, regression,
+    # arima) and redistribute their weight proportionally to the others.
+    # Tests the "noise signals are dragging in bull years" hypothesis.
+    "v3-no-noise": {
+        "obv_trend": 0.214,                 # 0.1667 / 0.778
+        "earnings_rank_score": 0.286,       # 0.2222 / 0.778
+        "institutional_flow_score": 0.143,  # 0.1111 / 0.778
+        "sentiment_score": 0.0,             # ZEROED
+        "sector_momentum_score": 0.0,
+        "quality_score": 0.214,             # 0.1667 / 0.778
+        "price_momentum_score": 0.143,      # 0.1111 / 0.778
+        "insider_score": 0.0,
+        "event_timing_score": 0.0,
+        "price_regression_score": 0.0,      # ZEROED
+        "arima_forecast_score": 0.0,        # ZEROED
+    },
+    # v3-fundamental-stack: most extreme — only signals with measured
+    # significant IC plus institutional. Tests "is the bull-year drag
+    # inherent to fundamental signals or caused by the noise pad?"
+    "v3-fundamental-stack": {
+        "obv_trend": 0.20,
+        "earnings_rank_score": 0.40,
+        "institutional_flow_score": 0.10,
+        "sentiment_score": 0.0,
+        "sector_momentum_score": 0.0,
+        "quality_score": 0.30,
+        "price_momentum_score": 0.0,        # ZEROED — near-zero IC
+        "insider_score": 0.0,
+        "event_timing_score": 0.0,
+        "price_regression_score": 0.0,
+        "arima_forecast_score": 0.0,
+    },
+}
+
+
 def progress(msg: str) -> None:
     print(f"  [{datetime.now().strftime('%H:%M:%S')}] {msg}")
 
@@ -392,6 +454,39 @@ def run_bonus_zero_insider(cfg: BacktestConfig) -> dict:
     return out
 
 
+def run_with_composite_weights(
+    name: str,
+    weights: dict[str, float],
+    cfg: BacktestConfig,
+) -> dict:
+    """
+    Run with a custom DEFAULT_COMPOSITE_WEIGHTS override.
+
+    Mutates the module-level dict in process, runs, then restores. Used by
+    Session 3 v3-* composite reweight configs.
+    """
+    orig = dict(cs.DEFAULT_COMPOSITE_WEIGHTS)
+    new = dict(orig)
+    # Apply overrides; any key present in weights replaces the production value
+    for k, v in weights.items():
+        new[k] = float(v)
+
+    print()
+    print(f"  [composite] DEFAULT_COMPOSITE_WEIGHTS overridden for {name}:")
+    for k in sorted(set(orig) | set(new)):
+        if new.get(k, 0.0) > 0 or orig.get(k, 0.0) > 0:
+            mark = "*" if abs(new.get(k, 0.0) - orig.get(k, 0.0)) > 1e-9 else " "
+            print(f"     {mark} {k:30s}  {orig.get(k, 0.0):.4f}  ->  {new.get(k, 0.0):.4f}")
+
+    cs.DEFAULT_COMPOSITE_WEIGHTS = new
+    try:
+        out = run_one_config(name, cfg)
+        out["composite_weights_used"] = new
+    finally:
+        cs.DEFAULT_COMPOSITE_WEIGHTS = orig
+    return out
+
+
 # ── Markdown report ──────────────────────────────────────────────────────
 
 def _fmt(v, fmt: str = "{:+.2f}") -> str:
@@ -635,6 +730,11 @@ def main() -> None:
         "--bonus", action="store_true",
         help="If both v0 and v2 succeed, also run v2 with insider_mspr zeroed in DEFAULT_COMPOSITE_WEIGHTS.",
     )
+    parser.add_argument(
+        "--composite-config", choices=list(COMPOSITE_WEIGHT_CONFIGS.keys()), default="",
+        help="Run a single Session 3 v3-* composite-reweight config with v2 earnings weights "
+             "(overrides --config and --bonus when set). Each config writes its own output files.",
+    )
     parser.add_argument("--output-md", default="", help="Override markdown output path")
     parser.add_argument("--output-json", default="", help="Override JSON output path")
     parser.add_argument("--verbose", "-v", action="store_true")
@@ -665,10 +765,52 @@ def main() -> None:
     print("*" * 70)
     print(f"  Universe: {len(tickers)} tickers ({universe_strategy})")
     print(f"  Window:   {args.start} → {args.end}")
-    print(f"  Configs:  {args.config}")
+    print(f"  Configs:  {args.config}{' + composite=' + args.composite_config if args.composite_config else ''}")
     print(f"  WF:       train={args.train_months}m / test={args.test_months}m")
     print(f"  Bonus:    {'YES' if args.bonus else 'no'}")
     print("*" * 70)
+
+    # ── Session 3 single-config composite-override mode ─────────────────
+    if args.composite_config:
+        cc_name = args.composite_config
+        cc_weights = COMPOSITE_WEIGHT_CONFIGS[cc_name]
+        # Use v2 earnings sub-blend (current production)
+        weights = EARNINGS_WEIGHT_CONFIGS["v2"]
+        cfg = build_config(
+            tickers=tickers,
+            start_date=args.start,
+            end_date=args.end,
+            earnings_weights=weights,
+            train_months=args.train_months,
+            test_months=args.test_months,
+        )
+        try:
+            summary = run_with_composite_weights(cc_name, cc_weights, cfg)
+        except Exception as exc:
+            logger.exception("Composite config %s FAILED", cc_name)
+            summary = {
+                "name": cc_name, "status": "error",
+                "error": f"{type(exc).__name__}: {exc}",
+                "config": {"start_date": cfg.start_date, "end_date": cfg.end_date,
+                           "n_tickers": len(cfg.tickers)},
+                "metrics": {}, "yearly": [], "n_windows": 0,
+            }
+        payload = {
+            "generated_at": datetime.utcnow().isoformat() + "Z",
+            "universe_size": len(tickers),
+            "universe_strategy": universe_strategy,
+            "window": {"start": args.start, "end": args.end},
+            "composite_config": cc_name,
+            "composite_weights": cc_weights,
+            "earnings_weights": weights,
+            "runs": [summary],
+        }
+        json_path.write_text(json.dumps(payload, indent=2, default=str))
+        # Skip the markdown report for single-config runs — synthesizer will
+        # combine the JSON outputs from all v3-* runs into one report.
+        print()
+        print(f"  Single-config run done. JSON: {json_path}")
+        return
 
     runs: list[dict] = []
 
