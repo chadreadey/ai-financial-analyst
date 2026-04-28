@@ -88,21 +88,36 @@ SIGNAL_FIELDS = [
     ("arima_forecast_score", None),
 ]
 
-# 8 signal fields (7 active + sector_momentum zeroed).
+# 7 active + 3 zeroed signal fields.
 # Event timing (PEAD) is orthogonal — captures post-earnings drift,
 # which is distinct from earnings revision momentum (ERM).
+#
+# AUDIT 2026-04-28: insider_score zeroed out. Audit Session 2 found the
+# Finnhub MSPR signal carries SIG_WRONG_SIGN IC at every horizon (1M
+# t=-2.06 ... 12M t=-3.97) on the 495-ticker WRDS panel, even after
+# the [-100,+100]→[-1,+1] scaling fix in `quant/sentiment.py` (commit
+# c489d9c). Walk-forward comparison on the 200-ticker universe showed
+# zeroing insider_score and redistributing its 10% proportionally
+# improved annualized return by +1.10pp (8.07% → 9.17%) and Sharpe
+# by +0.03 (0.97 → 1.00). The weight stays in the schema (not deleted)
+# in case a fixed insider construction is wired in later. See
+# `docs/audit/session-2/walkforward-comparison.md` and the
+# `project_insider_mspr_bug` memory for full context.
+#
+# The 0.10 weight is redistributed proportionally across the remaining
+# non-zero signals (each scaled by 1/0.90 ≈ 1.1111).
 DEFAULT_COMPOSITE_WEIGHTS = {
-    "obv_trend": 0.15,
-    "earnings_rank_score": 0.20,
-    "institutional_flow_score": 0.10,
-    "sentiment_score": 0.05,
+    "obv_trend": 0.1667,
+    "earnings_rank_score": 0.2222,
+    "institutional_flow_score": 0.1111,
+    "sentiment_score": 0.0556,
     "sector_momentum_score": 0.00,
-    "quality_score": 0.15,
-    "price_momentum_score": 0.10,
-    "insider_score": 0.10,
-    "event_timing_score": 0.00,  # PEAD data is sparse — distorts cross-sectional normalization. Better as a post-ranking filter than a composite signal.
-    "price_regression_score": 0.10,  # R²-filtered OLS trend (sparse — 0.0 when R² < 0.6)
-    "arima_forecast_score": 0.05,    # ARIMA forecast (0.0 in high-vol regimes)
+    "quality_score": 0.1667,
+    "price_momentum_score": 0.1111,
+    "insider_score": 0.00,           # zeroed 2026-04-28 — wrong-sign IC at every horizon
+    "event_timing_score": 0.00,      # PEAD data is sparse — distorts cross-sectional normalization
+    "price_regression_score": 0.1111,
+    "arima_forecast_score": 0.0556,
 }
 
 
