@@ -123,6 +123,12 @@ class BacktestConfig:
     conviction_sizing: float = 0.0        # 0=equal weight, 1=fully score-proportional sizing
     enable_agent_veto: bool = False       # Path C: quantified agent veto on candidates
     agent_veto_min_flags: int = 2         # minimum veto signals to remove a candidate (2 of 3)
+    # Short-side fundamental-strength veto (audit Session 4 — bull-year drag)
+    enable_short_fundamental_veto: bool = False  # remove shorts with strong fundamentals
+    short_veto_min_strong_signals: int = 1       # min strength flags to skip a short (1 of 3)
+    short_veto_erm_threshold: float = 0.20       # ERM (analyst upgrade) threshold
+    short_veto_quality_threshold: float = 0.30   # cross-sectional quality z threshold
+    short_veto_sue_threshold: float = 0.50       # earnings-surprise (SUE/3) threshold
     # Kalshi event prediction signals
     enable_kalshi_signal: bool = False          # Master switch for all Kalshi signals
     kalshi_macro_weight: float = 0.10           # Weight of macro modifier in composite
@@ -1530,6 +1536,33 @@ def build_target_portfolio(
                 continue
         shorts.append((t, sc, sv))
     shorts = shorts[-config.max_short_positions:]  # worst scores
+
+    # Fundamental-strength short veto: skip shorts on fundamentally strong
+    # names (positive ERM, high cross-sectional quality, or positive SUE).
+    # Addresses the bull-year drag identified in audit Session 3 — the
+    # 5 bearish technical signals (SMA/MR/BB/RSI/OBV) carry no fundamental
+    # quality screen, so we end up shorting NVDA-2022 type names that
+    # rebound aggressively.
+    if (
+        config.enable_short_fundamental_veto
+        and _wrds_provider is not None
+        and shorts
+    ):
+        from quant.agent_veto import apply_short_fundamental_veto
+        shorts, _short_veto_log = apply_short_fundamental_veto(
+            shorts,
+            _wrds_provider,
+            as_of_date=as_of_date.date() if hasattr(as_of_date, 'date') else as_of_date,
+            min_strong_signals=config.short_veto_min_strong_signals,
+            erm_threshold=config.short_veto_erm_threshold,
+            quality_threshold=config.short_veto_quality_threshold,
+            sue_threshold=config.short_veto_sue_threshold,
+        )
+        for _entry in _short_veto_log:
+            logger.debug(
+                "Skipping short %s (fundamental-strength flags=%d): %s",
+                _entry["ticker"], _entry["n_flags"], _entry.get("flags", []),
+            )
 
     # Agent veto: remove candidates that fail fundamental risk checks
     if config.enable_agent_veto and _wrds_provider is not None and longs:
