@@ -175,6 +175,35 @@ COMPOSITE_WEIGHT_CONFIGS: dict[str, dict[str, float]] = {
         "price_regression_score": 0.0,
         "arima_forecast_score": 0.0,
     },
+    # v4-gold: v3-fundamental-stack base + QMJ at 25% (highest measured
+    # IC: 12M IC +0.042 t=4.57; 12M L/S return +11.9% with -9.5% MaxDD
+    # and 90% hit-rate) + short-side fundamental veto enabled (vetoes
+    # NVDA-2022-style strong-fundamentals shorts that drag the strategy
+    # in bull years). Quality reduced 30→20% because QMJ overlaps
+    # (corr ρ ≈ +0.31). Earnings_rank reduced 40→30% to make room.
+    # All technical / unmeasured signals (sentiment, regression, ARIMA,
+    # momentum) = 0. OBV kept at 15% (only-surviving cross-sectional
+    # technical). Institutional flow kept at 10% (no measured IC but
+    # believed to work; cheap to keep).
+    #
+    # Auto-enabled when this config (or any composite-config containing
+    # `qmj_score > 0`) is selected: enable_qmj_signal=True AND
+    # enable_short_fundamental_veto=True. See `build_config` /
+    # `run_with_composite_weights` below for the wiring.
+    "v4-gold": {
+        "obv_trend": 0.15,
+        "earnings_rank_score": 0.30,
+        "institutional_flow_score": 0.10,
+        "sentiment_score": 0.0,
+        "sector_momentum_score": 0.0,
+        "quality_score": 0.20,
+        "price_momentum_score": 0.0,
+        "insider_score": 0.0,
+        "event_timing_score": 0.0,
+        "price_regression_score": 0.0,
+        "arima_forecast_score": 0.0,
+        "qmj_score": 0.25,
+    },
 }
 
 
@@ -464,6 +493,10 @@ def run_with_composite_weights(
 
     Mutates the module-level dict in process, runs, then restores. Used by
     Session 3 v3-* composite reweight configs.
+
+    Auto-enables QMJ + short-veto for any config with `qmj_score > 0`
+    (e.g. v4-gold). This keeps the harness CLI surface unchanged: just
+    pass `--composite-config v4-gold` and the right flags get set.
     """
     orig = dict(cs.DEFAULT_COMPOSITE_WEIGHTS)
     new = dict(orig)
@@ -471,17 +504,37 @@ def run_with_composite_weights(
     for k, v in weights.items():
         new[k] = float(v)
 
+    # Auto-enable QMJ precompute + short-veto when QMJ has weight.
+    # We mutate the live cfg object in place — the original cfg is
+    # not used elsewhere by the audit harness after this point.
+    auto_qmj = float(new.get("qmj_score", 0.0)) > 0.0
+    auto_short_veto = auto_qmj or name.startswith("v4-")
+    if auto_qmj and not getattr(cfg, "enable_qmj_signal", False):
+        cfg.enable_qmj_signal = True
+    if auto_short_veto and not getattr(cfg, "enable_short_fundamental_veto", False):
+        cfg.enable_short_fundamental_veto = True
+
     print()
     print(f"  [composite] DEFAULT_COMPOSITE_WEIGHTS overridden for {name}:")
     for k in sorted(set(orig) | set(new)):
         if new.get(k, 0.0) > 0 or orig.get(k, 0.0) > 0:
             mark = "*" if abs(new.get(k, 0.0) - orig.get(k, 0.0)) > 1e-9 else " "
             print(f"     {mark} {k:30s}  {orig.get(k, 0.0):.4f}  ->  {new.get(k, 0.0):.4f}")
+    if auto_qmj:
+        print(f"     [auto] enable_qmj_signal=True (qmj_score weight={new.get('qmj_score', 0.0):.4f})")
+    if auto_short_veto:
+        print(f"     [auto] enable_short_fundamental_veto=True (min_strong_signals={cfg.short_veto_min_strong_signals})")
 
     cs.DEFAULT_COMPOSITE_WEIGHTS = new
     try:
         out = run_one_config(name, cfg)
         out["composite_weights_used"] = new
+        out["auto_enabled"] = {
+            "enable_qmj_signal": bool(getattr(cfg, "enable_qmj_signal", False)),
+            "enable_short_fundamental_veto": bool(
+                getattr(cfg, "enable_short_fundamental_veto", False)
+            ),
+        }
     finally:
         cs.DEFAULT_COMPOSITE_WEIGHTS = orig
     return out
