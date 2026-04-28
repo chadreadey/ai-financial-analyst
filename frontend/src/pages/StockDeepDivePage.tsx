@@ -1,4 +1,4 @@
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -15,17 +15,51 @@ import { cn } from "@/lib/utils";
 export function StockDeepDivePage() {
   const { ticker } = useParams<{ ticker: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const t = ticker?.toUpperCase() || "";
+  const source = searchParams.get("source");
+  const fromPortfolio = source === "portfolio";
 
   const { records } = useRecommendationHistory(t);
   const [summary, setSummary] = useState<WatchlistSummary | undefined>();
   const [historyEntries, setHistoryEntries] = useState<HistoryEntry[]>([]);
+  const incomingJobId = searchParams.get("job_id");
 
   useEffect(() => {
     if (!t) return;
     api.getWatchlistSummary(t).then(setSummary).catch(() => {});
     api.getHistory(t, 50, 0).then((d) => setHistoryEntries(d.entries)).catch(() => {});
   }, [t]);
+
+  // Background job arrived from CandidatePipeline — poll history briefly so the
+  // new analysis surfaces as soon as it completes. Cheap; bails after 2 minutes.
+  useEffect(() => {
+    if (!incomingJobId || !t) return;
+    let cancelled = false;
+    let attempts = 0;
+    const id = window.setInterval(async () => {
+      attempts += 1;
+      if (attempts > 24 || cancelled) {
+        window.clearInterval(id);
+        return;
+      }
+      try {
+        const res = await api.getResult(incomingJobId);
+        if (!cancelled && res && (res.status === "complete" || res.ticker)) {
+          api.getHistory(t, 50, 0).then((d) => {
+            if (!cancelled) setHistoryEntries(d.entries);
+          });
+          window.clearInterval(id);
+        }
+      } catch {
+        // ignore — try again
+      }
+    }, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [incomingJobId, t]);
 
   const latestRecord = records[0];
   const latestVerdict = latestRecord?.verdict ?? "";
@@ -73,10 +107,10 @@ export function StockDeepDivePage() {
     <div className="p-6 max-w-6xl mx-auto space-y-4">
       {/* Back link */}
       <Link
-        to="/portfolio"
+        to={fromPortfolio ? "/paper-trading" : "/portfolio"}
         className="inline-flex items-center gap-2 text-sm text-blue-500 hover:text-blue-400 transition-colors"
       >
-        <ArrowLeft size={16} /> Back to Watchlist
+        <ArrowLeft size={16} /> {fromPortfolio ? "Back to Portfolio" : "Back to Watchlist"}
       </Link>
 
       {/* Page header */}
@@ -86,6 +120,11 @@ export function StockDeepDivePage() {
           {latestVerdict && (
             <Badge variant="outline" className={cn("text-[10px]", verdictColor)}>
               {latestVerdict}
+            </Badge>
+          )}
+          {incomingJobId && (
+            <Badge variant="outline" className="text-[10px] border-primary/40 text-primary">
+              Analysis running…
             </Badge>
           )}
         </div>

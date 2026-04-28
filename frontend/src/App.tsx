@@ -14,6 +14,7 @@ export default function App() {
         <Routes>
           <Route path="/analysis" element={<AnalysisPage />} />
           <Route path="/stock/:ticker" element={<StockDeepDivePage />} />
+          <Route path="/deepdive/:ticker" element={<StockDeepDivePage />} />
           <Route path="/backtest" element={<BacktestPage />} />
           <Route
             path="/backtest/modal/runs/:runId"

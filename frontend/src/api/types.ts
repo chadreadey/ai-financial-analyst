@@ -339,3 +339,64 @@ export interface ModalRunRequest {
   seed?: number;
   local?: boolean;
 }
+
+// ── Portfolio dashboard types (dashboard-v1) ────────────────────────────
+
+export interface LatestVerdict {
+  analysis_id: string;
+  verdict: string;
+  conviction: string;
+  composite_score: number | null;
+  price_target: number | null;
+  implied_upside_pct: number | null;
+  as_of: string;
+  run_at: number;
+  days_stale: number | null;
+}
+
+export interface PositionWithVerdict {
+  ticker: string;
+  entry_price: number;
+  entry_date: string;
+  current_price: number | null;
+  entry_verdict: string;
+  exit_conditions: string;
+  direction: string;
+  conviction_score: number | null;
+  unrealized_pnl_pct: number | null;
+  days_held: number;
+  latest_verdict: LatestVerdict | null;
+}
+
+export interface PortfolioOverviewTotals {
+  total_positions: number;
+  total_equity_at_entry: number;
+  avg_unrealized_pnl_pct: number | null;
+  stale_count: number;
+}
+
+export interface PortfolioOverviewResponse {
+  positions: PositionWithVerdict[];
+  totals: PortfolioOverviewTotals;
+}
+
+export interface CandidateSignal {
+  name: string;
+  score: number;
+}
+
+export interface PortfolioCandidate {
+  ticker: string;
+  composite_score: number;
+  composite_direction: string;
+  actionable: boolean;
+  top_signals: CandidateSignal[];
+  cached_at: string;
+}
+
+export interface PortfolioCandidatesResponse {
+  candidates: PortfolioCandidate[];
+  cached_at: string;
+  universe: string;
+  errors: string[];
+}

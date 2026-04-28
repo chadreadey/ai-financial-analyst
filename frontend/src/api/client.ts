@@ -251,4 +251,13 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  // ── Portfolio dashboard (dashboard-v1) ──────────────────────────────
+  getPortfolioOverview: () =>
+    request<import("./types").PortfolioOverviewResponse>("/api/paper-trading/positions-with-verdicts"),
+
+  getPortfolioCandidates: (limit: number = 20) =>
+    request<import("./types").PortfolioCandidatesResponse>(
+      `/api/portfolio/candidates?limit=${limit}`
+    ),
 };
