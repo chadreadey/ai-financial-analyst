@@ -143,12 +143,17 @@ class BacktestConfig:
     enable_arima_signal: bool = False
     arima_vol_threshold: float = 0.25
     # QMJ composite signal (Asness Quality-Minus-Junk proxy)
-    # Opt-in: when True, run_walk_forward calls compute_qmj_score per
-    # ticker per rebalance and writes the result to SignalVector.qmj_score.
+    # When True, run_walk_forward calls compute_qmj_score per ticker per
+    # rebalance and writes the result to SignalVector.qmj_score.
     # Cross-sectional normalization happens via SIGNAL_FIELDS so the
     # composite weight in DEFAULT_COMPOSITE_WEIGHTS["qmj_score"] is what
-    # ultimately tips the composite. Default-off keeps production unchanged.
-    enable_qmj_signal: bool = False
+    # ultimately tips the composite.
+    #
+    # AUDIT 2026-04-28: default flipped True to match v4-qmj-only production
+    # weights (DEFAULT_COMPOSITE_WEIGHTS["qmj_score"]=0.30). Walk-forward
+    # validated improvement: Sharpe 1.04 → 1.30, alpha +16pp vs prior gold
+    # standard (v3-fundamental-stack). See docs/audit/session-3/.
+    enable_qmj_signal: bool = True
     # Sector-diversified selection (wide scan, concentrated picks)
     max_per_sector: int = 3               # max positions from any single GICS sector
     min_score_gap: float = 0.0            # min score above universe median to enter (0 = disabled)

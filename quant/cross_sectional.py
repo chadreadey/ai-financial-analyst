@@ -89,42 +89,60 @@ SIGNAL_FIELDS = [
     ("qmj_score", None),
 ]
 
-# 7 active + 3 zeroed signal fields.
-# Event timing (PEAD) is orthogonal — captures post-earnings drift,
-# which is distinct from earnings revision momentum (ERM).
+# 4 active + 7 zeroed signal fields.
 #
-# AUDIT 2026-04-28: insider_score zeroed out. Audit Session 2 found the
-# Finnhub MSPR signal carries SIG_WRONG_SIGN IC at every horizon (1M
-# t=-2.06 ... 12M t=-3.97) on the 495-ticker WRDS panel, even after
-# the [-100,+100]→[-1,+1] scaling fix in `quant/sentiment.py` (commit
-# c489d9c). Walk-forward comparison on the 200-ticker universe showed
-# zeroing insider_score and redistributing its 10% proportionally
-# improved annualized return by +1.10pp (8.07% → 9.17%) and Sharpe
-# by +0.03 (0.97 → 1.00). The weight stays in the schema (not deleted)
-# in case a fixed insider construction is wired in later. See
-# `docs/audit/session-2/walkforward-comparison.md` and the
-# `project_insider_mspr_bug` memory for full context.
+# AUDIT 2026-04-28 (v4-qmj-only ship): production composite simplified to
+# four signals — earnings, qmj, obv, institutional. All other signals
+# zeroed because (a) they had no measured IC, (b) they had wrong-sign IC,
+# or (c) zeroing them in walk-forward improved aggregate Sharpe.
 #
-# The 0.10 weight is redistributed proportionally across the remaining
-# non-zero signals (each scaled by 1/0.90 ≈ 1.1111).
+# Walk-forward evidence (200 tickers, 2015-2024, 16 windows) for this
+# weighting vs the prior insider-only-zeroed baseline (v3-fundamental-stack
+# was the interim gold standard at Sharpe 1.04):
+#
+#   config                annual   sharpe   maxdd    alpha-vs-spy
+#   v3-fundamental-stack   8.05%    1.04    -16.66%   -157pp
+#   v4-qmj-only            9.21%    1.30    -14.83%   -141pp     <-- THIS
+#
+# Net change: Sharpe +0.26, annual +1.16pp, MaxDD 1.83pp tighter, alpha
+# +16pp better, AND the strategy beat SPY in 2024 (+39% vs +26%) — the
+# first time a tested config beat SPY in a bull year.
+#
+# What changed from production (insider-only-zeroed) → v4-qmj-only:
+#   sentiment_score        0.0556 → 0.0  (no measured IC; low IC historically)
+#   quality_score          0.1667 → 0.0  (QMJ subsumes — 4-pillar composite is richer)
+#   price_momentum_score   0.1111 → 0.0  (3M IC -0.003 t=-0.15, no signal)
+#   price_regression_score 0.1111 → 0.0  (no measured IC, very sparse)
+#   arima_forecast_score   0.0556 → 0.0  (no measured IC, very sparse)
+#   qmj_score              0.0    → 0.30 (strongest measured IC: 12M t=+4.57)
+#   earnings_rank_score    0.2222 → 0.40 (strongest monthly-IC fundamental)
+#   obv_trend              0.1667 → 0.20 (only-surviving cross-sectional technical)
+#   institutional_flow     0.1111 → 0.10 (no measured IC; retained — believed to work)
+#
+# Insider, event_timing, sector_momentum stay 0 (insider has wrong-sign
+# IC even after MSPR scaling fix; event_timing and sector_momentum were
+# already zeroed pre-audit).
+#
+# The composite-config v4-qmj-only in scripts/run_audit_walkforward.py is
+# now equivalent to the production weights.
+#
+# Implementation note: enabling qmj_score requires
+# `BacktestConfig.enable_qmj_signal=True` to populate per-ticker QMJ
+# scores on the SignalVector. The default is also flipped to True to
+# match production.
 DEFAULT_COMPOSITE_WEIGHTS = {
-    "obv_trend": 0.1667,
-    "earnings_rank_score": 0.2222,
-    "institutional_flow_score": 0.1111,
-    "sentiment_score": 0.0556,
-    "sector_momentum_score": 0.00,
-    "quality_score": 0.1667,
-    "price_momentum_score": 0.1111,
-    "insider_score": 0.00,           # zeroed 2026-04-28 — wrong-sign IC at every horizon
-    "event_timing_score": 0.00,      # PEAD data is sparse — distorts cross-sectional normalization
-    "price_regression_score": 0.1111,
-    "arima_forecast_score": 0.0556,
-    # QMJ (Asness Quality-Minus-Junk proxy) — schema slot only.
-    # Default 0.0 keeps production behaviour unchanged. Opted in by
-    # composite-config overrides (e.g. v4-gold) AND requires
-    # `BacktestConfig.enable_qmj_signal=True` to populate the per-ticker
-    # qmj_score on the SignalVector during the per-rebalance loop.
-    "qmj_score": 0.00,
+    "obv_trend": 0.20,
+    "earnings_rank_score": 0.40,
+    "institutional_flow_score": 0.10,
+    "sentiment_score": 0.0,           # zeroed 2026-04-28 (v4-qmj-only ship)
+    "sector_momentum_score": 0.0,     # already 0
+    "quality_score": 0.0,             # zeroed — QMJ subsumes (corr ρ=+0.31)
+    "price_momentum_score": 0.0,      # zeroed — 3M IC near zero
+    "insider_score": 0.0,             # zeroed earlier (RISK-2, wrong-sign IC)
+    "event_timing_score": 0.0,        # PEAD data sparse; orthogonal but noisy
+    "price_regression_score": 0.0,    # zeroed — no measured IC, sparse
+    "arima_forecast_score": 0.0,      # zeroed — no measured IC, sparse
+    "qmj_score": 0.30,                # NEW production signal — strongest measured IC
 }
 
 
