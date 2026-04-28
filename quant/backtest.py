@@ -165,7 +165,23 @@ class BacktestConfig:
     # standard (v3-fundamental-stack). See docs/audit/session-3/.
     enable_qmj_signal: bool = True
     # Sector-diversified selection (wide scan, concentrated picks)
-    max_per_sector: int = 3               # max positions from any single GICS sector
+    # AUDIT 2026-04-28 (sector-cap loosening): default 3 → 5.
+    # Walk-forward on the 200-ticker WRDS-∩-price-cache universe showed
+    # max_per_sector=5 improves every metric vs max_per_sector=3 with the
+    # same max_long_positions=10:
+    #   annual return  +9.11% → +9.66% (+0.55pp)
+    #   Sharpe         1.41   → 1.43
+    #   Sortino        1.97   → 2.01
+    #   MaxDD         -14.56% → -14.32%
+    #   alpha vs SPY  -142%   → -134%
+    # Mechanism: the prior 3/sector cap was structurally underweighting tech
+    # in tech-led tapes (2023 banks/AI, 2024 semis). Loosening to 5 lets
+    # conviction flow into genuinely concentrated thematic rallies without
+    # diluting the conviction count. Largest single-year impact was 2024:
+    # +30.7% → +38.4% (the biggest single-year SPY beat measured in the
+    # audit, +12.8pp alpha vs SPY).
+    # See docs/audit/session-3/v4-qmj-pos10-sec5-results.json.
+    max_per_sector: int = 5               # max positions from any single GICS sector
     min_score_gap: float = 0.0            # min score above universe median to enter (0 = disabled)
 
     def __post_init__(self):

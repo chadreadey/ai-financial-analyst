@@ -257,6 +257,9 @@ def build_config(
     train_months: int = 24,
     test_months: int = 6,
     zero_insider: bool = False,
+    max_short_positions: int = 10,
+    max_long_positions: int = 10,
+    max_per_sector: int = 3,
 ) -> BacktestConfig:
     """
     Build a BacktestConfig for the audit walk-forward.
@@ -278,8 +281,9 @@ def build_config(
         short_threshold=-0.40,
         enable_regime_filter=True,
         enable_ic_calibration=True,
-        max_long_positions=10,
-        max_short_positions=10,
+        max_long_positions=max_long_positions,
+        max_short_positions=max_short_positions,
+        max_per_sector=max_per_sector,
         train_months=train_months,
         test_months=test_months,
         # Phase 0 orthogonal signals: earnings + sentiment
@@ -837,6 +841,20 @@ def main() -> None:
         help="Run a single Session 3 v3-* composite-reweight config with v2 earnings weights "
              "(overrides --config and --bonus when set). Each config writes its own output files.",
     )
+    parser.add_argument(
+        "--max-short-positions", type=int, default=0,
+        help="Override BacktestConfig.max_short_positions. Default 0 matches "
+             "production (long-only since 2026-04-28). Set to 10 to test "
+             "long/short variants.",
+    )
+    parser.add_argument(
+        "--max-long-positions", type=int, default=10,
+        help="Override BacktestConfig.max_long_positions (default 10).",
+    )
+    parser.add_argument(
+        "--max-per-sector", type=int, default=3,
+        help="Override BacktestConfig.max_per_sector (default 3).",
+    )
     parser.add_argument("--output-md", default="", help="Override markdown output path")
     parser.add_argument("--output-json", default="", help="Override JSON output path")
     parser.add_argument("--verbose", "-v", action="store_true")
@@ -885,6 +903,9 @@ def main() -> None:
             earnings_weights=weights,
             train_months=args.train_months,
             test_months=args.test_months,
+            max_short_positions=args.max_short_positions,
+            max_long_positions=args.max_long_positions,
+            max_per_sector=args.max_per_sector,
         )
         try:
             summary = run_with_composite_weights(cc_name, cc_weights, cfg)
@@ -933,6 +954,9 @@ def main() -> None:
             earnings_weights=weights,
             train_months=args.train_months,
             test_months=args.test_months,
+            max_short_positions=args.max_short_positions,
+            max_long_positions=args.max_long_positions,
+            max_per_sector=args.max_per_sector,
         )
         if cfg_name == "v2":
             cfg_for_bonus = cfg
