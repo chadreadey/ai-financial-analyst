@@ -163,12 +163,22 @@ def compute_insider_sentiment_score(
     """
     Compute insider sentiment signal from Finnhub MSPR data.
 
-    MSPR (Monthly Share Purchase Ratio) is already in [-1, +1]:
-      +1 = insiders only buying
-      -1 = insiders only selling
+    Finnhub MSPR (Monthly Share Purchase Ratio) is returned as a PERCENTAGE
+    in roughly [-100, +100]:
+      +100 = insiders only buying that month
+      -100 = insiders only selling that month
+       0   = balanced / no activity
 
-    Uses the average MSPR over the last `lookback_months` months,
-    lagged by 1 month to avoid lookahead (insider filings have ~2 day delay).
+    We average MSPR over `lookback_months`, divide by 100 to get a fraction,
+    then clip to [-1, +1] for the signal score. The 1-month lag preserves
+    point-in-time safety (insider filings have ~2-day delay; rounding up to
+    a full month is conservative).
+
+    AUDIT 2026-04-27: Prior implementation clipped raw MSPR to [-1, +1]
+    WITHOUT dividing by 100, which saturated almost every ticker at ±1 and
+    destroyed cross-sectional ranking. That bug produced the SIG_WRONG_SIGN
+    IC observed in `docs/audit/session-2/ic-summary.md` (the wrong sign was
+    a quantization artifact, not a real anomaly).
     """
     sym = ticker.upper()
     # Lag by 1 month for point-in-time safety
@@ -200,7 +210,8 @@ def compute_insider_sentiment_score(
         return SignalResult(0.0, "no MSPR values", {"n_months": 0})
 
     mean_mspr = sum(mspr_values) / len(mspr_values)
-    score = max(-1.0, min(1.0, mean_mspr))
+    # MSPR is reported as a percentage; normalize to fraction before clipping.
+    score = max(-1.0, min(1.0, mean_mspr / 100.0))
 
     return SignalResult(
         score=round(score, 4),
