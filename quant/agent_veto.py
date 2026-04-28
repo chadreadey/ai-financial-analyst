@@ -4,7 +4,7 @@ Quantified Agent Veto — deterministic proxy for LLM agent risk screening.
 Approximates what the RiskAgent and EarningsAgent would flag as "avoid"
 using structured WRDS data. Fully backtestable and CPCV-compatible.
 
-Three veto signals:
+Three veto signals (LONG side — `apply_agent_veto`):
   1. Balance sheet deterioration (RiskAgent proxy)
      - D/E ratio spiking QoQ
      - Cash burn (cheq declining)
@@ -18,11 +18,32 @@ Three veto signals:
 
 A stock is vetoed if it triggers 2+ of 3 signals. Vetoed stocks are
 removed from the candidate list before position selection.
+
+SHORT side — `apply_short_fundamental_veto`:
+  Mirrors the long-side logic with INVERTED checks. A short candidate
+  scoring poorly on the technical/composite layer may still have strong
+  underlying fundamentals (NVDA-2022 type — bullish ERM, high quality,
+  positive SUE despite a temporary technical drawdown). For these names,
+  shorting is a structural bet against the fundamentals, which carries
+  high carry risk in a bull market.
+
+  Three "fundamental strength" flags:
+    - ERM > threshold (analyst upgrades / positive revisions)
+    - quality_score > threshold (high ROIC + margin vs cross-section)
+    - SUE > threshold (recent positive earnings surprise)
+
+  A short candidate is vetoed (= removed from the short list) if it
+  trips `min_strong_signals` or more flags. Default is 1 — even a single
+  fundamental-strength signal is enough to skip the short. "Innocent
+  until proven guilty": when ALL inputs are missing/error, the candidate
+  is NOT vetoed (we don't know it's strong, so we let the technical
+  layer decide), matching the conservative pattern in `apply_agent_veto`.
 """
 
 from __future__ import annotations
 
 import logging
+import math
 from datetime import date
 from typing import Optional
 
@@ -251,5 +272,186 @@ def apply_agent_veto(
         vetoed_tickers = [v["ticker"] for v in veto_log]
         logger.info("Agent veto removed %d/%d candidates: %s",
                      len(veto_log), len(candidates), ", ".join(vetoed_tickers))
+
+    return survivors, veto_log
+
+
+# ── Short-side fundamental-strength veto ───────────────────────────────
+
+
+def _safe_float(val) -> Optional[float]:
+    """Convert to float, returning None for NaN / non-numeric / None."""
+    if val is None:
+        return None
+    try:
+        f = float(val)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(f):
+        return None
+    return f
+
+
+def compute_fundamental_strength_veto(
+    ticker: str,
+    provider,
+    sv,
+    as_of_date: Optional[date] = None,
+    erm_threshold: float = 0.20,
+    quality_threshold: float = 0.30,
+    sue_threshold: float = 0.50,
+) -> tuple[bool, dict]:
+    """
+    For SHORT candidates: return (should_veto=True, meta) if the ticker
+    has *strong* fundamentals — i.e. it is NOT a clean short despite a
+    low composite score. Inverts the long-side trap-detection logic.
+
+    Veto fires if ANY of:
+      - ERM > erm_threshold (analysts upgrading consensus)
+      - quality_score > quality_threshold (ROIC+margin vs cross-section)
+      - SUE > sue_threshold (recent positive earnings surprise)
+
+    Reads quality from `sv.quality_score` (already cross-sectionally
+    normalized). Reads ERM/SUE directly from the provider via
+    `compute_erm_score` / `compute_sue_score` since the composite
+    `earnings_rank_score` blends them with dispersion and we want
+    each lever clean for short-side risk control.
+
+    Conservative behavior: when ALL three inputs are unavailable
+    (all errored / returned None), returns `(False, {...})` — i.e.
+    we do NOT veto on missing data. "Innocent until proven guilty"
+    matches the long-side `apply_agent_veto` pattern.
+
+    Returns (should_skip_short, metadata_dict).
+    """
+    flags: list[str] = []
+    erm_score: Optional[float] = None
+    quality: Optional[float] = None
+    sue_score: Optional[float] = None
+    erm_meta: dict = {}
+    sue_meta: dict = {}
+
+    # ERM via earnings_signals
+    try:
+        from quant.earnings_signals import compute_erm_score
+        erm_score, erm_meta = compute_erm_score(ticker, provider, as_of_date)
+        # compute_erm_score returns 0.0 when data missing; treat 0 with an
+        # 'error' meta as missing (don't count as strength signal).
+        if isinstance(erm_meta, dict) and erm_meta.get("error"):
+            erm_score = None
+    except Exception as exc:
+        logger.debug("ERM strength check failed for %s: %s", ticker, exc)
+        erm_score = None
+
+    # Quality from the (already cross-sectionally normalized) signal vector
+    if sv is not None:
+        q_raw = getattr(sv, "quality_score", None)
+        quality = _safe_float(q_raw)
+        # quality_score=0.0 is ambiguous — could mean "not computed" or a
+        # genuine zero z-score. Be conservative: treat exactly 0.0 as
+        # "no strength signal" (matches the original cross_sectional logic
+        # of skipping zero-only fields).
+        if quality is not None and quality == 0.0:
+            quality = None
+
+    # SUE via earnings_signals
+    try:
+        from quant.earnings_signals import compute_sue_score
+        sue_score, sue_meta = compute_sue_score(ticker, provider, as_of_date)
+        if isinstance(sue_meta, dict) and sue_meta.get("error"):
+            sue_score = None
+    except Exception as exc:
+        logger.debug("SUE strength check failed for %s: %s", ticker, exc)
+        sue_score = None
+
+    # Apply thresholds
+    if erm_score is not None and erm_score > erm_threshold:
+        flags.append(f"ERM={erm_score:+.3f}>{erm_threshold:+.3f}")
+    if quality is not None and quality > quality_threshold:
+        flags.append(f"quality={quality:+.3f}>{quality_threshold:+.3f}")
+    if sue_score is not None and sue_score > sue_threshold:
+        flags.append(f"SUE={sue_score:+.3f}>{sue_threshold:+.3f}")
+
+    # Track which inputs we actually saw — useful for the "all-missing"
+    # innocent-until-proven-guilty path.
+    inputs_seen = sum(x is not None for x in (erm_score, quality, sue_score))
+
+    return len(flags) >= 1, {
+        "n_flags": len(flags),
+        "flags": flags,
+        "erm_score": erm_score,
+        "quality_score": quality,
+        "sue_score": sue_score,
+        "inputs_seen": inputs_seen,
+        "erm_threshold": erm_threshold,
+        "quality_threshold": quality_threshold,
+        "sue_threshold": sue_threshold,
+    }
+
+
+def apply_short_fundamental_veto(
+    short_candidates: list[tuple],
+    provider,
+    as_of_date: Optional[date] = None,
+    min_strong_signals: int = 1,
+    erm_threshold: float = 0.20,
+    quality_threshold: float = 0.30,
+    sue_threshold: float = 0.50,
+) -> tuple[list[tuple], list[dict]]:
+    """
+    Filter short candidates: skip any with `min_strong_signals` or more
+    fundamental-strength flags. Returns (survivors, veto_log).
+
+    "Innocent until proven guilty": if NO fundamental inputs are available
+    (all None / error), the candidate is NOT vetoed.
+
+    Args:
+        short_candidates: list of (ticker, score, signal_vector) tuples
+        provider: WRDSFundamentalProvider
+        as_of_date: point-in-time date
+        min_strong_signals: min strength flags to remove a candidate (default 1)
+        erm_threshold / quality_threshold / sue_threshold: per-flag thresholds
+
+    Returns:
+        (surviving_short_candidates, veto_log)
+    """
+    survivors: list[tuple] = []
+    veto_log: list[dict] = []
+
+    for ticker, score, sv in short_candidates:
+        is_strong, meta = compute_fundamental_strength_veto(
+            ticker, provider, sv, as_of_date,
+            erm_threshold=erm_threshold,
+            quality_threshold=quality_threshold,
+            sue_threshold=sue_threshold,
+        )
+        n_flags = meta.get("n_flags", 0)
+
+        if is_strong and n_flags >= min_strong_signals:
+            veto_log.append({
+                "ticker": ticker,
+                "score": round(float(score), 3),
+                "n_flags": n_flags,
+                "flags": meta.get("flags", []),
+                "erm_score": meta.get("erm_score"),
+                "quality_score": meta.get("quality_score"),
+                "sue_score": meta.get("sue_score"),
+                "inputs_seen": meta.get("inputs_seen", 0),
+            })
+            if sv is not None and hasattr(sv, "flags"):
+                sv.flags.append(f"SHORT_VETOED(strength={n_flags})")
+            logger.debug(
+                "Short veto %s (score=%.3f): %d strength flags — %s",
+                ticker, score, n_flags, ", ".join(meta.get("flags", [])),
+            )
+        else:
+            survivors.append((ticker, score, sv))
+
+    if veto_log:
+        vetoed = [v["ticker"] for v in veto_log]
+        logger.info(
+            "Short fundamental-strength veto removed %d/%d candidates: %s",
+            len(veto_log), len(short_candidates), ", ".join(vetoed),
+        )
 
     return survivors, veto_log
