@@ -1,8 +1,8 @@
 # Audit Session 2 — Per-Signal IC Summary
 
-**Generated**: 2026-04-28 00:56 UTC  
+**Generated**: 2026-04-28 02:44 UTC  
 **Window**: 2015-01-01 → 2024-12-31  **Universe**: 495 tickers (WRDS ∩ price-cache)  
-**Rebalance dates**: 120  **Walk-forward only** (no CPCV).  **Runtime**: 295.5s
+**Rebalance dates**: 120  **Walk-forward only** (no CPCV).  **Runtime**: 274.7s
 
 ## Universe Coverage
 - WRDS PIT cache: 495 tickers
@@ -20,7 +20,7 @@ Tickers in WRDS but missing from the local price cache are EXCLUDED from the IC 
 | `analyst_dispersion` | 470.0 | 490 | 100.0% |
 | `quality_score` | 480.1 | 495 | 100.0% |
 | `price_momentum` | 303.1 | 490 | 100.0% |
-| `insider_mspr` | 381.8 | 477 | 100.0% |
+| `insider_mspr` | 381.7 | 477 | 100.0% |
 | `piotroski` | 472.8 | 492 | 100.0% |
 | `qmj` | 475.7 | 493 | 100.0% |
 | `hml_bm` | 319.4 | 463 | 100.0% |
@@ -37,7 +37,7 @@ Tickers in WRDS but missing from the local price cache are EXCLUDED from the IC 
 | `piotroski` | 120 | +0.0020 | 0.0943 | +0.24 | 50% | -1.9% | 60% | -38.4% | NO_SIGNAL |
 | `hml_bm` | 120 | +0.0005 | 0.1514 | +0.04 | 46% | +6.6% | 60% | -33.0% | NO_SIGNAL |
 | `analyst_dispersion` | 120 | -0.0071 | 0.1629 | -0.47 | 48% | -6.6% | 30% | -63.1% | NO_SIGNAL |
-| `insider_mspr` | 120 | -0.0226 | 0.0955 | -2.59 | 42% | -5.2% | 30% | -44.8% | SIG_WRONG_SIGN |
+| `insider_mspr` | 120 | -0.0177 | 0.0938 | -2.06 | 40% | -2.0% | 40% | -45.6% | SIG_WRONG_SIGN |
 
 ## IC at 3M horizon
 
@@ -51,7 +51,7 @@ Tickers in WRDS but missing from the local price cache are EXCLUDED from the IC 
 | `price_momentum` | 120 | -0.0027 | 0.1964 | -0.15 | 53% | +2.3% | 50% | -55.7% | NO_SIGNAL |
 | `piotroski` | 120 | -0.0088 | 0.0859 | -1.12 | 47% | -2.9% | 40% | -31.1% | NO_SIGNAL |
 | `analyst_dispersion` | 120 | -0.0164 | 0.1512 | -1.19 | 48% | -6.9% | 30% | -63.3% | NO_SIGNAL |
-| `insider_mspr` | 120 | -0.0283 | 0.1101 | -2.81 | 37% | -4.5% | 30% | -39.4% | SIG_WRONG_SIGN |
+| `insider_mspr` | 120 | -0.0304 | 0.1080 | -3.09 | 37% | -3.4% | 30% | -31.2% | SIG_WRONG_SIGN |
 
 ## IC at 6M horizon
 
@@ -65,7 +65,7 @@ Tickers in WRDS but missing from the local price cache are EXCLUDED from the IC 
 | `hml_bm` | 120 | -0.0066 | 0.1748 | -0.41 | 40% | +4.7% | 60% | -26.6% | NO_SIGNAL |
 | `piotroski` | 120 | -0.0118 | 0.0840 | -1.53 | 49% | -4.6% | 40% | -37.1% | marginal |
 | `analyst_dispersion` | 120 | -0.0232 | 0.1524 | -1.67 | 45% | -9.3% | 30% | -68.2% | marginal |
-| `insider_mspr` | 120 | -0.0280 | 0.1113 | -2.75 | 36% | -4.1% | 30% | -40.8% | SIG_WRONG_SIGN |
+| `insider_mspr` | 120 | -0.0299 | 0.1083 | -3.03 | 34% | -2.7% | 50% | -24.9% | SIG_WRONG_SIGN |
 
 ## IC at 12M horizon
 
@@ -79,7 +79,7 @@ Tickers in WRDS but missing from the local price cache are EXCLUDED from the IC 
 | `price_momentum` | 120 | -0.0132 | 0.1890 | -0.76 | 49% | +2.1% | 50% | -58.6% | NO_SIGNAL |
 | `piotroski` | 120 | -0.0315 | 0.0729 | -4.73 | 34% | -2.8% | 30% | -33.9% | SIG_WRONG_SIGN |
 | `analyst_dispersion` | 120 | -0.0316 | 0.1697 | -2.04 | 44% | -11.5% | 40% | -79.6% | SIG_WRONG_SIGN |
-| `insider_mspr` | 120 | -0.0344 | 0.1039 | -3.62 | 33% | -3.8% | 40% | -42.4% | SIG_WRONG_SIGN |
+| `insider_mspr` | 120 | -0.0374 | 0.1033 | -3.97 | 31% | -5.8% | 30% | -50.6% | SIG_WRONG_SIGN |
 
 ## 3M Decision Summary
 
@@ -92,7 +92,7 @@ Tickers in WRDS but missing from the local price cache are EXCLUDED from the IC 
 | `quality_score` | +0.0158 | **YES** |
 | `price_momentum` | -0.0027 | **YES** |
 | `analyst_dispersion` | -0.0164 | no |
-| `insider_mspr` | -0.0283 | no |
+| `insider_mspr` | -0.0304 | no |
 
 ## Methodology
 
