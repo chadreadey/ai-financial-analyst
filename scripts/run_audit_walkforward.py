@@ -175,6 +175,41 @@ COMPOSITE_WEIGHT_CONFIGS: dict[str, dict[str, float]] = {
         "price_regression_score": 0.0,
         "arima_forecast_score": 0.0,
     },
+    # v4-shortveto-only: v3-fundamental-stack weights, short-veto enabled,
+    # QMJ disabled. Isolates the short-veto's contribution. If this beats
+    # v3-fundamental-stack, the short-veto pulls weight on its own.
+    "v4-shortveto-only": {
+        "obv_trend": 0.20,
+        "earnings_rank_score": 0.40,
+        "institutional_flow_score": 0.10,
+        "sentiment_score": 0.0,
+        "sector_momentum_score": 0.0,
+        "quality_score": 0.30,
+        "price_momentum_score": 0.0,
+        "insider_score": 0.0,
+        "event_timing_score": 0.0,
+        "price_regression_score": 0.0,
+        "arima_forecast_score": 0.0,
+        "qmj_score": 0.0,                 # NOT enabled
+    },
+    # v4-qmj-only: v3-fundamental-stack base, QMJ replaces quality_score
+    # entirely (QMJ subsumes quality at corr ρ=+0.31), short-veto disabled.
+    # Isolates QMJ's contribution. If this beats v3-fundamental-stack, the
+    # QMJ-as-composite-signal change pulls weight on its own.
+    "v4-qmj-only": {
+        "obv_trend": 0.20,
+        "earnings_rank_score": 0.40,
+        "institutional_flow_score": 0.10,
+        "sentiment_score": 0.0,
+        "sector_momentum_score": 0.0,
+        "quality_score": 0.0,             # ZEROED — QMJ subsumes
+        "price_momentum_score": 0.0,
+        "insider_score": 0.0,
+        "event_timing_score": 0.0,
+        "price_regression_score": 0.0,
+        "arima_forecast_score": 0.0,
+        "qmj_score": 0.30,                # takes the 0.30 quality weight
+    },
     # v4-gold: v3-fundamental-stack base + QMJ at 25% (highest measured
     # IC: 12M IC +0.042 t=4.57; 12M L/S return +11.9% with -9.5% MaxDD
     # and 90% hit-rate) + short-side fundamental veto enabled (vetoes
@@ -504,15 +539,29 @@ def run_with_composite_weights(
     for k, v in weights.items():
         new[k] = float(v)
 
-    # Auto-enable QMJ precompute + short-veto when QMJ has weight.
-    # We mutate the live cfg object in place — the original cfg is
-    # not used elsewhere by the audit harness after this point.
-    auto_qmj = float(new.get("qmj_score", 0.0)) > 0.0
-    auto_short_veto = auto_qmj or name.startswith("v4-")
-    if auto_qmj and not getattr(cfg, "enable_qmj_signal", False):
-        cfg.enable_qmj_signal = True
-    if auto_short_veto and not getattr(cfg, "enable_short_fundamental_veto", False):
-        cfg.enable_short_fundamental_veto = True
+    # Per-config flag overrides for v4-* isolation tests. If a config name
+    # is keyed here, these flags take precedence over the qmj_score-based
+    # auto-enable. Lets us isolate "short-veto only" vs "QMJ only" cleanly.
+    # Configs not listed here fall back to:
+    #   - enable_qmj_signal: qmj_score > 0
+    #   - enable_short_fundamental_veto: same as enable_qmj_signal OR v4-* name
+    COMPOSITE_FLAG_OVERRIDES = {
+        "v4-shortveto-only": {"enable_qmj_signal": False, "enable_short_fundamental_veto": True},
+        "v4-qmj-only":       {"enable_qmj_signal": True,  "enable_short_fundamental_veto": False},
+        "v4-gold":           {"enable_qmj_signal": True,  "enable_short_fundamental_veto": True},
+    }
+
+    if name in COMPOSITE_FLAG_OVERRIDES:
+        flags = COMPOSITE_FLAG_OVERRIDES[name]
+        auto_qmj = flags["enable_qmj_signal"]
+        auto_short_veto = flags["enable_short_fundamental_veto"]
+    else:
+        # Fallback: qmj_score weight implies enabling QMJ; v4-* prefix implies short-veto.
+        auto_qmj = float(new.get("qmj_score", 0.0)) > 0.0
+        auto_short_veto = auto_qmj or name.startswith("v4-")
+
+    cfg.enable_qmj_signal = bool(auto_qmj)
+    cfg.enable_short_fundamental_veto = bool(auto_short_veto)
 
     print()
     print(f"  [composite] DEFAULT_COMPOSITE_WEIGHTS overridden for {name}:")
