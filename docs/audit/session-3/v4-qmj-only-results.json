@@ -1,0 +1,142 @@
+{
+  "generated_at": "2026-04-28T15:34:14.182312Z",
+  "universe_size": 200,
+  "universe_strategy": "WRDS \u2229 price-cache, top-200 alphabetical (sample reduction)",
+  "window": {
+    "start": "2015-01-01",
+    "end": "2024-12-31"
+  },
+  "composite_config": "v4-qmj-only",
+  "composite_weights": {
+    "obv_trend": 0.2,
+    "earnings_rank_score": 0.4,
+    "institutional_flow_score": 0.1,
+    "sentiment_score": 0.0,
+    "sector_momentum_score": 0.0,
+    "quality_score": 0.0,
+    "price_momentum_score": 0.0,
+    "insider_score": 0.0,
+    "event_timing_score": 0.0,
+    "price_regression_score": 0.0,
+    "arima_forecast_score": 0.0,
+    "qmj_score": 0.3
+  },
+  "earnings_weights": {
+    "erm_weight": 0.4846,
+    "sue_weight": 0.4654,
+    "dispersion_weight": 0.05
+  },
+  "runs": [
+    {
+      "name": "v4-qmj-only",
+      "label_suffix": "",
+      "status": "complete",
+      "error": null,
+      "elapsed_seconds": 299.2,
+      "config": {
+        "start_date": "2015-01-01",
+        "end_date": "2024-12-31",
+        "rebalance_freq": "monthly",
+        "train_months": 24,
+        "test_months": 6,
+        "n_tickers": 200,
+        "long_threshold": 0.2,
+        "short_threshold": -0.4,
+        "max_long_positions": 10,
+        "max_short_positions": 10,
+        "earnings_signal_weight": 0.3,
+        "earnings_erm_weight": 0.4846,
+        "earnings_sue_weight": 0.4654,
+        "earnings_dispersion_weight": 0.05,
+        "news_sentiment_weight": 0.1,
+        "enable_earnings_signals": true,
+        "enable_news_sentiment": true,
+        "enable_regime_filter": true,
+        "enable_ic_calibration": true
+      },
+      "metrics": {
+        "total_return_pct": 99.21,
+        "annual_return_pct": 9.21,
+        "sharpe": 1.3,
+        "sortino": 1.79,
+        "calmar": 0.62,
+        "max_drawdown_pct": 14.83,
+        "win_rate_pct": 47.9,
+        "total_trades": 847,
+        "avg_holding_days": 22.8,
+        "benchmark_return_pct": 239.88,
+        "benchmark_sharpe": null,
+        "alpha_pct": -140.67
+      },
+      "yearly": [
+        {
+          "year": 2017,
+          "strategy_return_pct": 21.06,
+          "benchmark_return_pct": 20.78,
+          "strategy_beats_benchmark": true
+        },
+        {
+          "year": 2018,
+          "strategy_return_pct": -1.83,
+          "benchmark_return_pct": -5.24,
+          "strategy_beats_benchmark": true
+        },
+        {
+          "year": 2019,
+          "strategy_return_pct": -0.35,
+          "benchmark_return_pct": 31.09,
+          "strategy_beats_benchmark": false
+        },
+        {
+          "year": 2020,
+          "strategy_return_pct": 2.58,
+          "benchmark_return_pct": 17.28,
+          "strategy_beats_benchmark": false
+        },
+        {
+          "year": 2021,
+          "strategy_return_pct": 15.61,
+          "benchmark_return_pct": 30.52,
+          "strategy_beats_benchmark": false
+        },
+        {
+          "year": 2022,
+          "strategy_return_pct": -7.18,
+          "benchmark_return_pct": -18.64,
+          "strategy_beats_benchmark": true
+        },
+        {
+          "year": 2023,
+          "strategy_return_pct": 7.0,
+          "benchmark_return_pct": 26.72,
+          "strategy_beats_benchmark": false
+        },
+        {
+          "year": 2024,
+          "strategy_return_pct": 39.12,
+          "benchmark_return_pct": 25.59,
+          "strategy_beats_benchmark": true
+        }
+      ],
+      "n_windows": 16,
+      "composite_weights_used": {
+        "obv_trend": 0.2,
+        "earnings_rank_score": 0.4,
+        "institutional_flow_score": 0.1,
+        "sentiment_score": 0.0,
+        "sector_momentum_score": 0.0,
+        "quality_score": 0.0,
+        "price_momentum_score": 0.0,
+        "insider_score": 0.0,
+        "event_timing_score": 0.0,
+        "price_regression_score": 0.0,
+        "arima_forecast_score": 0.0,
+        "qmj_score": 0.3
+      },
+      "auto_enabled": {
+        "enable_qmj_signal": true,
+        "enable_short_fundamental_veto": false
+      }
+    }
+  ]
+}
