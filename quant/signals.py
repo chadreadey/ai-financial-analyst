@@ -49,6 +49,7 @@ class SignalVector:
     kalshi_macro_momentum: float = 0.0  # Rate-of-change of macro modifier (velocity)
     price_regression_score: float = 0.0  # R²-filtered OLS trend signal [-1, +1]
     arima_forecast_score: float = 0.0    # ARIMA(1,1,1) forecast signal, stable regimes only [-1, +1]
+    qmj_score: float = 0.0  # Quality-Minus-Junk composite (Asness/Frazzini/Pedersen 2019) — opt-in via cfg.enable_qmj_signal
     earnings_blocked: bool = False  # True if earnings within 3 days — block new entries
     flags: list = field(default_factory=list)
 

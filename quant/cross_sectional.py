@@ -86,6 +86,7 @@ SIGNAL_FIELDS = [
     ("event_timing_score", None),
     ("price_regression_score", None),
     ("arima_forecast_score", None),
+    ("qmj_score", None),
 ]
 
 # 7 active + 3 zeroed signal fields.
@@ -118,6 +119,12 @@ DEFAULT_COMPOSITE_WEIGHTS = {
     "event_timing_score": 0.00,      # PEAD data is sparse — distorts cross-sectional normalization
     "price_regression_score": 0.1111,
     "arima_forecast_score": 0.0556,
+    # QMJ (Asness Quality-Minus-Junk proxy) — schema slot only.
+    # Default 0.0 keeps production behaviour unchanged. Opted in by
+    # composite-config overrides (e.g. v4-gold) AND requires
+    # `BacktestConfig.enable_qmj_signal=True` to populate the per-ticker
+    # qmj_score on the SignalVector during the per-rebalance loop.
+    "qmj_score": 0.00,
 }
 
 

@@ -142,6 +142,13 @@ class BacktestConfig:
     # ARIMA short-term forecast signal (stable vol regimes only)
     enable_arima_signal: bool = False
     arima_vol_threshold: float = 0.25
+    # QMJ composite signal (Asness Quality-Minus-Junk proxy)
+    # Opt-in: when True, run_walk_forward calls compute_qmj_score per
+    # ticker per rebalance and writes the result to SignalVector.qmj_score.
+    # Cross-sectional normalization happens via SIGNAL_FIELDS so the
+    # composite weight in DEFAULT_COMPOSITE_WEIGHTS["qmj_score"] is what
+    # ultimately tips the composite. Default-off keeps production unchanged.
+    enable_qmj_signal: bool = False
     # Sector-diversified selection (wide scan, concentrated picks)
     max_per_sector: int = 3               # max positions from any single GICS sector
     min_score_gap: float = 0.0            # min score above universe median to enter (0 = disabled)
@@ -2182,6 +2189,49 @@ def run_backtest(
             for ticker, qscore in quality_scores.items():
                 if ticker in signals:
                     signals[ticker].quality_score = qscore
+
+        # QMJ (Quality-Minus-Junk) composite signal — opt-in.
+        # Reads the WRDSPointInTimeStore directly via the provider's
+        # `_store` attribute since `compute_qmj_score` expects a store
+        # (not a FundamentalProvider wrapper). Per-ticker None / errors
+        # propagate as 0.0 (consistent with the cross-sectional skip
+        # behavior for all-zero columns). The cross-sectional normalizer
+        # in `cross_sectional.py:SIGNAL_FIELDS` z-scores qmj_score across
+        # the universe at each rebalance.
+        if (
+            getattr(config, "enable_qmj_signal", False)
+            and _wrds_provider is not None
+            and hasattr(_wrds_provider, "_store")
+        ):
+            try:
+                from quant.factor_baselines import compute_qmj_score
+                _qmj_store = _wrds_provider._store
+                _qmj_n_set = 0
+                for ticker, sv in signals.items():
+                    try:
+                        raw = compute_qmj_score(
+                            ticker, reb_date.date(), _qmj_store,
+                        )
+                    except Exception as _qmj_exc:
+                        logger.debug("QMJ failed for %s: %s", ticker, _qmj_exc)
+                        raw = None
+                    if raw is None:
+                        # NaN propagation per project_silent_zeros — but
+                        # SignalVector.qmj_score is a plain float so we
+                        # use 0.0 with the understanding that the cross-
+                        # sectional normalizer treats all-zero columns as
+                        # "skip". Individual zero values get z-scored to
+                        # neutral, which is the desired innocent-default.
+                        sv.qmj_score = 0.0
+                    else:
+                        sv.qmj_score = float(raw)
+                        _qmj_n_set += 1
+                logger.debug(
+                    "QMJ raw score set for %d/%d tickers at %s",
+                    _qmj_n_set, len(signals), reb_date.date(),
+                )
+            except Exception as _qmj_exc:
+                logger.warning("QMJ precompute failed: %s", _qmj_exc)
 
         # Price Momentum 12-1M (sets price_momentum_score from price cache)
         from quant.additional_signals import compute_price_momentum_scores
