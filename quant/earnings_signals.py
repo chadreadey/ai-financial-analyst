@@ -24,66 +24,58 @@ logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────────────────────────────────
-# IC-weighted earnings sub-blend (audit session 2)
+# IC-weighted earnings sub-blend (audit session 2 — 495-ticker universe)
 # ─────────────────────────────────────────────────────────────────────────
 #
 # Source IC numbers: docs/audit/session-2/ic-summary.md
-# (194-ticker WRDS ∩ price-cache universe, 2015-2024, walk-forward).
+# (495-ticker WRDS ∩ price-cache universe, 2015-2024, walk-forward).
 #
-# Per-horizon mean Spearman IC for each sub-signal:
+# Initial weights were computed on a 194-ticker subset (the WRDS ∩
+# price-cache universe BEFORE the 2026-04-27 price backfill). After the
+# backfill expanded coverage to the full 495 WRDS tickers, the IC re-run
+# materially shifted the relative ranking — most importantly, SUE
+# strengthened to nearly equal ERM. This block records the 495-universe
+# weights, which supersede the 194-universe values.
+#
+# Per-horizon mean Spearman IC for each sub-signal (495-universe):
 #                  1M       3M       6M       12M     3M t-stat   verdict
-#   ERM         +0.0277  +0.0325  +0.0518  +0.0344    +3.30   SIGNIFICANT all 4
-#   SUE         +0.0218  +0.0170  +0.0185  +0.0120    +1.35   marginal at 1M
-#   Dispersion  -0.0032  -0.0134  -0.0245  -0.0375    -0.83   NO_SIGNAL/wrong-sign
+#   ERM         +0.0196  +0.0239  +0.0353  +0.0188    +2.52   SIG 3M+6M; marginal 1M+12M
+#   SUE         +0.0276  +0.0241  +0.0210  +0.0167    +2.47   SIGNIFICANT 1M+3M
+#   Dispersion  -0.0071  -0.0164  -0.0232  -0.0316    -1.19   NO_SIGNAL/wrong-sign
 #
-# Methodology:
-#   1. Use the **multi-horizon mean IC over 1M/3M/6M only** (skip 12M).
-#      Rationale: at 12M both Piotroski and analyst_dispersion flip sign,
-#      indicating horizon-specific noise / regime contamination — see audit
-#      doc, "12M horizon" section. Including 12M would penalize signals
-#      for noise unrelated to their cross-sectional information content.
-#         ERM:  mean over 1M/3M/6M = +0.03733
-#         SUE:  mean over 1M/3M/6M = +0.01910
-#         DISP: mean over 1M/3M/6M = -0.01370
+# Methodology (unchanged from initial reweight):
+#   1. Multi-horizon mean IC over 1M/3M/6M only (skip 12M anomalies).
+#         ERM:  mean over 1M/3M/6M = +0.02627
+#         SUE:  mean over 1M/3M/6M = +0.02423
+#         DISP: mean over 1M/3M/6M = -0.01557
 #
-#   2. Zero out signals whose |3M t-stat| < 1.0. Dispersion (-0.83) is
-#      zeroed; SUE (+1.35) is RIGHT-direction at every horizon and is kept
-#      with a reduced weight. (The audit's stricter |t|≥1.5 "marginal"
-#      threshold would zero SUE too — we use the looser bar so the blend
-#      preserves the second-most-informative signal rather than collapsing
-#      to a single-signal portfolio.)
+#   2. Zero out signals whose |3M t-stat| < 1.0. Dispersion (-1.19) is
+#      zeroed. ERM (+2.52) and SUE (+2.47) both kept.
 #
-#   3. Apply 50% shrinkage toward equal weight (canonical for small-sample
-#      IC estimates):
-#         w_i = 0.5 * (IC_i / sum |IC_j|) + 0.5 * (1 / N_kept)
-#      computed across the kept signals (N_kept = 2 here: ERM, SUE).
-#         ERM_raw = 0.5 * (0.03733/0.05643) + 0.5 * 0.5 = 0.5808
-#         SUE_raw = 0.5 * (0.01910/0.05643) + 0.5 * 0.5 = 0.4192
+#   3. 50% shrinkage toward equal weight across kept signals (N=2):
+#         w_i = 0.5 * (IC_i / sum |IC_j|) + 0.5 * (1 / 2)
+#         ERM_raw = 0.5 * (0.02627/0.05050) + 0.5 * 0.5 = 0.5101
+#         SUE_raw = 0.5 * (0.02423/0.05050) + 0.5 * 0.5 = 0.4899
 #
-#   4. Reserve a 5% TOKEN weight for analyst_dispersion. We do NOT delete
-#      dispersion — per user direction the code path stays live so:
-#        (a) the cross-sectional pipeline doesn't break,
-#        (b) the signal can be promoted again if a regime shift makes it
-#            useful, and
-#        (c) divergence between dispersion and ERM/SUE may itself become
-#            a signal in Session 3.
-#      The 0.95/0.05 reweight on the kept-signals block:
-#         ERM_final = 0.5808 * 0.95 = 0.5517
-#         SUE_final = 0.4192 * 0.95 = 0.3983
-#         DISP_final =                0.0500
+#   4. 0.95/0.05 reweight to keep dispersion path alive at 5% token weight:
+#         ERM_final = 0.5101 * 0.95 = 0.4846
+#         SUE_final = 0.4899 * 0.95 = 0.4654
+#         DISP_final =                 0.0500
+#      Rounded to 4dp for clarity: ERM 0.4846, SUE 0.4654, DISP 0.0500.
 #
-# Comparison vs prior hand-tuned weights:
-#     name                  prior   new      delta
-#     erm_weight             0.40   0.5517   +0.15
-#     sue_weight             0.35   0.3983   +0.05
-#     dispersion_weight      0.25   0.0500   -0.20
+# Comparison vs prior weights:
+#     name             v0(prior)  v1(194)  v2(495)   net change
+#     erm_weight          0.40    0.5517   0.4846    +0.085
+#     sue_weight          0.35    0.3983   0.4654    +0.115
+#     dispersion_weight   0.25    0.0500   0.0500    -0.200
 #
-# Net effect: weight reallocates AWAY from analyst_dispersion (which has
-# wrong-sign IC at every horizon and t=-0.83 at 3M) and INTO ERM (+3.30 t,
-# strongest signal in the entire fundamental stack at 3M).
+# Net effect: ERM and SUE are now nearly co-equal at ~48% / ~47%. The
+# 495-universe data revealed SUE was understated on the small-cap-deficient
+# 194-ticker set. Dispersion remains effectively dropped at 5% (path live
+# for divergence-as-signal experiments per user direction).
 EARNINGS_BLEND_WEIGHTS: dict[str, float] = {
-    "erm": 0.5517,
-    "sue": 0.3983,
+    "erm": 0.4846,
+    "sue": 0.4654,
     "analyst_dispersion": 0.0500,
 }
 
