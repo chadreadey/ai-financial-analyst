@@ -1,0 +1,536 @@
+{
+  "meta": {
+    "start": "2015-01-01",
+    "end": "2024-12-31",
+    "universe_size": 495,
+    "n_rebalance_dates": 120,
+    "signals": [
+      "erm",
+      "sue",
+      "analyst_dispersion",
+      "quality_score",
+      "price_momentum",
+      "piotroski",
+      "qmj",
+      "hml_bm",
+      "obv_trend"
+    ],
+    "method": "spearman",
+    "walk_forward_only": true,
+    "cpcv_used": false,
+    "runtime_seconds": 223.2,
+    "wrds_tickers_total": 495,
+    "price_cache_tickers_total": 516,
+    "intersection_universe_total": 495,
+    "limit_tickers": null,
+    "exclusions": {
+      "insider_mspr": "0% coverage (Finnhub MSPR cache not on disk).",
+      "institutional_flow": "Excluded for honesty \u2014 partial cache only."
+    }
+  },
+  "signal_coverage_pct": {
+    "erm": 100.0,
+    "sue": 100.0,
+    "analyst_dispersion": 100.0,
+    "quality_score": 100.0,
+    "price_momentum": 100.0,
+    "piotroski": 100.0,
+    "qmj": 100.0,
+    "hml_bm": 100.0,
+    "obv_trend": 100.0
+  },
+  "mean_correlation": {
+    "erm": {
+      "erm": 1.0,
+      "sue": 0.2674,
+      "analyst_dispersion": 0.0527,
+      "quality_score": 0.1303,
+      "price_momentum": 0.3381,
+      "piotroski": 0.1751,
+      "qmj": 0.2279,
+      "hml_bm": -0.1194,
+      "obv_trend": 0.0455
+    },
+    "sue": {
+      "erm": 0.2674,
+      "sue": 1.0,
+      "analyst_dispersion": 0.1242,
+      "quality_score": 0.2487,
+      "price_momentum": 0.2589,
+      "piotroski": 0.4353,
+      "qmj": 0.5355,
+      "hml_bm": -0.1205,
+      "obv_trend": 0.0355
+    },
+    "analyst_dispersion": {
+      "erm": 0.0527,
+      "sue": 0.1242,
+      "analyst_dispersion": 1.0,
+      "quality_score": 0.2001,
+      "price_momentum": 0.0616,
+      "piotroski": 0.0925,
+      "qmj": 0.0667,
+      "hml_bm": -0.2477,
+      "obv_trend": 0.0306
+    },
+    "quality_score": {
+      "erm": 0.1303,
+      "sue": 0.2487,
+      "analyst_dispersion": 0.2001,
+      "quality_score": 1.0,
+      "price_momentum": 0.1096,
+      "piotroski": 0.1219,
+      "qmj": 0.31,
+      "hml_bm": -0.2923,
+      "obv_trend": 0.0226
+    },
+    "price_momentum": {
+      "erm": 0.3381,
+      "sue": 0.2589,
+      "analyst_dispersion": 0.0616,
+      "quality_score": 0.1096,
+      "price_momentum": 1.0,
+      "piotroski": 0.1591,
+      "qmj": 0.2156,
+      "hml_bm": -0.1868,
+      "obv_trend": 0.0173
+    },
+    "piotroski": {
+      "erm": 0.1751,
+      "sue": 0.4353,
+      "analyst_dispersion": 0.0925,
+      "quality_score": 0.1219,
+      "price_momentum": 0.1591,
+      "piotroski": 1.0,
+      "qmj": 0.2847,
+      "hml_bm": -0.0462,
+      "obv_trend": 0.0273
+    },
+    "qmj": {
+      "erm": 0.2279,
+      "sue": 0.5355,
+      "analyst_dispersion": 0.0667,
+      "quality_score": 0.31,
+      "price_momentum": 0.2156,
+      "piotroski": 0.2847,
+      "qmj": 1.0,
+      "hml_bm": -0.1004,
+      "obv_trend": 0.0322
+    },
+    "hml_bm": {
+      "erm": -0.1194,
+      "sue": -0.1205,
+      "analyst_dispersion": -0.2477,
+      "quality_score": -0.2923,
+      "price_momentum": -0.1868,
+      "piotroski": -0.0462,
+      "qmj": -0.1004,
+      "hml_bm": 1.0,
+      "obv_trend": -0.0286
+    },
+    "obv_trend": {
+      "erm": 0.0455,
+      "sue": 0.0355,
+      "analyst_dispersion": 0.0306,
+      "quality_score": 0.0226,
+      "price_momentum": 0.0173,
+      "piotroski": 0.0273,
+      "qmj": 0.0322,
+      "hml_bm": -0.0286,
+      "obv_trend": 1.0
+    }
+  },
+  "std_correlation": {
+    "erm": {
+      "erm": 0.0,
+      "sue": 0.0897,
+      "analyst_dispersion": 0.1536,
+      "quality_score": 0.0708,
+      "price_momentum": 0.0872,
+      "piotroski": 0.0797,
+      "qmj": 0.0986,
+      "hml_bm": 0.0784,
+      "obv_trend": 0.1009
+    },
+    "sue": {
+      "erm": 0.0897,
+      "sue": 0.0,
+      "analyst_dispersion": 0.1109,
+      "quality_score": 0.0812,
+      "price_momentum": 0.1007,
+      "piotroski": 0.0703,
+      "qmj": 0.198,
+      "hml_bm": 0.0938,
+      "obv_trend": 0.0935
+    },
+    "analyst_dispersion": {
+      "erm": 0.1536,
+      "sue": 0.1109,
+      "analyst_dispersion": 0.0,
+      "quality_score": 0.065,
+      "price_momentum": 0.1992,
+      "piotroski": 0.0848,
+      "qmj": 0.131,
+      "hml_bm": 0.0691,
+      "obv_trend": 0.1316
+    },
+    "quality_score": {
+      "erm": 0.0708,
+      "sue": 0.0812,
+      "analyst_dispersion": 0.065,
+      "quality_score": 0.0,
+      "price_momentum": 0.126,
+      "piotroski": 0.0818,
+      "qmj": 0.0971,
+      "hml_bm": 0.0647,
+      "obv_trend": 0.1062
+    },
+    "price_momentum": {
+      "erm": 0.0872,
+      "sue": 0.1007,
+      "analyst_dispersion": 0.1992,
+      "quality_score": 0.126,
+      "price_momentum": 0.0,
+      "piotroski": 0.1015,
+      "qmj": 0.1156,
+      "hml_bm": 0.1871,
+      "obv_trend": 0.1884
+    },
+    "piotroski": {
+      "erm": 0.0797,
+      "sue": 0.0703,
+      "analyst_dispersion": 0.0848,
+      "quality_score": 0.0818,
+      "price_momentum": 0.1015,
+      "piotroski": 0.0,
+      "qmj": 0.1407,
+      "hml_bm": 0.066,
+      "obv_trend": 0.0826
+    },
+    "qmj": {
+      "erm": 0.0986,
+      "sue": 0.198,
+      "analyst_dispersion": 0.131,
+      "quality_score": 0.0971,
+      "price_momentum": 0.1156,
+      "piotroski": 0.1407,
+      "qmj": 0.0,
+      "hml_bm": 0.0957,
+      "obv_trend": 0.0973
+    },
+    "hml_bm": {
+      "erm": 0.0784,
+      "sue": 0.0938,
+      "analyst_dispersion": 0.0691,
+      "quality_score": 0.0647,
+      "price_momentum": 0.1871,
+      "piotroski": 0.066,
+      "qmj": 0.0957,
+      "hml_bm": 0.0,
+      "obv_trend": 0.1392
+    },
+    "obv_trend": {
+      "erm": 0.1009,
+      "sue": 0.0935,
+      "analyst_dispersion": 0.1316,
+      "quality_score": 0.1062,
+      "price_momentum": 0.1884,
+      "piotroski": 0.0826,
+      "qmj": 0.0973,
+      "hml_bm": 0.1392,
+      "obv_trend": 0.0
+    }
+  },
+  "pairs": [
+    {
+      "a": "erm",
+      "b": "sue",
+      "mean": 0.2674,
+      "std": 0.0897,
+      "abs_mean": 0.2674,
+      "instability_ratio": 0.336
+    },
+    {
+      "a": "erm",
+      "b": "analyst_dispersion",
+      "mean": 0.0527,
+      "std": 0.1536,
+      "abs_mean": 0.0527,
+      "instability_ratio": 2.916
+    },
+    {
+      "a": "erm",
+      "b": "quality_score",
+      "mean": 0.1303,
+      "std": 0.0708,
+      "abs_mean": 0.1303,
+      "instability_ratio": 0.543
+    },
+    {
+      "a": "erm",
+      "b": "price_momentum",
+      "mean": 0.3381,
+      "std": 0.0872,
+      "abs_mean": 0.3381,
+      "instability_ratio": 0.258
+    },
+    {
+      "a": "erm",
+      "b": "piotroski",
+      "mean": 0.1751,
+      "std": 0.0797,
+      "abs_mean": 0.1751,
+      "instability_ratio": 0.455
+    },
+    {
+      "a": "erm",
+      "b": "qmj",
+      "mean": 0.2279,
+      "std": 0.0986,
+      "abs_mean": 0.2279,
+      "instability_ratio": 0.433
+    },
+    {
+      "a": "erm",
+      "b": "hml_bm",
+      "mean": -0.1194,
+      "std": 0.0784,
+      "abs_mean": 0.1194,
+      "instability_ratio": 0.657
+    },
+    {
+      "a": "erm",
+      "b": "obv_trend",
+      "mean": 0.0455,
+      "std": 0.1009,
+      "abs_mean": 0.0455,
+      "instability_ratio": 2.219
+    },
+    {
+      "a": "sue",
+      "b": "analyst_dispersion",
+      "mean": 0.1242,
+      "std": 0.1109,
+      "abs_mean": 0.1242,
+      "instability_ratio": 0.893
+    },
+    {
+      "a": "sue",
+      "b": "quality_score",
+      "mean": 0.2487,
+      "std": 0.0812,
+      "abs_mean": 0.2487,
+      "instability_ratio": 0.327
+    },
+    {
+      "a": "sue",
+      "b": "price_momentum",
+      "mean": 0.2589,
+      "std": 0.1007,
+      "abs_mean": 0.2589,
+      "instability_ratio": 0.389
+    },
+    {
+      "a": "sue",
+      "b": "piotroski",
+      "mean": 0.4353,
+      "std": 0.0703,
+      "abs_mean": 0.4353,
+      "instability_ratio": 0.161
+    },
+    {
+      "a": "sue",
+      "b": "qmj",
+      "mean": 0.5355,
+      "std": 0.198,
+      "abs_mean": 0.5355,
+      "instability_ratio": 0.37
+    },
+    {
+      "a": "sue",
+      "b": "hml_bm",
+      "mean": -0.1205,
+      "std": 0.0938,
+      "abs_mean": 0.1205,
+      "instability_ratio": 0.778
+    },
+    {
+      "a": "sue",
+      "b": "obv_trend",
+      "mean": 0.0355,
+      "std": 0.0935,
+      "abs_mean": 0.0355,
+      "instability_ratio": 2.631
+    },
+    {
+      "a": "analyst_dispersion",
+      "b": "quality_score",
+      "mean": 0.2001,
+      "std": 0.065,
+      "abs_mean": 0.2001,
+      "instability_ratio": 0.325
+    },
+    {
+      "a": "analyst_dispersion",
+      "b": "price_momentum",
+      "mean": 0.0616,
+      "std": 0.1992,
+      "abs_mean": 0.0616,
+      "instability_ratio": 3.234
+    },
+    {
+      "a": "analyst_dispersion",
+      "b": "piotroski",
+      "mean": 0.0925,
+      "std": 0.0848,
+      "abs_mean": 0.0925,
+      "instability_ratio": 0.917
+    },
+    {
+      "a": "analyst_dispersion",
+      "b": "qmj",
+      "mean": 0.0667,
+      "std": 0.131,
+      "abs_mean": 0.0667,
+      "instability_ratio": 1.965
+    },
+    {
+      "a": "analyst_dispersion",
+      "b": "hml_bm",
+      "mean": -0.2477,
+      "std": 0.0691,
+      "abs_mean": 0.2477,
+      "instability_ratio": 0.279
+    },
+    {
+      "a": "analyst_dispersion",
+      "b": "obv_trend",
+      "mean": 0.0306,
+      "std": 0.1316,
+      "abs_mean": 0.0306,
+      "instability_ratio": 4.296
+    },
+    {
+      "a": "quality_score",
+      "b": "price_momentum",
+      "mean": 0.1096,
+      "std": 0.126,
+      "abs_mean": 0.1096,
+      "instability_ratio": 1.149
+    },
+    {
+      "a": "quality_score",
+      "b": "piotroski",
+      "mean": 0.1219,
+      "std": 0.0818,
+      "abs_mean": 0.1219,
+      "instability_ratio": 0.67
+    },
+    {
+      "a": "quality_score",
+      "b": "qmj",
+      "mean": 0.31,
+      "std": 0.0971,
+      "abs_mean": 0.31,
+      "instability_ratio": 0.313
+    },
+    {
+      "a": "quality_score",
+      "b": "hml_bm",
+      "mean": -0.2923,
+      "std": 0.0647,
+      "abs_mean": 0.2923,
+      "instability_ratio": 0.221
+    },
+    {
+      "a": "quality_score",
+      "b": "obv_trend",
+      "mean": 0.0226,
+      "std": 0.1062,
+      "abs_mean": 0.0226,
+      "instability_ratio": 4.708
+    },
+    {
+      "a": "price_momentum",
+      "b": "piotroski",
+      "mean": 0.1591,
+      "std": 0.1015,
+      "abs_mean": 0.1591,
+      "instability_ratio": 0.638
+    },
+    {
+      "a": "price_momentum",
+      "b": "qmj",
+      "mean": 0.2156,
+      "std": 0.1156,
+      "abs_mean": 0.2156,
+      "instability_ratio": 0.536
+    },
+    {
+      "a": "price_momentum",
+      "b": "hml_bm",
+      "mean": -0.1868,
+      "std": 0.1871,
+      "abs_mean": 0.1868,
+      "instability_ratio": 1.002
+    },
+    {
+      "a": "price_momentum",
+      "b": "obv_trend",
+      "mean": 0.0173,
+      "std": 0.1884,
+      "abs_mean": 0.0173,
+      "instability_ratio": 10.921
+    },
+    {
+      "a": "piotroski",
+      "b": "qmj",
+      "mean": 0.2847,
+      "std": 0.1407,
+      "abs_mean": 0.2847,
+      "instability_ratio": 0.494
+    },
+    {
+      "a": "piotroski",
+      "b": "hml_bm",
+      "mean": -0.0462,
+      "std": 0.066,
+      "abs_mean": 0.0462,
+      "instability_ratio": 1.429
+    },
+    {
+      "a": "piotroski",
+      "b": "obv_trend",
+      "mean": 0.0273,
+      "std": 0.0826,
+      "abs_mean": 0.0273,
+      "instability_ratio": 3.027
+    },
+    {
+      "a": "qmj",
+      "b": "hml_bm",
+      "mean": -0.1004,
+      "std": 0.0957,
+      "abs_mean": 0.1004,
+      "instability_ratio": 0.953
+    },
+    {
+      "a": "qmj",
+      "b": "obv_trend",
+      "mean": 0.0322,
+      "std": 0.0973,
+      "abs_mean": 0.0322,
+      "instability_ratio": 3.019
+    },
+    {
+      "a": "hml_bm",
+      "b": "obv_trend",
+      "mean": -0.0286,
+      "std": 0.1392,
+      "abs_mean": 0.0286,
+      "instability_ratio": 4.872
+    }
+  ],
+  "effective_dimensionality": 7.85,
+  "nominal_signals": 9
+}

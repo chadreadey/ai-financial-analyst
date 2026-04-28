@@ -67,7 +67,13 @@ from quant.earnings_signals import (  # noqa: E402
 from quant.additional_signals import (  # noqa: E402
     compute_quality_scores,
     compute_price_momentum_scores,
+    compute_insider_scores,
 )
+try:
+    from finnhub_client import SentimentDiskCache  # noqa: E402
+    _SENTIMENT_CACHE = SentimentDiskCache()
+except Exception:
+    _SENTIMENT_CACHE = None
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +180,10 @@ def compute_signal_panel(
     # ── Vectorized cross-sectional precompute ─────────────────────────
     momentum_scores = compute_price_momentum_scores(universe_data, as_of)
     quality_scores = compute_quality_scores(tickers, provider, as_of_d)
+    # insider MSPR — disk cache only, no API calls (prefetched 2026-04-27)
+    insider_scores = compute_insider_scores(
+        tickers, as_of, finnhub_client=None, sentiment_cache=_SENTIMENT_CACHE,
+    )
 
     rows = {}
     for t in tickers:
@@ -205,6 +215,8 @@ def compute_signal_panel(
             row["quality_score"] = float(quality_scores[t])
         if t in momentum_scores:
             row["price_momentum"] = float(momentum_scores[t])
+        if t in insider_scores:
+            row["insider_mspr"] = float(insider_scores[t])
 
         # Baselines
         try:
