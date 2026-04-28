@@ -105,6 +105,14 @@ class BacktestConfig:
     enable_earnings_signals: bool = False
     earnings_signal_weight: float = 0.30  # total weight for combined earnings signal
     earnings_rank_mode: bool = False      # Path A: rank by earnings score, technicals filter only
+    # Per-component sub-blend weight overrides for the earnings signal.
+    # When None, defaults from EARNINGS_BLEND_WEIGHTS in quant/earnings_signals.py
+    # are used. Audit harnesses (scripts/run_audit_walkforward.py) set these to
+    # compare v0 (hand-tuned) vs v2 (IC-derived) sub-blend weights without
+    # mutating the committed module-level defaults.
+    earnings_erm_weight: Optional[float] = None
+    earnings_sue_weight: Optional[float] = None
+    earnings_dispersion_weight: Optional[float] = None
     # Institutional flow signal (FMP + Finnhub 13F ownership data)
     enable_institutional_flow: bool = False
     institutional_flow_weight: float = 0.15  # weight in composite
@@ -2834,9 +2842,17 @@ def run_walk_forward(
             # Earnings signals overlay (ERM + SUE + Dispersion from WRDS IBES)
             if config.enable_earnings_signals and _wrds_provider is not None:
                 from quant.earnings_signals import compute_earnings_signal_scores, blend_earnings_signals
+                _earn_kwargs = {}
+                if config.earnings_erm_weight is not None:
+                    _earn_kwargs["erm_weight"] = config.earnings_erm_weight
+                if config.earnings_sue_weight is not None:
+                    _earn_kwargs["sue_weight"] = config.earnings_sue_weight
+                if config.earnings_dispersion_weight is not None:
+                    _earn_kwargs["dispersion_weight"] = config.earnings_dispersion_weight
                 earn_scores = compute_earnings_signal_scores(
                     list(signals.keys()), _wrds_provider,
                     as_of_date=reb_date.date(),
+                    **_earn_kwargs,
                 )
                 if earn_scores:
                     signals = blend_earnings_signals(signals, earn_scores, config.earnings_signal_weight)
