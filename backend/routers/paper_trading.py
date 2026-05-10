@@ -414,10 +414,29 @@ async def get_alpaca_orders():
 
 @router.post("/rebalance")
 async def trigger_rebalance(body: dict = None):
-    """Trigger a manual rebalance. Optionally pass {"tickers": ["AAPL", "MSFT"]}."""
+    """
+    Trigger a manual rebalance.
+
+    Body (all fields optional):
+      {
+        "tickers": ["AAPL", "MSFT"],  // explicit override — bypasses quant screen
+        "use_quant_screen": true,     // default true; set false to use watchlist
+        "top_n_quant": 30             // default 30; number of quant candidates
+      }
+
+    Backward compat: passing only `{"tickers": [...]}` continues to work
+    (explicit tickers override the quant screen, same as before).
+    """
     try:
-        tickers = (body or {}).get("tickers")
-        result = run_rebalance(target_tickers=tickers)
+        body = body or {}
+        tickers = body.get("tickers")
+        use_quant_screen = bool(body.get("use_quant_screen", True))
+        top_n_quant = int(body.get("top_n_quant", 30))
+        result = run_rebalance(
+            target_tickers=tickers,
+            use_quant_screen=use_quant_screen,
+            top_n_quant=top_n_quant,
+        )
         return result
     except Exception as exc:
         logger.error("Rebalance failed: %s", exc, exc_info=True)
