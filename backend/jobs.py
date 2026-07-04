@@ -67,8 +67,14 @@ class ProgressReporter:
         self._job.progress_queue.put({"step": message, "pct": pct})
 
 
-def run_analysis_job(job: JobState, request) -> None:
-    """Run the analysis pipeline in a background thread."""
+def run_analysis_job(job: JobState, request, auto_paper_trade: Optional[bool] = None) -> None:
+    """Run the analysis pipeline in a background thread.
+
+    ``auto_paper_trade`` overrides the global ``settings.auto_paper_trade``
+    for this run only. The rebalance scheduler passes ``False`` so it stays
+    the single order submitter (audit F-001); ``None`` keeps the default
+    behaviour for the normal ``/analysis/run`` path.
+    """
     import asyncio
 
     job.status = "running"
@@ -121,7 +127,11 @@ def run_analysis_job(job: JobState, request) -> None:
 
         async def _pipeline():
             reporter.write(f"Initializing analysis for {job.ticker}...", 2)
-            return await orchestrator.run(job.ticker, progress_callback=reporter.write)
+            return await orchestrator.run(
+                job.ticker,
+                progress_callback=reporter.write,
+                auto_paper_trade=auto_paper_trade,
+            )
 
         try:
             result = asyncio.run(_pipeline())
