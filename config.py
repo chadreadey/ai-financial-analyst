@@ -126,6 +126,14 @@ class Settings(BaseSettings):
     # ── Logging ────────────────────────────────────────────────────
     log_level: str = "INFO"
 
+    # ── Assumption audit (stochastic assumption logger) ─────────────
+    # When enabled, statistical routines that are instrumented with
+    # quant.assumption_audit record every assumption they rely on (min
+    # sample, IID/no-autocorrelation, silent zeros, look-ahead, ...) to a
+    # JSONL file. Read it with `python scripts/show_assumption_log.py`.
+    assumption_audit_enabled: bool = True
+    assumption_audit_log_path: str = "logs/assumptions.jsonl"
+
     # ── Warehouse ───────────────────────────────────────────────────
     enable_warehouse: bool = False
     warehouse_db_path: str = ".warehouse.db"

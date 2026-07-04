@@ -871,28 +871,75 @@ _default_log: Optional[AssumptionLog] = None
 _default_lock = threading.Lock()
 
 
+def _resolve_default_config() -> tuple[bool, Optional[str]]:
+    """Resolve (enabled, jsonl_path) for the default log.
+
+    Precedence: explicit environment variables win (so ops can toggle without a
+    code change), then ``config.settings`` if importable, then hard defaults.
+    Importing ``config`` is optional and wrapped — this module must stay usable
+    with no application config present.
+    """
+    enabled: bool = True
+    jsonl: Optional[str] = None
+
+    # Layer 1: application settings, if available.
+    try:
+        from config import settings  # optional
+        enabled = bool(getattr(settings, "assumption_audit_enabled", True))
+        jsonl = getattr(settings, "assumption_audit_log_path", None) or None
+    except Exception:
+        pass
+
+    # Layer 2: environment overrides.
+    env_enabled = os.getenv("ASSUMPTION_AUDIT_ENABLED")
+    if env_enabled is not None:
+        enabled = env_enabled.lower() not in ("0", "false", "no")
+    env_jsonl = os.getenv("ASSUMPTION_AUDIT_JSONL")
+    if env_jsonl is not None:
+        jsonl = env_jsonl or None
+
+    return enabled, jsonl
+
+
 def get_audit_log() -> AssumptionLog:
     """Return the process-wide default log.
 
-    Honours two environment variables so instrumentation can be toggled
-    without code changes:
-      ASSUMPTION_AUDIT_ENABLED  ("0"/"false" disables recording)
-      ASSUMPTION_AUDIT_JSONL    (path to stream records to)
+    Configuration precedence (see :func:`_resolve_default_config`):
+      1. ``ASSUMPTION_AUDIT_ENABLED`` / ``ASSUMPTION_AUDIT_JSONL`` env vars
+      2. ``config.settings.assumption_audit_enabled`` / ``.assumption_audit_log_path``
+      3. built-in defaults (enabled, no file sink)
     """
     global _default_log
     if _default_log is None:
         with _default_lock:
             if _default_log is None:
-                enabled_env = os.getenv("ASSUMPTION_AUDIT_ENABLED", "1").lower()
-                enabled = enabled_env not in ("0", "false", "no")
-                jsonl = os.getenv("ASSUMPTION_AUDIT_JSONL") or None
+                enabled, jsonl = _resolve_default_config()
                 _default_log = AssumptionLog(enabled=enabled, jsonl_path=jsonl)
     return _default_log
 
 
+def configure_default_log(
+    *,
+    enabled: Optional[bool] = None,
+    jsonl_path: Optional[str] = None,
+) -> AssumptionLog:
+    """Reconfigure the process-wide default log in place (e.g. at app startup).
+
+    Only the provided arguments are changed. Returns the default log.
+    """
+    log = get_audit_log()
+    if enabled is not None:
+        log.set_enabled(enabled)
+    if jsonl_path is not None:
+        log.set_jsonl_path(jsonl_path)
+    return log
+
+
 def reset_audit_log() -> AssumptionLog:
-    """Replace the default log with a fresh one (useful in tests)."""
+    """Replace the default log with a fresh one, re-resolving configuration
+    (env vars / settings). Useful in tests and after a config change."""
     global _default_log
     with _default_lock:
-        _default_log = AssumptionLog()
+        enabled, jsonl = _resolve_default_config()
+        _default_log = AssumptionLog(enabled=enabled, jsonl_path=jsonl)
     return _default_log

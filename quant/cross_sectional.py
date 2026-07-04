@@ -74,6 +74,18 @@ MIN_CROSS_SECTION = 10
 WINSORIZE_LOW = 2.5
 WINSORIZE_HIGH = 97.5
 
+
+def _get_assumption_log():
+    """Return the default assumption log if the logger is importable and
+    enabled, else None. Import is wrapped so this file never hard-depends on
+    the audit module or the app config."""
+    try:
+        from quant.assumption_audit import get_audit_log
+        log = get_audit_log()
+        return log if log.enabled else None
+    except Exception:
+        return None
+
 SIGNAL_FIELDS = [
     ("obv_trend", "score"),
     ("earnings_rank_score", None),
@@ -183,9 +195,21 @@ def normalize_signals_cross_sectionally(
     tickers = list(signals.keys())
     n = len(tickers)
 
+    # Assumption logging (inert unless enabled): the cross-sectional z-score is
+    # only meaningful with enough names, and a signal field that is mostly zeros
+    # is usually missing data coerced to 0 rather than a genuine neutral reading
+    # (audit C1). This never changes the returned signals.
+    _audit = _get_assumption_log()
+
     if n < MIN_CROSS_SECTION:
         logger.debug("Cross-section too small (%d < %d) — skipping normalization", n, MIN_CROSS_SECTION)
+        if _audit is not None:
+            with _audit.context(module="cross_sectional.normalize", n_tickers=n):
+                _audit.min_sample("cross_section_size", n=n, min_n=MIN_CROSS_SECTION)
         return signals
+
+    if _audit is not None:
+        _audit.min_sample("cross_section_size", n=n, min_n=MIN_CROSS_SECTION)
 
     sectors = {t: sector_fn(t) for t in tickers}
 
@@ -194,6 +218,10 @@ def normalize_signals_cross_sectionally(
 
         if np.all(raw_scores == 0.0):
             continue
+
+        if _audit is not None:
+            with _audit.context(module="cross_sectional.normalize", signal=field_name):
+                _audit.no_silent_zeros(field_name, raw_scores.tolist())
 
         # Subtract sector mean
         sector_means = {}
