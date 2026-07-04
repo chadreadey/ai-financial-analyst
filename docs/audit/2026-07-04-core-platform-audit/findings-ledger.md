@@ -414,4 +414,113 @@ The skill requires every finding be cross-examined. With 53 findings, the contro
 
 ---
 
-*(Phase 2/3/4 verdicts appended below as they complete.)*
+## Phase 2 — Cross-Examination Verdicts
+
+Five batched cross-examiners, each with a **refuter lens different from the origin persona** of every finding it examined, received claim+evidence only (not severity/confidence). Instructed to *refute*.
+
+| Finding | Refuter lens | Verdict | Key reasoning |
+|---|---|---|---|
+| F-001 | SEC+COR | **CONFIRMED** | Both order paths fire on one run; no idempotency guard; `current_symbols` captured once and never refreshed. |
+| F-002 | SEC+COR | **CONFIRMED** | Scheduled path uses `target_tickers=None`; bare except → `[]` → close-all; no fail-closed. |
+| F-003 | REL+COR | **CONFIRMED** (paper-only) | No global auth; trade gated only by deploy-time Alpaca keys, not access control. |
+| F-004 | REL+COR | **CONFIRMED** | Parent of F-003/F-005. Auth on exactly one router; public via Vercel→Railway rewrite + `--host 0.0.0.0`. |
+| F-005 | REL+COR | **CONFIRMED** (paper-only) | Chain verified; order requires keys + conviction≥0.40 + BUY/SELL + entry_price>0, but fires without caller auth. |
+| F-006 | SEC+COR | **CONFIRMED** | Held names hit `continue`; no stop-loss monitor exists; only watchlist-removal closes. |
+| F-007 | DATA+SEC | **DOWNGRADED** | Deterministic override (orch:879-907) neutralizes orchestrator/scheduler paths; residual = legacy DB rows / missing `weighted_score` → track as NEEDS-EVIDENCE for legacy rows. |
+| F-008 | DATA+SEC | **CONFIRMED** | Unconditional INSERT OR REPLACE; realized PnL only on manual close. |
+| F-009 | DATA+SEC | **CONFIRMED** | Sync drops unstated columns → verdict/conviction wiped, entry_date reset; nothing repopulates after. |
+| F-010 | DATA+SEC | **CONFIRMED** | No DELETE for closed symbols; ghost rows surface on /positions and block re-entry. |
+| F-011 | REL+COR | **CONFIRMED** | Unlocked env race between set and Orchestrator init; finally-restore can clobber sibling job. |
+| F-012 | REL+COR | **DOWNGRADED** | Verbatim error return confirmed; "key fragments" unproven (typical caller = requester). |
+| F-013 | REL+COR | **REFUTED** | sentry-sdk 2.x defaults `send_default_pii` off + EventScrubber active; omission ≠ enablement. |
+| F-014 | REL+COR | **CONFIRMED** | No throttling middleware; operator-key denial-of-wallet + CPU DoS real (news 300s cache = partial). |
+| F-015 | REL+COR | **DOWNGRADED** | Regex squatting plausible, but frontend never sends credentials; real exposure is F-004, not CORS. |
+| F-016 | SEC+COR | **CONFIRMED** | `async def` calls blocking `run_rebalance` directly; analysis.py shows the offload pattern that's missing here. |
+| F-017 | SEC+COR | **CONFIRMED** | TradingClient given no timeout; alpaca-py exposes none; underlying requests default = infinite. |
+| F-018 | SEC+COR | **CONFIRMED** | fredapi wrapped with no timeout; on default-on analysis path; cache doesn't bound hangs. |
+| F-019 | SEC+COR | **CONFIRMED (loop)** / scope-narrowed | Infinite loop real; affects Alpaca price-provider consumers, NOT the rebalance LLM path (uses Tiingo). |
+| F-020 | SEC+COR | **CONFIRMED** | `asyncio.run` with no wait_for; job GC only cleans completed dict entries, doesn't interrupt. |
+| F-021 | SEC+COR | **DOWNGRADED** | Wedged-worker/LB claim refuted (probe times out → detected). Real gap = silent dependency degradation. |
+| F-022 | SEC+COR | **CONFIRMED** | Module dict, TTL-on-read only, no eviction/cap. |
+| F-023 | SEC+COR | **CONFIRMED** | close() only on success paths at all three sites; correct try/finally exists elsewhere in repo. |
+| F-024 | REL+SEC | **CONFIRMED** | Consumer verified: `enable_ic_calibration=True` default (backtest.py:51); IC weights from later train applied to earlier test. Per-date signals ARE PIT-safe (leak is in weight calibration only). |
+| F-025 | REL+SEC | **DOWNGRADED** | Real footgun but all defaults=1 (router, UI, scripts); zero never used in repo. |
+| F-026 | REL+SEC | **REFUTED** | Purge removes shared boundary date from BOTH lists (cpcv.py:190-191) → in neither set, not both. |
+| F-027 | REL+SEC | **CONFIRMED** | `n_obs` = combo count feeds DSR se∝1/√(n_obs-1); not return-sample size. Median (not max) is slightly conservative. |
+| F-028 | REL+SEC | **REFUTED** | `is_sharpes` never populated anywhere → `is_optimal` branch is dead code; live PBO path is `oos_negative_fraction`. (Residual: that proxy is also not rigorous logit-PBO — logged as F-028R below.) |
+| F-029 | REL+SEC | **DOWNGRADED** | Backtest/CPCV use `compute_signals_at_date` (PIT-safe); helper's only caller is live "now" ranking. |
+| F-030 | REL+SEC | **CONFIRMED** | run() never references config.start_date/end_date; recs = all history, prices = rolling 5y from now. |
+| F-032 | DATA+SEC | **CONFIRMED** | TIME_DECAY_DAYS=90 constant; early stop-loss exits happen → mis-annualization. |
+| F-033 | DATA+SEC | **CONFIRMED** | metrics.py multiplies by √252 on a per-trade series at both call sites. |
+| F-034 | DATA+SEC | **DOWNGRADED** | Terminal equity is order-invariant (commutative); the `equity_curve` time series is what's wrong. |
+| F-035 | DATA+SEC | **REFUTED** | total_pnl_pct and mean/std are order-invariant over the same multiset → no impact. |
+| F-036 | DATA+SEC | **CONFIRMED** | No direction branch; SHORTs exist (SELL→SHORT mapping); callers pass no correction. |
+| F-037 | DATA+SEC | **CONFIRMED** (recommendations router only) | Hardcoded None; /analysis/history DOES compute outcomes (different endpoint). |
+| F-038 | DATA+SEC | **CONFIRMED** | (Triaged Tier-2 in report; label mismatch confirmed.) |
+| F-039 | COR+SEC | **CONFIRMED** | orchestrator has no quant import; 0.40 vs 0.60 are genuinely different semantics; no linking test. |
+| F-040 | COR+SEC | **CONFIRMED** | `settings.enable_warehouse` never read anywhere; runtime uses os.getenv("ENABLE_WAREHOUSE"). |
+| F-041 | DATA+SEC / COR+SEC | **CONFIRMED** (both examiners) | Lines 593-594 syntactically dead; default path never attaches `_signal_vector` → fixed ±8% stops. |
+| F-042 | COR+SEC | **CONFIRMED** | Live 2×ATR/8% vs backtest fixed 15%; engine never selects stored stop_loss_value. |
+| F-043 | COR+SEC | **DOWNGRADED** | Real asymmetry but veto is opt-in (`enable_agent_veto=False` default), a research flag, not a silent prod bypass. |
+| F-044 | COR+SEC | **CONFIRMED** | Candidate ranking = OBV-only WEIGHTS; CPCV path applies cross-sectional norm + blends. Divergence by code-path design. |
+| F-045 | COR+SEC | **CONFIRMED** | settings singleton frozen at import; provider selection mitigated (passed explicitly) but flag/budget overrides silently fail. |
+| F-046 | COR+SEC | **CONFIRMED** | Four numeric mismatches verified; impact conditional on copying .env.example into .env. |
+| F-047 | COR+SEC | **CONFIRMED** | get_quote sends no params → full EOD array materialized for one price. |
+| F-048 | COR+SEC | **CONFIRMED** (cited callers) | Factory builds new client+cache every call; backtest paths warm caches, the 3 cited callers don't. |
+| F-049 | COR+SEC | **CONFIRMED** | New client + blocking get_quote per position inside async def; no offload. |
+| F-050 | COR+SEC | **DOWNGRADED** | Index exists (idx_analysis_history_ticker_run_at) but query still materializes all rows; small DB tempers severity. |
+| F-051 | COR+SEC | **CONFIRMED** | No ticker length cap; thread-per-job (unbounded across concurrent jobs). |
+| F-052 | COR+SEC | **CONFIRMED** | Module dicts store full to_dict() with no TTL/LRU; analysis jobs have GC, these don't. |
+| F-053 | COR+SEC | **CONFIRMED** | Cartesian tickers×dates, serial loop, sleep=1.1s default; ~110 min at 50×120 per docstring. |
+
+**Cross-examination outcome:** 39 CONFIRMED, 10 DOWNGRADED, 4 REFUTED (F-013, F-026, F-028, F-035). Refuted findings drop from the report but remain here for audit trail.
+
+### F-028R (spawned by cross-examination of F-028)
+- **origin:** cross-examiner (REL+SEC lens) · **assets:** A3 · **status:** NOTED (not put through full machinery; feeds plan follow-up)
+- The *live* PBO path (`oos_negative_fraction`, `quant/cpcv.py:232-235`) is not the Bailey/López de Prado logit-PBO either. This is the *real* residual behind the refuted F-028: the headline overfitting gate is a simplified proxy. Lower severity than the dead-code claim, but genuine. Routed to the strengthening plan as a methodology follow-up.
+
+---
+
+## Phase 3 — Devil's-Advocate Defense
+
+Two fresh defenders argued the code's case against the standing findings.
+
+- **DEFENSE-FAILED (finding stands, → HARDENED):** F-001, F-002 (defender found it is *worse* than audited — surfaced the `watchlist`/`watchlist_entries` table mismatch).
+- **DEFENSE-SUCCEEDED (counter both prior rounds missed, → arbitration):** F-007, F-029, F-034, F-038, F-040, F-041, F-044, F-046, F-050.
+- **SEVERITY-MITIGATED (real but lower priority, → arbitration/record):** F-003, F-004, F-005, F-006, F-008, F-009, F-010, F-011, F-012, F-014, F-016, F-017, F-018, F-019, F-020, F-021, F-022, F-023, F-024, F-025, F-027, F-030, F-032, F-033, F-036, F-037, F-039, F-042, F-043, F-045, F-047, F-048, F-049, F-051, F-052, F-053.
+
+Note: no DEFENSE-SUCCEEDED verdict *falsified* a HARDENED mechanical bug; the strongest defenses narrowed scope (paper-only broker, scheduler-off-event-loop, wrong-engine-frame) or lowered severity.
+
+## Phase 4 — Arbitration (disputed findings)
+
+A fresh arbitrator (no prior role) ruled on the DEFENSE-SUCCEEDED disputes and the F-002 escalation, from code evidence:
+
+| Finding | Ruling | Final severity | Basis |
+|---|---|---|---|
+| F-002 | **HARDENED** | **CRITICAL / DEMONSTRATED** | `watchlist.py:24-27,74-76` writes `watchlist_entries`; no code creates a `watchlist` table; scheduler query raises → `[]` → close-all every scheduled run. Worse than audited. |
+| F-007 | **REFUTED (live)** | — (residual LOW in legacy backtest only) | orchestrator.py:879-907 enum override runs before persist/trade; live order paths cannot receive "DO NOT BUY". |
+| F-024 | **HARDENED-DOWNGRADED** | **HIGH** (was CRITICAL) | Leak real (backtest.py:3410-3453) but `ic_shrinkage=0.90` + negative-IC-zeroing bound it to ≤10% of OOS weighting; still inflates the headline CPCV metric. |
+| F-029 | **REFUTED** | — | Only caller is live "now" ranking; CPCV uses PIT-safe `compute_signals_at_date`. |
+| F-034 | **HARDENED-DOWNGRADED** | **MEDIUM** | Terminal equity/total order-invariant; only `equity_curve` series shape wrong. |
+| F-038 | **HARDENED-DOWNGRADED** | **LOW** | Mislabel real but field unrendered (types.ts:100 only). |
+| F-040 | **HARDENED-DOWNGRADED** | **LOW** | Feature works via `os.getenv`+`load_dotenv`; only the `settings.enable_warehouse` mirror is dead. |
+| F-041 | **HARDENED** | **HIGH / DEMONSTRATED** | Defense rejected: ATR *is* computed (market_enrichment.py:1276-1310) but never wired due to dead code (orchestrator.py:593-594); 2×ATR stops are dead on the default deploy. |
+| F-044 | **HARDENED-DOWNGRADED** | **MEDIUM** | Documented intentional "paralysis-breaker v1" decoupling (portfolio.py:140-144); explains, not eliminates, divergence risk. |
+| F-046 | **HARDENED-DOWNGRADED** | **LOW** | Real only if `.env.example` is copied to `.env`. |
+| F-050 | **HARDENED-DOWNGRADED** | **LOW** | Index exists; scalability smell bounded by current paper scale. |
+
+**SEVERITY-MITIGATED findings not sent to the arbitrator** are recorded at their defense-mitigated severity (mutual agreement that the finding is real but lower priority is not a dispute). Final severities are consolidated in `audit-report.md`.
+
+### Refuted / dropped (audit trail)
+F-013 (Sentry SDK default), F-026 (boundary purged from both sides), F-028 (dead `is_optimal` branch → but see F-028R), F-035 (order-invariant), F-029 (live-only), F-007-live (enum override). These do **not** appear in the report except as residuals where noted.
+
+---
+
+## Ledger guarantees (self-check)
+
+- **Every finding traces to file:line evidence.** ✓ (intake rejected any without it; none were submitted without.)
+- **Every surviving finding passed a hostile refutation AND a defense attempt.** ✓ for Tier-1; Tier-2 recorded with rationale.
+- **No verdict rests on a single subagent.** ✓ Each finding has ≥3 independent passes (auditor → cross-examiner → defender), disputes add an arbitrator; the controller spot-verified the 5 highest-severity.
+- **Cross-examiner ≠ originator persona; defender ≠ both; arbitrator had no prior role.** ✓ (persona-hygiene assignments documented per phase.)
+- **Refuted/downgraded findings retained** with reasons. ✓
+- **SHA integrity:** all phases ran against `60855802…`; no code changed during the audit (only additive docs on a separate branch). ✓
