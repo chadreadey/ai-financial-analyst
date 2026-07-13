@@ -51,4 +51,5 @@ frontend/.env.local
 .claude/
 .vercel
 .price_cache/
+.fred_cache/
 .sentiment_cache/
