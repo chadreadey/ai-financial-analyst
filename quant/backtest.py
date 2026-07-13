@@ -82,6 +82,10 @@ class BacktestConfig:
     leverage_stressed_day_loss_pct: Optional[float] = None
     leverage_stress_shock_pct: float = 0.08
     leverage_financing_cost_cap_frac_of_excess_return: Optional[float] = None
+    # Fail the run when more than this fraction of requested tickers silently
+    # drop for non-IPO reasons (provider errors, truncated caches). 0.05 = 5%.
+    # Set to 1.0 to disable. See load_universe_data / UniverseCoverageError.
+    silent_drop_threshold: float = 0.05
     # Walk-forward
     train_months: int = 24                   # rolling train window
     test_months: int = 6                     # out-of-sample test window
@@ -316,9 +320,90 @@ def _fetch_ohlcv(ticker: str, start_date: str, provider=None) -> Optional[pd.Dat
         return None
 
 
+class UniverseCoverageError(RuntimeError):
+    """Raised when the loader silently drops more tickers than allowed.
+
+    A 'silent drop' is a ticker the user asked for that neither loaded from
+    cache nor from the provider, AND whose local CSV (if any) had sufficient
+    pre-start_date history to have loaded — i.e., something went wrong that
+    isn't 'this stock did not exist yet'. See load_universe_data.
+    """
+
+
+def _classify_dropped_ticker(ticker: str, start_date: str) -> str:
+    """Explain why a requested ticker failed to load.
+
+    Returns one of:
+      "post_ipo"           — CSV first-date is >30d after start_date (legitimate)
+      "no_csv"             — no cached CSV at all (provider was the only source)
+      "truncated_csv"      — CSV exists with first-date <=30d of start_date but load failed
+                             (something went wrong; this is a silent drop worth investigating)
+      "provider_fault"     — CSV was fine but load still failed (rare; provider error)
+    """
+    cache_file = os.path.join(_PRICE_CACHE_DIR, f"{ticker}.csv")
+    if not os.path.exists(cache_file):
+        return "no_csv"
+    try:
+        df = pd.read_csv(cache_file, parse_dates=["date"], index_col="date")
+        df.index = df.index.normalize()
+        first = pd.Timestamp(df.index[0])
+        gap_days = (first - pd.Timestamp(start_date)).days
+        if gap_days > 30:
+            return "post_ipo"
+        # CSV starts within 30d of start_date but the loader still dropped it —
+        # that's a real problem (probably a provider hiccup during the run).
+        return "provider_fault" if len(df) >= 60 else "truncated_csv"
+    except Exception:
+        return "truncated_csv"
+
+
+def _write_coverage_report(
+    tickers: list[str],
+    loaded: dict[str, "pd.DataFrame"],
+    start_date: str,
+    reasons: dict[str, str],
+) -> str:
+    """Persist a per-run coverage report. Returns the path written."""
+    import json
+    from datetime import datetime
+    from pathlib import Path
+
+    out_dir = Path(__file__).parent.parent / "docs" / "audit" / "coverage"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ts = datetime.now().strftime("%Y-%m-%dT%H%M%S")
+    out_path = out_dir / f"{ts}.json"
+
+    per_ticker = []
+    for t in tickers:
+        entry = {"ticker": t, "loaded": t in loaded}
+        if t in loaded:
+            df = loaded[t]
+            entry["rows"] = int(len(df))
+            entry["first_date"] = str(df.index[0].date())
+            entry["last_date"] = str(df.index[-1].date())
+        else:
+            entry["reason"] = reasons.get(t, "unknown")
+        per_ticker.append(entry)
+
+    report = {
+        "generated_at": datetime.now().isoformat(timespec="seconds"),
+        "start_date": start_date,
+        "requested": len(tickers),
+        "loaded": len(loaded),
+        "dropped": len(tickers) - len(loaded),
+        "drop_reasons": {r: sum(1 for k, v in reasons.items() if v == r) for r in set(reasons.values())} if reasons else {},
+        "tickers": per_ticker,
+    }
+    out_path.write_text(json.dumps(report, indent=2))
+    return str(out_path)
+
+
 def load_universe_data(
     tickers: list[str], start_date: str, api_key: str = "",
     progress_cb=None, provider=None,
+    coverage_out: Optional[dict] = None,
+    silent_drop_threshold: float = 0.05,
+    write_coverage_report: bool = True,
 ) -> dict[str, pd.DataFrame]:
     """Load OHLCV for all tickers. Returns {ticker: DataFrame}.
 
@@ -328,6 +413,16 @@ def load_universe_data(
     Args:
         api_key: Deprecated — kept for backward compat. Use provider or PRICE_PROVIDER env var.
         provider: A PriceProvider instance. If None, built from env vars.
+        coverage_out: If provided, populated with {ticker: reason_string} for dropped tickers.
+        silent_drop_threshold: Raise UniverseCoverageError if silent-drop fraction exceeds this.
+            "Silent drop" excludes legitimate post-IPO exclusions. Set to 1.0 to disable.
+        write_coverage_report: Write a per-run JSON coverage report under
+            docs/audit/coverage/. Set False for tests or one-off scripts.
+
+    Raises:
+        UniverseCoverageError: When silent drops exceed silent_drop_threshold.
+            The audit archive has been contaminated in the past by silent drops
+            going unnoticed — this exception is the fail-loud safeguard.
     """
     if provider is None:
         from price_provider import get_price_provider
@@ -383,6 +478,36 @@ def load_universe_data(
 
     if progress_cb:
         progress_cb(f"Loaded {len(data)}/{len(tickers)} tickers successfully")
+
+    # Classify every dropped ticker so we can distinguish legitimate exclusions
+    # (post-IPO, no data available at start_date) from silent failures (provider
+    # errors, truncated caches). The audit archive has been contaminated by
+    # silent failures going unnoticed — see docs/audit/coverage/ for history.
+    dropped = [t for t in tickers if t not in data]
+    reasons = {t: _classify_dropped_ticker(t, start_date) for t in dropped}
+    if coverage_out is not None:
+        coverage_out.update(reasons)
+
+    if write_coverage_report:
+        try:
+            path = _write_coverage_report(tickers, data, start_date, reasons)
+            logger.info("Wrote coverage report: %s", path)
+        except Exception as exc:
+            # Coverage reporting must never break the run itself.
+            logger.warning("Failed to write coverage report: %s", exc)
+
+    silent_drops = [t for t, r in reasons.items() if r != "post_ipo"]
+    silent_frac = len(silent_drops) / max(len(tickers), 1)
+    if silent_frac > silent_drop_threshold:
+        preview = ", ".join(silent_drops[:20]) + (f" (+{len(silent_drops)-20} more)" if len(silent_drops) > 20 else "")
+        raise UniverseCoverageError(
+            f"Loader silently dropped {len(silent_drops)}/{len(tickers)} tickers "
+            f"({silent_frac:.1%} > threshold {silent_drop_threshold:.1%}). "
+            f"Dropped for non-IPO reasons: {preview}. "
+            f"See docs/audit/coverage/ for the per-ticker breakdown. "
+            f"Fix the data provider or raise silent_drop_threshold to proceed."
+        )
+
     return data
 
 
@@ -2081,7 +2206,10 @@ def run_backtest(
                    - timedelta(days=config.lookback_days + 30)).strftime("%Y-%m-%d")
 
     all_tickers = list(set(config.tickers + [BENCHMARK]))
-    universe_data = load_universe_data(all_tickers, fetch_start, progress_cb=progress_cb, provider=provider)
+    universe_data = load_universe_data(
+        all_tickers, fetch_start, progress_cb=progress_cb, provider=provider,
+        silent_drop_threshold=config.silent_drop_threshold,
+    )
 
     if len(universe_data) < 3:
         result.status = "error"
@@ -2893,7 +3021,10 @@ def run_walk_forward(
                    - timedelta(days=config.lookback_days + 30)).strftime("%Y-%m-%d")
 
     all_tickers = list(set(config.tickers + [BENCHMARK]))
-    universe_data = load_universe_data(all_tickers, fetch_start, progress_cb=progress_cb, provider=provider)
+    universe_data = load_universe_data(
+        all_tickers, fetch_start, progress_cb=progress_cb, provider=provider,
+        silent_drop_threshold=config.silent_drop_threshold,
+    )
 
     if len(universe_data) < 3:
         result.status = "error"
@@ -4062,7 +4193,10 @@ def run_cpcv(
                    - timedelta(days=config.lookback_days + 30)).strftime("%Y-%m-%d")
 
     all_tickers = list(set(config.tickers + [BENCHMARK]))
-    universe_data = load_universe_data(all_tickers, fetch_start, progress_cb=progress_cb, provider=provider)
+    universe_data = load_universe_data(
+        all_tickers, fetch_start, progress_cb=progress_cb, provider=provider,
+        silent_drop_threshold=config.silent_drop_threshold,
+    )
 
     if len(universe_data) < 3:
         result.error = f"Only loaded {len(universe_data)} tickers"
