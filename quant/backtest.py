@@ -71,6 +71,17 @@ class BacktestConfig:
     # 1.0 = current 130/30 book (100% long + 30% short overlay); 1.5 = 195/45.
     # Financing cost on borrowed dollars is modeled separately (engine piece 2).
     gross_exposure: float = 1.0
+    # Spread over the 3M SOFR-equivalent short rate applied to borrowed
+    # dollars whenever gross_exposure > 1.0. 150bp matches an "IB-plus"
+    # broker offer; ±200bp sweeps live in the sensitivity harness.
+    financing_spread_bps: float = 150.0
+    # Pre-declared leverage guardrails (see quant.financing.LeverageGuardrails).
+    # None on every field disables the checker; a breach on any enabled
+    # gate causes evaluate_guardrails() to mark the run/CPCV path failed.
+    leverage_max_drawdown_pct: Optional[float] = None
+    leverage_stressed_day_loss_pct: Optional[float] = None
+    leverage_stress_shock_pct: float = 0.08
+    leverage_financing_cost_cap_frac_of_excess_return: Optional[float] = None
     # Walk-forward
     train_months: int = 24                   # rolling train window
     test_months: int = 6                     # out-of-sample test window
@@ -1833,6 +1844,13 @@ class BacktestResult:
     # Config echo
     config_summary: dict = field(default_factory=dict)
     error: Optional[str] = None
+    # Financing accounting (populated when gross_exposure > 1.0)
+    financing_dollars_paid: float = 0.0
+    financing_drag_bps: float = 0.0  # annualized bps of NAV
+    # Guardrail evaluation (populated when any leverage_* field is set)
+    guardrail_passed: Optional[bool] = None
+    guardrail_breaches: list = field(default_factory=list)
+    guardrail_stats: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -1856,6 +1874,11 @@ class BacktestResult:
             "walk_forward": self.walk_forward,
             "config_summary": self.config_summary,
             "error": self.error,
+            "financing_dollars_paid": self.financing_dollars_paid,
+            "financing_drag_bps": self.financing_drag_bps,
+            "guardrail_passed": self.guardrail_passed,
+            "guardrail_breaches": self.guardrail_breaches,
+            "guardrail_stats": self.guardrail_stats,
         }
 
 
@@ -1865,13 +1888,24 @@ def _compute_daily_portfolio_returns(
     start_date: pd.Timestamp,
     end_date: pd.Timestamp,
     config: BacktestConfig,
-) -> tuple[list[TradeRecord], pd.Series]:
+    sofr_series: Optional[pd.Series] = None,
+    nav_at_start: Optional[float] = None,
+) -> tuple[list[TradeRecord], pd.Series, pd.Series]:
     """
     Compute daily portfolio returns from positions held between start_date and end_date.
-    Returns trade records and a daily return series.
+
+    Returns (trade_records, daily_pnl_series, daily_financing_series).
+
+    When ``config.gross_exposure > 1.0`` and ``sofr_series`` is provided, a
+    positive financing charge is subtracted from each day's P&L. The
+    ``daily_financing_series`` is the *positive-signed* dollar drag per day
+    (i.e. day_pnl in the returned pnl series is *already* net of financing).
+
+    ``nav_at_start`` seeds the NAV used to compute borrowed dollars each
+    day; when None it defaults to ``config.initial_capital``.
     """
     trades = []
-    daily_pnl = {}  # date -> total dollar pnl
+    daily_pnl = {}  # date -> total dollar pnl (pre-financing)
 
     for pos in positions:
         df = universe_data.get(pos.ticker)
@@ -1954,7 +1988,23 @@ def _compute_daily_portfolio_returns(
     else:
         pnl_series = pd.Series(dtype=float)
 
-    return trades, pnl_series
+    # Financing accrual on borrowed dollars whenever gross > 1.0.
+    financing_series = pd.Series(dtype=float)
+    if config.gross_exposure > 1.0 and not pnl_series.empty:
+        from quant.financing import compute_financing_series
+        nav0 = float(nav_at_start) if nav_at_start is not None else float(config.initial_capital)
+        financing_series = compute_financing_series(
+            daily_pnl=pnl_series,
+            initial_capital=nav0,
+            gross_exposure=config.gross_exposure,
+            sofr_series=sofr_series if sofr_series is not None else pd.Series(dtype=float),
+            spread_bps=config.financing_spread_bps,
+        )
+        # Subtract financing (positive-signed) from P&L
+        if not financing_series.empty:
+            pnl_series = pnl_series.subtract(financing_series, fill_value=0.0)
+
+    return trades, pnl_series, financing_series
 
 
 def run_backtest(
@@ -2099,9 +2149,21 @@ def run_backtest(
     # ── 3. Walk through rebalance periods ─────────────────────────
     all_trades: list[TradeRecord] = []
     all_daily_pnl = pd.Series(dtype=float)
+    all_daily_financing = pd.Series(dtype=float)
     capital = config.initial_capital
     calibrated_weights = None
     ic_history_log = {}
+
+    # Load SOFR-equivalent short rate series (once) whenever the run is
+    # levered. Cheap no-op when gross_exposure <= 1.0.
+    sofr_series: Optional[pd.Series] = None
+    if config.gross_exposure > 1.0:
+        try:
+            from quant.financing import load_sofr_series
+            sofr_series = load_sofr_series(config.start_date, config.end_date)
+        except Exception as exc:
+            logger.warning("SOFR load failed (financing will use fallback): %s", exc)
+            sofr_series = None
 
     # IC calibration: compute trailing ICs from pre-start history if available
     if config.enable_ic_calibration and len(rebalance_dates) > config.ic_trailing_periods:
@@ -2512,18 +2574,24 @@ def run_backtest(
         if not positions:
             continue
 
-        # Compute returns for this period
-        trades, period_pnl = _compute_daily_portfolio_returns(
+        # Compute returns for this period (period_pnl is *net of financing*
+        # when gross > 1.0; period_financing is the positive-signed drag).
+        trades, period_pnl, period_financing = _compute_daily_portfolio_returns(
             positions, universe_data, reb_date, next_reb, config,
+            sofr_series=sofr_series, nav_at_start=capital,
         )
 
         all_trades.extend(trades)
         if len(period_pnl) > 0:
             all_daily_pnl = pd.concat([all_daily_pnl, period_pnl])
+        if len(period_financing) > 0:
+            all_daily_financing = pd.concat([all_daily_financing, period_financing])
 
-        # Update capital
+        # Update capital (trade-level pnl is pre-financing; subtract the
+        # period's financing separately so tallying matches the equity curve)
         period_dollar_pnl = sum(t.pnl_dollar for t in trades)
-        capital += period_dollar_pnl
+        period_financing_total = float(period_financing.sum()) if len(period_financing) > 0 else 0.0
+        capital += period_dollar_pnl - period_financing_total
 
     # ── 4. Compute metrics ────────────────────────────────────────
     if progress_cb:
@@ -2614,8 +2682,74 @@ def run_backtest(
                 "avg_return_pct": round(avg_ret, 2),
             }
 
+    # ── 7. Financing accounting + guardrails ──────────────────────
+    _finalize_financing_and_guardrails(
+        result, all_daily_pnl, all_daily_financing, config,
+    )
+
     result.status = "complete"
     return result
+
+
+def _finalize_financing_and_guardrails(
+    result: "BacktestResult",
+    daily_pnl: pd.Series,
+    daily_financing: pd.Series,
+    config: "BacktestConfig",
+) -> None:
+    """Populate financing metrics and guardrail evaluation on `result`."""
+    from quant.financing import LeverageGuardrails, evaluate_guardrails
+
+    financing_total = float(daily_financing.sum()) if len(daily_financing) > 0 else 0.0
+    result.financing_dollars_paid = round(financing_total, 2)
+    if len(daily_pnl) > 0 and config.initial_capital > 0:
+        # Annualized bps of NAV: total financing / initial_capital / years * 10000
+        n_days = len(daily_pnl)
+        years = max(n_days / 252.0, 1e-9)
+        drag_frac = financing_total / config.initial_capital / years
+        result.financing_drag_bps = round(drag_frac * 10_000.0, 2)
+
+    # Guardrail evaluation runs whenever any leverage_* field is set.
+    has_gate = any(
+        getattr(config, f) is not None
+        for f in (
+            "leverage_max_drawdown_pct",
+            "leverage_stressed_day_loss_pct",
+            "leverage_financing_cost_cap_frac_of_excess_return",
+        )
+    )
+    if not has_gate:
+        return
+
+    guardrails = LeverageGuardrails(
+        max_drawdown_pct=config.leverage_max_drawdown_pct,
+        stressed_day_loss_pct=config.leverage_stressed_day_loss_pct,
+        stress_shock_pct=config.leverage_stress_shock_pct,
+        financing_cost_cap_frac_of_excess_return=(
+            config.leverage_financing_cost_cap_frac_of_excess_return
+        ),
+    )
+
+    if len(daily_pnl) == 0:
+        result.guardrail_passed = False
+        result.guardrail_breaches = ["no_daily_pnl"]
+        return
+
+    cumulative = config.initial_capital + daily_pnl.cumsum()
+    daily_returns = daily_pnl / config.initial_capital
+
+    ev = evaluate_guardrails(
+        equity_curve=cumulative,
+        daily_returns=daily_returns,
+        financing_dollars_paid=financing_total,
+        initial_capital=config.initial_capital,
+        gross_exposure=config.gross_exposure,
+        guardrails=guardrails,
+        benchmark_return_pct=result.benchmark_return_pct,
+    )
+    result.guardrail_passed = ev.passed
+    result.guardrail_breaches = ev.breaches
+    result.guardrail_stats = ev.stats
 
 
 # ── Walk-forward validation ────────────────────────────────────────────
@@ -2798,6 +2932,17 @@ def run_walk_forward(
         for _ht, _hdf in hedge_prices.items():
             universe_data[_ht] = _hdf
 
+    # Load SOFR-equivalent short rate series (once) whenever the run is
+    # levered. Cheap no-op when gross_exposure <= 1.0.
+    sofr_series_wf: Optional[pd.Series] = None
+    if config.gross_exposure > 1.0:
+        try:
+            from quant.financing import load_sofr_series
+            sofr_series_wf = load_sofr_series(config.start_date, config.end_date)
+        except Exception as exc:
+            logger.warning("SOFR load failed (financing will use fallback): %s", exc)
+            sofr_series_wf = None
+
     # Generate walk-forward windows
     start = datetime.strptime(config.start_date, "%Y-%m-%d")
     end = datetime.strptime(config.end_date, "%Y-%m-%d")
@@ -2825,6 +2970,7 @@ def run_walk_forward(
     # Run each window
     all_trades = []
     all_daily_pnl = pd.Series(dtype=float)
+    all_daily_financing = pd.Series(dtype=float)
     capital = config.initial_capital
     window_results = []
 
@@ -2853,6 +2999,14 @@ def run_walk_forward(
             execution_delay_days=config.execution_delay_days,
             stop_loss_atr_mult=config.stop_loss_atr_mult,
             initial_capital=capital,
+            gross_exposure=config.gross_exposure,
+            financing_spread_bps=config.financing_spread_bps,
+            leverage_max_drawdown_pct=config.leverage_max_drawdown_pct,
+            leverage_stressed_day_loss_pct=config.leverage_stressed_day_loss_pct,
+            leverage_stress_shock_pct=config.leverage_stress_shock_pct,
+            leverage_financing_cost_cap_frac_of_excess_return=(
+                config.leverage_financing_cost_cap_frac_of_excess_return
+            ),
             enable_timesfm=config.enable_timesfm,
             timesfm_weight=config.timesfm_weight,
             timesfm_horizon=config.timesfm_horizon,
@@ -2901,6 +3055,7 @@ def run_walk_forward(
 
         window_trades = []
         window_pnl = pd.Series(dtype=float)
+        window_financing = pd.Series(dtype=float)
 
         _vix_persistence_count = 0
         for i, reb_date in enumerate(rebalance_dates[:-1]):
@@ -3243,29 +3398,37 @@ def run_walk_forward(
             positions.extend(_etf_positions)
             if not positions:
                 continue
-            trades, period_pnl = _compute_daily_portfolio_returns(
+            trades, period_pnl, period_financing = _compute_daily_portfolio_returns(
                 positions, universe_data, reb_date, next_reb, window_config,
+                sofr_series=sofr_series_wf, nav_at_start=capital,
             )
             window_trades.extend(trades)
             if len(period_pnl) > 0:
                 window_pnl = pd.concat([window_pnl, period_pnl])
+            if len(period_financing) > 0:
+                window_financing = pd.concat([window_financing, period_financing])
 
-        # Summarize window
+        # Summarize window (subtract financing so ending_capital matches
+        # the equity curve).
         window_dollar_pnl = sum(t.pnl_dollar for t in window_trades)
-        capital += window_dollar_pnl
+        window_financing_total = float(window_financing.sum()) if len(window_financing) > 0 else 0.0
+        capital += window_dollar_pnl - window_financing_total
         wins = sum(1 for t in window_trades if t.pnl_pct > 0)
 
         window_summary = {
             **window,
             "n_trades": len(window_trades),
             "win_rate_pct": round(wins / len(window_trades) * 100, 1) if window_trades else 0,
-            "return_pct": round(window_dollar_pnl / window_config.initial_capital * 100, 2),
+            "return_pct": round((window_dollar_pnl - window_financing_total) / window_config.initial_capital * 100, 2),
             "ending_capital": round(capital, 2),
+            "financing_dollars": round(window_financing_total, 2),
         }
         window_results.append(window_summary)
         all_trades.extend(window_trades)
         if len(window_pnl) > 0:
             all_daily_pnl = pd.concat([all_daily_pnl, window_pnl])
+        if len(window_financing) > 0:
+            all_daily_financing = pd.concat([all_daily_financing, window_financing])
 
     # Aggregate results (reuse the same metric computation)
     result.walk_forward = window_results
@@ -3325,6 +3488,12 @@ def run_walk_forward(
            if k not in ("tickers",)},
         "n_tickers": len(config.tickers),
     }
+
+    # Financing accounting + guardrails
+    _finalize_financing_and_guardrails(
+        result, all_daily_pnl, all_daily_financing, config,
+    )
+
     result.status = "complete"
     return result
 
@@ -3354,6 +3523,8 @@ class CPCVState:
     all_rebalance_dates: pd.DatetimeIndex
     purge_months: int = 1
     embargo_months: int = 1
+    # SOFR-equivalent short rate series for financing (levered runs only).
+    sofr_series: Optional[pd.Series] = None
     # Optional XGBoost feature matrix — if present, CPCV combo will attach
     # it to `config._xgb_feature_matrix` so the existing XGB rolling-retrain
     # logic fires during CPCV (previously only run_walk_forward loaded this).
@@ -3422,6 +3593,7 @@ def _run_single_cpcv_combo(
         )
 
     combo_daily_pnl = pd.Series(dtype=float)
+    combo_daily_financing = pd.Series(dtype=float)
     combo_trades = []
     _vix_persistence_count = 0
 
@@ -3716,8 +3888,10 @@ def _run_single_cpcv_combo(
         positions.extend(_etf_positions)
         if not positions:
             continue
-        trades, period_pnl = _compute_daily_portfolio_returns(
+        trades, period_pnl, period_financing = _compute_daily_portfolio_returns(
             positions, universe_data, reb_date, next_reb, config,
+            sofr_series=getattr(state, "sofr_series", None),
+            nav_at_start=config.initial_capital,
         )
         regime_level = getattr(regime, "level", None) if regime is not None else None
         for tr in trades:
@@ -3731,10 +3905,13 @@ def _run_single_cpcv_combo(
         combo_trades.extend(trades)
         if len(period_pnl) > 0:
             combo_daily_pnl = pd.concat([combo_daily_pnl, period_pnl])
+        if len(period_financing) > 0:
+            combo_daily_financing = pd.concat([combo_daily_financing, period_financing])
 
     oos_sharpe = None
     n_trades = len(combo_trades)
     combo_return = 0.0
+    financing_total = float(combo_daily_financing.sum()) if len(combo_daily_financing) > 0 else 0.0
     if len(combo_daily_pnl) > 0:
         combo_daily_pnl = combo_daily_pnl.groupby(combo_daily_pnl.index).sum().sort_index()
         daily_returns = combo_daily_pnl / config.initial_capital
@@ -3743,6 +3920,52 @@ def _run_single_cpcv_combo(
 
     if oos_sharpe is None:
         return None
+
+    # ── Guardrail check (structural fail on breach) ──────────────
+    guardrail_passed = True
+    guardrail_breaches: list[str] = []
+    guardrail_stats: dict = {}
+    _has_gate = any(
+        getattr(config, f) is not None
+        for f in (
+            "leverage_max_drawdown_pct",
+            "leverage_stressed_day_loss_pct",
+            "leverage_financing_cost_cap_frac_of_excess_return",
+        )
+    )
+    if _has_gate and len(combo_daily_pnl) > 0:
+        from quant.financing import LeverageGuardrails, evaluate_guardrails
+        _guardrails = LeverageGuardrails(
+            max_drawdown_pct=config.leverage_max_drawdown_pct,
+            stressed_day_loss_pct=config.leverage_stressed_day_loss_pct,
+            stress_shock_pct=config.leverage_stress_shock_pct,
+            financing_cost_cap_frac_of_excess_return=(
+                config.leverage_financing_cost_cap_frac_of_excess_return
+            ),
+        )
+        _cum = config.initial_capital + combo_daily_pnl.cumsum()
+        _dr = combo_daily_pnl / config.initial_capital
+        # Approx benchmark ret across combo test window: use SPY held constant
+        # over the same date span; the caller does not thread benchmark_df in,
+        # so pull from state.
+        _bench_ret_pct = 0.0
+        if getattr(state, "benchmark_df", None) is not None and len(combo_daily_pnl) > 0:
+            _b = state.benchmark_df
+            _b_avail = _b[(_b.index >= combo_daily_pnl.index[0]) & (_b.index <= combo_daily_pnl.index[-1])]
+            if len(_b_avail) >= 2:
+                _bench_ret_pct = float(_b_avail["close"].iloc[-1] / _b_avail["close"].iloc[0] - 1.0) * 100.0
+        _ev = evaluate_guardrails(
+            equity_curve=_cum,
+            daily_returns=_dr,
+            financing_dollars_paid=financing_total,
+            initial_capital=config.initial_capital,
+            gross_exposure=config.gross_exposure,
+            guardrails=_guardrails,
+            benchmark_return_pct=_bench_ret_pct,
+        )
+        guardrail_passed = _ev.passed
+        guardrail_breaches = _ev.breaches
+        guardrail_stats = _ev.stats
 
     return {
         "combo_idx": combo_idx,
@@ -3753,6 +3976,10 @@ def _run_single_cpcv_combo(
         "oos_sharpe": oos_sharpe,
         "return_pct": combo_return,
         "trades": [tr.to_json_dict() for tr in combo_trades],
+        "financing_dollars": round(financing_total, 2),
+        "guardrail_passed": guardrail_passed,
+        "guardrail_breaches": guardrail_breaches,
+        "guardrail_stats": guardrail_stats,
     }
 
 
@@ -3877,6 +4104,15 @@ def run_cpcv(
         config.rebalance_freq, trading_dates,
     )
 
+    # Load SOFR-equivalent series once for the whole CPCV run
+    sofr_series_cpcv: Optional[pd.Series] = None
+    if config.gross_exposure > 1.0:
+        try:
+            from quant.financing import load_sofr_series
+            sofr_series_cpcv = load_sofr_series(config.start_date, config.end_date)
+        except Exception as exc:
+            logger.warning("SOFR load failed for CPCV (financing will use fallback): %s", exc)
+
     combos = generate_cpcv_combinations(n_groups, n_test_groups)
     result.n_combinations = len(combos)
 
@@ -3905,6 +4141,7 @@ def run_cpcv(
         all_rebalance_dates=all_rebalance_dates,
         purge_months=purge_months,
         embargo_months=embargo_months,
+        sofr_series=sofr_series_cpcv,
     )
 
     for ci, (train_indices, test_indices) in enumerate(combos):
