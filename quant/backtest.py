@@ -67,6 +67,10 @@ class BacktestConfig:
     execution_delay_days: int = 1            # no same-day fills
     stop_loss_atr_mult: float = 2.0          # stop at 2x ATR
     initial_capital: float = 100_000.0
+    # Gross exposure multiplier applied to both long and short capital pools.
+    # 1.0 = current 130/30 book (100% long + 30% short overlay); 1.5 = 195/45.
+    # Financing cost on borrowed dollars is modeled separately (engine piece 2).
+    gross_exposure: float = 1.0
     # Walk-forward
     train_months: int = 24                   # rolling train window
     test_months: int = 6                     # out-of-sample test window
@@ -1650,8 +1654,9 @@ def build_target_portfolio(
     # Capital pools: 130/30 structure — independent long and short books.
     # Longs invest 100% of capital. Shorts are a 30% overlay (funded by margin).
     # Gross exposure: 130%, Net exposure: ~70%, Target beta: ~0.5-0.7.
-    long_capital = capital  # 100% of capital to longs
-    short_capital_pool = capital * 0.30  # 30% overlay for shorts
+    # config.gross_exposure scales both pools proportionally (1.0 = baseline).
+    long_capital = capital * config.gross_exposure
+    short_capital_pool = capital * 0.30 * config.gross_exposure
 
     # Apply regime-based sizing scalar
     regime_scalar = regime.sizing_scalar
