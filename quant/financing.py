@@ -237,6 +237,7 @@ def evaluate_guardrails(
     gross_exposure: float,
     guardrails: LeverageGuardrails,
     benchmark_return_pct: float = 0.0,
+    strategy_return_pct: Optional[float] = None,
 ) -> GuardrailEvaluation:
     """
     Run every configured guardrail. Return an evaluation with a pass/fail
@@ -275,11 +276,18 @@ def evaluate_guardrails(
             )
 
     # Financing cap as fraction of realized excess return over the window.
-    # If daily_returns has data, use its total return as the realized
-    # strategy return; excess return = strategy_return - benchmark_return.
+    # Prefer the explicit `strategy_return_pct` (matches BacktestResult's
+    # total_return_pct = final_NAV / initial - 1); fall back to a
+    # daily-return compound as a rough approximation. Note the daily-return
+    # fallback is *not* TWR — it operates on dollar-normalized returns and
+    # can diverge from total_return_pct for long horizons; callers should
+    # pass strategy_return_pct whenever available.
     if guardrails.financing_cost_cap_frac_of_excess_return is not None:
         if not daily_returns.empty and initial_capital > 0:
-            strat_return_pct = float((1.0 + daily_returns).prod() - 1.0) * 100.0
+            if strategy_return_pct is not None:
+                strat_return_pct = float(strategy_return_pct)
+            else:
+                strat_return_pct = float((1.0 + daily_returns).prod() - 1.0) * 100.0
             excess_pct = strat_return_pct - float(benchmark_return_pct)
             excess_dollars = excess_pct / 100.0 * initial_capital
             if excess_dollars > 0:

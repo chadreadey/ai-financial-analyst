@@ -2746,6 +2746,7 @@ def _finalize_financing_and_guardrails(
         gross_exposure=config.gross_exposure,
         guardrails=guardrails,
         benchmark_return_pct=result.benchmark_return_pct,
+        strategy_return_pct=result.total_return_pct,
     )
     result.guardrail_passed = ev.passed
     result.guardrail_breaches = ev.breaches
@@ -3962,6 +3963,7 @@ def _run_single_cpcv_combo(
             gross_exposure=config.gross_exposure,
             guardrails=_guardrails,
             benchmark_return_pct=_bench_ret_pct,
+            strategy_return_pct=combo_return,
         )
         guardrail_passed = _ev.passed
         guardrail_breaches = _ev.breaches

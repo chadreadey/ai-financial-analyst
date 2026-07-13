@@ -350,10 +350,11 @@ def write_markdown_report(
         monotone_up_then_down = all(
             vals[i] <= vals[i + 1] for i in range(max_idx)
         ) and all(vals[i] >= vals[i + 1] for i in range(max_idx, len(vals) - 1))
+        seq = ", ".join(f"L-{g:.2f}={s:.2f}" for g, s in sharpes)
         q2 = (
-            f"Sharpe peaks at L-{max_gross:.2f} (Sharpe={vals[max_idx]:.2f}). "
+            f"Sharpe peaks at L-{max_gross:.2f} (Sharpe={vals[max_idx]:.2f}). Sequence: {seq}. "
             + ("Monotone rise-then-fall — clear optimum." if monotone_up_then_down
-               else "Non-monotone — no clean optimum in observed range.")
+               else "Non-monotone (some ordering violation in the interior).")
         )
     lines.append(f"2. **Is there a Sharpe optimum in the sweep?** {q2}")
 
@@ -391,6 +392,24 @@ def write_markdown_report(
     lines.append(f"4. **Recommended next step**: {q4}")
     lines.append("")
 
+    # Caveat block on the guardrail-compounding bug (fixed in engine after
+    # this sweep ran; the JSON stats reflect the *old* logic where
+    # (1+daily_returns).prod() diverges from total_return_pct across long
+    # horizons). Any sensitivity variant marked PASS that shows negative
+    # alpha would flip to FAIL under the corrected rule.
+    lines.append(
+        "> **Post-run caveat**: The excess-return arm of the financing "
+        "guardrail was originally derived from `(1 + daily_returns).prod()` "
+        "on dollar-normalized returns, which diverges from `total_return_pct` "
+        "for long horizons. The engine now passes `strategy_return_pct` "
+        "explicitly (see `quant/financing.evaluate_guardrails`), and any "
+        "levered run with negative alpha_pct fails the fin/exc cap under "
+        "the corrected rule — this affects only the L-1.5 −200bp sensitivity "
+        "cell (shown as PASS in the raw JSON; flips to FAIL after re-eval). "
+        "Base variants are unaffected."
+    )
+    lines.append("")
+
     # Results table
     lines.append("## Results")
     lines.append("")
@@ -418,13 +437,22 @@ def write_markdown_report(
         sens_minus = sens.get("minus", {}).get("metrics", {}).get("sharpe")
         sens_plus = sens.get("plus", {}).get("metrics", {}).get("sharpe")
         sens_str = f"{_fmt(sens_minus, '{:.2f}')} / {_fmt(sens_plus, '{:.2f}')}"
-        # Guardrail marker
+        # Guardrail marker (short form; details in per-variant JSON)
         if r["guardrail_passed"] is None:
             gr = "no-gate"
         elif r["guardrail_passed"]:
             gr = "PASS"
         else:
-            gr = "FAIL: " + "; ".join(r.get("guardrail_breaches", []))[:80]
+            # Show which gates fired, not full breach text
+            fired = []
+            for b in r.get("guardrail_breaches", []):
+                if b.startswith("max_drawdown"):
+                    fired.append("DD")
+                elif b.startswith("stressed_day_loss"):
+                    fired.append("stress")
+                elif b.startswith("financing_frac_of_excess"):
+                    fired.append("fin/exc")
+            gr = "FAIL: " + ",".join(fired) if fired else "FAIL"
 
         lines.append(
             f"| {v} | {gross:.2f} | {_fmt(m['annual_return_pct'], '{:+.2f}%')} | "
@@ -432,6 +460,20 @@ def write_markdown_report(
             f"{_fmt(ann_vol, '{:.2f}%')} | {_fmt(pbo, '{:.1%}')} | {_fmt(dsr, '{:.2f}')} | "
             f"{_fmt(r['financing_drag_bps'], '{:.1f}')} | {gr} | {sens_str} |"
         )
+    lines.append("")
+
+    # Detailed breach list (per variant)
+    lines.append("### Guardrail breach detail")
+    lines.append("")
+    for r in variant_runs_sorted:
+        v = r["variant"]
+        if r["guardrail_passed"] is None:
+            continue
+        if r["guardrail_passed"]:
+            lines.append(f"- **{v}**: all gates PASS.")
+        else:
+            for b in r.get("guardrail_breaches", []):
+                lines.append(f"- **{v}**: {b}")
     lines.append("")
 
     # CPCV note if none

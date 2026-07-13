@@ -218,6 +218,29 @@ def test_guardrail_financing_frac_of_excess_return_breach():
     assert any("financing_frac_of_excess" in b for b in ev.breaches)
 
 
+def test_guardrail_strategy_return_pct_override_matches_reported_alpha():
+    """
+    When strategy_return_pct is explicitly passed, the checker must use it
+    verbatim (not re-derive from daily_returns compounding). Regression
+    guard: a run with alpha_pct = -100 (bench 200 - strat 100) must fail
+    the fin/exc gate at any positive financing, matching the
+    engine-reported alpha, not a compounded approximation.
+    """
+    dates = pd.date_range("2024-01-02", periods=10, freq="B")
+    equity = pd.Series(np.linspace(100_000, 200_000, 10), index=dates)
+    rets = equity.pct_change().fillna(0.0)
+    ev = evaluate_guardrails(
+        equity_curve=equity, daily_returns=rets,
+        financing_dollars_paid=1_000.0, initial_capital=100_000.0,
+        gross_exposure=1.5,
+        guardrails=LeverageGuardrails(financing_cost_cap_frac_of_excess_return=0.30),
+        benchmark_return_pct=200.0,
+        strategy_return_pct=100.0,  # reported alpha = -100pp
+    )
+    assert not ev.passed
+    assert any("financing_frac_of_excess" in b for b in ev.breaches)
+
+
 def test_guardrail_financing_frac_pass():
     dates = pd.date_range("2024-01-02", periods=10, freq="B")
     equity = pd.Series(np.linspace(100_000, 110_000, 10), index=dates)
