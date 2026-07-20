@@ -1,0 +1,23 @@
+{
+  "n_train": 662,
+  "n_test": 166,
+  "base_rate_train": 0.5075528700906344,
+  "base_rate_test": 0.608433734939759,
+  "train_accuracy": 0.8066465256797583,
+  "test_accuracy": 0.5542168674698795,
+  "train_f1": 0.8072289156626506,
+  "test_f1": 0.6224489795918368,
+  "train_auc": 0.8939435436751387,
+  "test_auc": 0.5016755521706017,
+  "features": [
+    "composite",
+    "contrib_qmj",
+    "contrib_sue",
+    "contrib_erm",
+    "pick_weight",
+    "portfolio_cash_weight",
+    "portfolio_n_picks",
+    "portfolio_source_is_llm",
+    "candidate_rank"
+  ]
+}

@@ -35,7 +35,15 @@ backtest_wf_*.json
 phase0_*.json
 .xgb_features_*.csv
 # Modal CPCV run summaries (written by scripts/run_modal_cpcv.py)
+# also: Phase 1/2 candidate + AI-pick artifacts (regenerable)
 runs/
+
+# Trained-model binaries and large training frames (regenerable)
+models/*.pkl
+models/training_frame.csv
+
+# Large daily-returns dumps from Phase 3 eval (small metrics files are tracked)
+docs/eval/three_series/daily_returns.csv
 
 # Superpowers / agent workspaces
 .superpowers/
