@@ -53,5 +53,8 @@ alpaca-py>=0.28.0
 # Scheduling
 APScheduler>=3.10.4
 
+# Cache backend (redis client — used by timesfm_cache tests)
+redis>=5.0.0
+
 # Cloud compute (Modal backtesting fan-out)
 modal>=0.64.0

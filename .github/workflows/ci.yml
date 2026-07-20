@@ -66,12 +66,16 @@ jobs:
         with:
           path: ~/.cache/pip
           key: pip-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('pyproject.toml', 'requirements.txt') }}
-      - name: Install project + dev deps
+      - name: Install project + runtime deps + dev deps
         run: |
           python -m pip install --upgrade pip
+          # requirements.txt has runtime deps not yet mirrored in pyproject.toml
+          # (alpaca-py, APScheduler, redis, modal, etc.). Install both so pytest
+          # can import every module the tests depend on.
+          pip install -r requirements.txt
           pip install -e ".[dev]"
       - name: Run pytest
-        run: pytest tests/ -x --tb=short -m "not integration and not slow"
+        run: pytest tests/ --tb=short -m "not integration and not slow"
 
   secret-scan:
     name: Secret scan (detect-secrets)
