@@ -27,6 +27,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 
@@ -41,7 +42,7 @@ def run_quant_signals(ticker: str, runs: int) -> dict:
 
     results = []
     for i in range(runs):
-        print(f"  Quant run {i+1}/{runs}...", end=" ", flush=True)
+        print(f"  Quant run {i + 1}/{runs}...", end=" ", flush=True)
         sv = compute_signal_vector_from_tiingo(ticker, api_key)
         if sv is None:
             print("FAILED (no data)")
@@ -84,7 +85,7 @@ async def run_full_analysis(ticker: str, runs: int) -> dict:
 
     results = []
     for i in range(runs):
-        print(f"  Full analysis run {i+1}/{runs}...", end=" ", flush=True)
+        print(f"  Full analysis run {i + 1}/{runs}...", end=" ", flush=True)
         t0 = time.time()
         try:
             orch = Orchestrator()
@@ -92,16 +93,20 @@ async def run_full_analysis(ticker: str, runs: int) -> dict:
             elapsed = time.time() - t0
 
             structured = result.structured_verdict or {}
-            results.append({
-                "verdict": structured.get("verdict", "UNKNOWN"),
-                "conviction_score": structured.get("conviction_score"),
-                "weighted_score": structured.get("weighted_score"),
-                "price_target": structured.get("price_target"),
-                "entry_price": structured.get("entry_price"),
-                "signal_breakdown": structured.get("signal_breakdown", {}),
-                "elapsed_s": round(elapsed, 1),
-            })
-            print(f"verdict={structured.get('verdict')} conviction={structured.get('conviction_score')} ({elapsed:.1f}s)")
+            results.append(
+                {
+                    "verdict": structured.get("verdict", "UNKNOWN"),
+                    "conviction_score": structured.get("conviction_score"),
+                    "weighted_score": structured.get("weighted_score"),
+                    "price_target": structured.get("price_target"),
+                    "entry_price": structured.get("entry_price"),
+                    "signal_breakdown": structured.get("signal_breakdown", {}),
+                    "elapsed_s": round(elapsed, 1),
+                }
+            )
+            print(
+                f"verdict={structured.get('verdict')} conviction={structured.get('conviction_score')} ({elapsed:.1f}s)"
+            )
         except Exception as exc:
             print(f"FAILED: {exc}")
             continue
@@ -171,14 +176,30 @@ def print_report(ticker: str, quant_result: dict, llm_result: dict):
         for field in ["conviction_score", "weighted_score", "price_target", "entry_price"]:
             data = llm_result[field]
             if data["mean"] is not None:
-                stability = "STABLE" if data["std"] < 0.10 else "UNSTABLE" if data["std"] > 0.20 else "MODERATE"
-                print(f"  {field:20s}  mean={data['mean']:.4f}  std={data['std']:.4f}  range=[{data['min']:.4f}, {data['max']:.4f}]  {stability}")
+                stability = (
+                    "STABLE"
+                    if data["std"] < 0.10
+                    else "UNSTABLE"
+                    if data["std"] > 0.20
+                    else "MODERATE"
+                )
+                print(
+                    f"  {field:20s}  mean={data['mean']:.4f}  std={data['std']:.4f}  range=[{data['min']:.4f}, {data['max']:.4f}]  {stability}"
+                )
 
         print("\n  Per-agent signal score variance:")
         for agent, data in llm_result.get("agent_signal_scores", {}).items():
             if data["mean"] is not None:
-                stability = "STABLE" if data["std"] < 0.15 else "NOISY" if data["std"] > 0.30 else "MODERATE"
-                print(f"    {agent:15s}  mean={data['mean']:.3f}  std={data['std']:.3f}  {stability}")
+                stability = (
+                    "STABLE"
+                    if data["std"] < 0.15
+                    else "NOISY"
+                    if data["std"] > 0.30
+                    else "MODERATE"
+                )
+                print(
+                    f"    {agent:15s}  mean={data['mean']:.3f}  std={data['std']:.3f}  {stability}"
+                )
 
     print("\n" + "=" * 70)
 
@@ -187,7 +208,9 @@ def main():
     parser = argparse.ArgumentParser(description="Signal reproducibility tester")
     parser.add_argument("ticker", help="Stock ticker to test")
     parser.add_argument("--runs", type=int, default=5, help="Number of runs (default: 5)")
-    parser.add_argument("--quant-only", action="store_true", help="Only test quant signals (no LLM)")
+    parser.add_argument(
+        "--quant-only", action="store_true", help="Only test quant signals (no LLM)"
+    )
     parser.add_argument("--llm-only", action="store_true", help="Only test full LLM analysis")
     args = parser.parse_args()
 

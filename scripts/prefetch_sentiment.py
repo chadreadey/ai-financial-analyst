@@ -26,6 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 import pandas as pd
@@ -41,7 +42,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-RATE_LIMIT_SLEEP = 1.1   # seconds between API calls — stays under 60 req/min
+RATE_LIMIT_SLEEP = 1.1  # seconds between API calls — stays under 60 req/min
 
 
 def generate_monthly_dates(start: str, end: str) -> list[pd.Timestamp]:
@@ -83,8 +84,9 @@ def prefetch_news(
             fetched += 1
             if fetched % 10 == 0:
                 pct = i / total * 100
-                logger.info("News: %d/%d (%.0f%%) | fetched=%d skipped=%d",
-                            i, total, pct, fetched, skipped)
+                logger.info(
+                    "News: %d/%d (%.0f%%) | fetched=%d skipped=%d", i, total, pct, fetched, skipped
+                )
         except Exception as e:
             logger.warning("News fetch failed %s %s→%s: %s", ticker, from_d, to_d, e)
             fetched += 1  # count as attempted to keep rate-limit sleep consistent
@@ -104,7 +106,7 @@ def prefetch_insider(
     """Prefetch insider MSPR for all (ticker, window) pairs. Returns (fetched, skipped)."""
     windows = set()
     for d in rebalance_dates:
-        end = d - timedelta(days=30)            # 1-month lag for point-in-time safety
+        end = d - timedelta(days=30)  # 1-month lag for point-in-time safety
         start = end - timedelta(days=lookback_months * 31)
         from_d = start.strftime("%Y-%m-%d")
         to_d = end.strftime("%Y-%m-%d")
@@ -124,8 +126,14 @@ def prefetch_insider(
             fetched += 1
             if fetched % 10 == 0:
                 pct = i / total * 100
-                logger.info("Insider: %d/%d (%.0f%%) | fetched=%d skipped=%d",
-                            i, total, pct, fetched, skipped)
+                logger.info(
+                    "Insider: %d/%d (%.0f%%) | fetched=%d skipped=%d",
+                    i,
+                    total,
+                    pct,
+                    fetched,
+                    skipped,
+                )
         except Exception as e:
             logger.warning("Insider fetch failed %s %s→%s: %s", ticker, from_d, to_d, e)
             fetched += 1
@@ -137,18 +145,22 @@ def prefetch_insider(
 
 def main():
     parser = argparse.ArgumentParser(description="Pre-populate Finnhub sentiment cache")
-    parser.add_argument("--universe", default="liquid_20",
-                        help="Universe name (default: liquid_20)")
-    parser.add_argument("--tickers", default="",
-                        help="Comma-separated tickers (overrides --universe)")
-    parser.add_argument("--start", default="2025-01-01",
-                        help="Start date YYYY-MM-DD (default: 2025-01-01)")
-    parser.add_argument("--end", default="",
-                        help="End date YYYY-MM-DD (default: today)")
-    parser.add_argument("--news-only", action="store_true",
-                        help="Only prefetch news (skip insider MSPR)")
-    parser.add_argument("--insider-only", action="store_true",
-                        help="Only prefetch insider MSPR (skip news)")
+    parser.add_argument(
+        "--universe", default="liquid_20", help="Universe name (default: liquid_20)"
+    )
+    parser.add_argument(
+        "--tickers", default="", help="Comma-separated tickers (overrides --universe)"
+    )
+    parser.add_argument(
+        "--start", default="2025-01-01", help="Start date YYYY-MM-DD (default: 2025-01-01)"
+    )
+    parser.add_argument("--end", default="", help="End date YYYY-MM-DD (default: today)")
+    parser.add_argument(
+        "--news-only", action="store_true", help="Only prefetch news (skip insider MSPR)"
+    )
+    parser.add_argument(
+        "--insider-only", action="store_true", help="Only prefetch insider MSPR (skip news)"
+    )
     args = parser.parse_args()
 
     api_key = os.getenv("FINNHUB_API_KEY", "").strip()
@@ -158,7 +170,8 @@ def main():
 
     tickers = (
         [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
-        if args.tickers else get_universe(args.universe)
+        if args.tickers
+        else get_universe(args.universe)
     )
     end = args.end or datetime.today().strftime("%Y-%m-%d")
     rebalance_dates = generate_monthly_dates(args.start, end)
@@ -170,7 +183,9 @@ def main():
     est_minutes = (total_windows * 2 * RATE_LIMIT_SLEEP) / 60  # news + insider
 
     print(f"\nFinnhub Sentiment Prefetch")
-    print(f"  Tickers:   {len(tickers)} ({', '.join(tickers[:5])}{'...' if len(tickers) > 5 else ''})")
+    print(
+        f"  Tickers:   {len(tickers)} ({', '.join(tickers[:5])}{'...' if len(tickers) > 5 else ''})"
+    )
     print(f"  Dates:     {args.start} → {end} ({len(rebalance_dates)} rebalance months)")
     print(f"  Windows:   {total_windows} total")
     print(f"  Est. time: ~{est_minutes:.0f} min (uncached) — cached windows skip instantly")
@@ -190,7 +205,7 @@ def main():
         print(f"    Insider done: {i_fetched} fetched, {i_skipped} skipped\n")
 
     elapsed = time.time() - t0
-    print(f"Prefetch complete in {elapsed/60:.1f} min")
+    print(f"Prefetch complete in {elapsed / 60:.1f} min")
     print(f"Cache ready at: {cache._dir}")
     print(f"\nNow run the backtest — it will read from cache, no API calls during the run.")
 

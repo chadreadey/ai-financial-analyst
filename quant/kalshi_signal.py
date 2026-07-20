@@ -13,6 +13,7 @@ Two signals:
    and Kalshi's market-implied probability. Returns 0.0 if divergence
    is below threshold (no-bet zone).
 """
+
 from __future__ import annotations
 
 import logging
@@ -27,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 _MACRO_SERIES_CONFIG = {
     "FED": {"weight": 0.50, "bullish_if_yes": True},
-    "CPI":  {"weight": 0.25, "bullish_if_yes": False},
+    "CPI": {"weight": 0.25, "bullish_if_yes": False},
     "JOBS": {"weight": 0.25, "bullish_if_yes": False},
 }
 
@@ -142,7 +143,8 @@ def _find_earn_market(
 
     ticker_upper = ticker.upper()
     matching = [
-        m for m in all_earn
+        m
+        for m in all_earn
         if ticker_upper in m.get("ticker", "").upper()
         or ticker_upper in m.get("event_ticker", "").upper()
     ]

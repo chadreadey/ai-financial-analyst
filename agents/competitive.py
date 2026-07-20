@@ -83,10 +83,15 @@ margins, growth rates, and R&D spend reveal competitive dynamics."""
             parts.append("\n── Competitive-Relevant Metrics ──")
             m = data.metrics
             for key in [
-                "revenue", "revenue_growth_yoy",
-                "revenue_cagr_3y", "revenue_cagr_5y",
-                "gross_margin", "operating_margin", "net_margin",
-                "gross_profit", "operating_income",
+                "revenue",
+                "revenue_growth_yoy",
+                "revenue_cagr_3y",
+                "revenue_cagr_5y",
+                "gross_margin",
+                "operating_margin",
+                "net_margin",
+                "gross_profit",
+                "operating_income",
                 "operating_leverage_5y",
             ]:
                 if key in m and m[key] is not None:

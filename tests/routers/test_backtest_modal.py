@@ -5,6 +5,7 @@ Supabase, stale sweepers) are monkeypatched. Auth is exercised by setting
 settings.internal_api_key to a test value and asserting missing/wrong keys
 return 403.
 """
+
 from __future__ import annotations
 
 from typing import Any
@@ -50,6 +51,7 @@ def _set_api_key(monkeypatch):
     load time).
     """
     from backend.routers import backtest_modal as router_mod
+
     # Make both the local reference and the global settings object carry
     # the key — the dependency reads settings.internal_api_key.
     monkeypatch.setattr(router_mod.settings, "internal_api_key", GOOD_KEY, raising=False)
@@ -59,6 +61,7 @@ def _set_api_key(monkeypatch):
 def _stub_sweepers(monkeypatch):
     """list_runs route opportunistically calls stale sweepers — no-op them."""
     from backend import cpcv_sqlite, supabase_backtest
+
     monkeypatch.setattr(cpcv_sqlite, "sweep_stale_runs", lambda *a, **k: 0, raising=False)
     monkeypatch.setattr(supabase_backtest, "sweep_stale_runs", lambda *a, **k: 0, raising=False)
 
@@ -67,6 +70,7 @@ def _stub_sweepers(monkeypatch):
 def _mock_reader(monkeypatch):
     """Patch the reader module that the router imports."""
     from backend import backtest_reader as reader
+
     monkeypatch.setattr(reader, "source", lambda: "sqlite")
     monkeypatch.setattr(reader, "list_runs", lambda **kw: [FAKE_RUN])
     monkeypatch.setattr(
@@ -74,9 +78,7 @@ def _mock_reader(monkeypatch):
         "get_run",
         lambda run_id: FAKE_RUN if run_id == "abc123" else None,
     )
-    monkeypatch.setattr(
-        reader, "find_runs_by_config_hash", lambda h, **kw: [FAKE_RUN]
-    )
+    monkeypatch.setattr(reader, "find_runs_by_config_hash", lambda h, **kw: [FAKE_RUN])
     monkeypatch.setattr(reader, "get_combinations", lambda run_id, **kw: [FAKE_COMBO])
     monkeypatch.setattr(reader, "get_trades", lambda run_id, **kw: [FAKE_TRADE])
     monkeypatch.setattr(
@@ -89,10 +91,12 @@ def _mock_reader(monkeypatch):
 @pytest.fixture()
 def client():
     from backend.main import app
+
     return TestClient(app)
 
 
 # ── Auth gating ───────────────────────────────────────────────────────────
+
 
 def test_missing_api_key_returns_403(client):
     r = client.get("/api/backtest/modal/runs")
@@ -114,6 +118,7 @@ def test_correct_api_key_succeeds(client):
 
 # ── GET endpoints (happy path) ────────────────────────────────────────────
 
+
 def test_source(client):
     r = client.get("/api/backtest/modal/source", headers=AUTH_HEADERS)
     assert r.status_code == 200
@@ -129,9 +134,7 @@ def test_list_runs_default(client):
 
 
 def test_list_runs_status_filter(client):
-    r = client.get(
-        "/api/backtest/modal/runs?status=complete", headers=AUTH_HEADERS
-    )
+    r = client.get("/api/backtest/modal/runs?status=complete", headers=AUTH_HEADERS)
     assert r.status_code == 200
 
 
@@ -147,16 +150,12 @@ def test_get_run_found(client):
 
 
 def test_get_run_not_found(client):
-    r = client.get(
-        "/api/backtest/modal/runs/doesnotexist", headers=AUTH_HEADERS
-    )
+    r = client.get("/api/backtest/modal/runs/doesnotexist", headers=AUTH_HEADERS)
     assert r.status_code == 404
 
 
 def test_runs_by_config_hash(client):
-    r = client.get(
-        "/api/backtest/modal/runs/by-config-hash/hash1", headers=AUTH_HEADERS
-    )
+    r = client.get("/api/backtest/modal/runs/by-config-hash/hash1", headers=AUTH_HEADERS)
     assert r.status_code == 200
     body = r.json()
     assert body["count"] == 1
@@ -164,9 +163,7 @@ def test_runs_by_config_hash(client):
 
 
 def test_get_combinations(client):
-    r = client.get(
-        "/api/backtest/modal/runs/abc123/combinations", headers=AUTH_HEADERS
-    )
+    r = client.get("/api/backtest/modal/runs/abc123/combinations", headers=AUTH_HEADERS)
     assert r.status_code == 200
     assert r.json()["count"] == 1
 
@@ -191,9 +188,7 @@ def test_get_combo_trades(client):
 
 
 def test_get_run_trades(client):
-    r = client.get(
-        "/api/backtest/modal/runs/abc123/trades", headers=AUTH_HEADERS
-    )
+    r = client.get("/api/backtest/modal/runs/abc123/trades", headers=AUTH_HEADERS)
     assert r.status_code == 200
     assert r.json()["count"] == 1
 
@@ -202,9 +197,7 @@ def test_get_events(client):
     """The reader now returns {"source": ..., "events": [...]} — the router
     must flatten source into the response envelope and still produce a
     count field."""
-    r = client.get(
-        "/api/backtest/modal/runs/abc123/events", headers=AUTH_HEADERS
-    )
+    r = client.get("/api/backtest/modal/runs/abc123/events", headers=AUTH_HEADERS)
     assert r.status_code == 200
     body = r.json()
     assert body["count"] == 1
@@ -213,6 +206,7 @@ def test_get_events(client):
 
 
 # ── POST /modal dispatch ──────────────────────────────────────────────────
+
 
 def test_dispatch_modal_missing_tickers_and_universe(client):
     r = client.post("/api/backtest/modal", json={}, headers=AUTH_HEADERS)
@@ -271,9 +265,8 @@ def test_dispatch_modal_success(client, monkeypatch):
     # Patch get_universe on the real module (don't wholesale-replace it,
     # which would break `from quant.universe import BENCHMARK` in quant.backtest).
     from quant import universe as universe_mod
-    monkeypatch.setattr(
-        universe_mod, "get_universe", lambda name: ["AAPL", "MSFT"], raising=False
-    )
+
+    monkeypatch.setattr(universe_mod, "get_universe", lambda name: ["AAPL", "MSFT"], raising=False)
 
     r = client.post(
         "/api/backtest/modal",
@@ -286,6 +279,7 @@ def test_dispatch_modal_success(client, monkeypatch):
 
 # ── CORS regex pin ────────────────────────────────────────────────────────
 
+
 def test_cors_evil_vercel_tenant_rejected(client):
     r = client.options(
         "/api/backtest/modal/runs",
@@ -295,9 +289,7 @@ def test_cors_evil_vercel_tenant_rejected(client):
             "Access-Control-Request-Headers": "X-API-Key,Content-Type",
         },
     )
-    assert "evil-attacker.vercel.app" not in r.headers.get(
-        "access-control-allow-origin", ""
-    )
+    assert "evil-attacker.vercel.app" not in r.headers.get("access-control-allow-origin", "")
 
 
 def test_cors_own_vercel_project_allowed(client):

@@ -16,6 +16,7 @@ Examples:
   # Same, locally (slow — ~hours — useful to compare numerical parity):
   python scripts/run_modal_cpcv.py --universe liquid_50 --n-groups 5 --n-test 2 --local
 """
+
 from __future__ import annotations
 
 import argparse
@@ -32,6 +33,7 @@ if str(_REPO_ROOT) not in sys.path:
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv(_REPO_ROOT / ".env", override=False)
 except ImportError:
     pass
@@ -40,26 +42,41 @@ logger = logging.getLogger("run_modal_cpcv")
 
 
 def _parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--smoke", action="store_true",
-                   help="Tiny preset: 5 tickers, 5 groups, 2 test, 3 combos.")
-    p.add_argument("--universe", default="liquid_50",
-                   help="Named universe (liquid_10, liquid_50, liquid_100).")
+    p = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    p.add_argument(
+        "--smoke", action="store_true", help="Tiny preset: 5 tickers, 5 groups, 2 test, 3 combos."
+    )
+    p.add_argument(
+        "--universe", default="liquid_50", help="Named universe (liquid_10, liquid_50, liquid_100)."
+    )
     p.add_argument("--start-date", default="2018-01-01")
     p.add_argument("--end-date", default="")
     p.add_argument("--n-groups", type=int, default=16)
     p.add_argument("--n-test", type=int, default=8)
     p.add_argument("--purge-months", type=int, default=1)
     p.add_argument("--embargo-months", type=int, default=1)
-    p.add_argument("--max-combos", type=int, default=None,
-                   help="Sample this many combos (deterministic seed=42). "
-                        "Default: run all.")
-    p.add_argument("--local", action="store_true",
-                   help="Run in-process (no Modal). Useful for debugging.")
-    p.add_argument("--allow-dirty", action="store_true",
-                   help="Permit dirty git tree (stamps run git_sha with '-dirty-<ts>').")
-    p.add_argument("--output", type=Path, default=None,
-                   help="Save summary JSON here (default: runs/<run_id>.json).")
+    p.add_argument(
+        "--max-combos",
+        type=int,
+        default=None,
+        help="Sample this many combos (deterministic seed=42). Default: run all.",
+    )
+    p.add_argument(
+        "--local", action="store_true", help="Run in-process (no Modal). Useful for debugging."
+    )
+    p.add_argument(
+        "--allow-dirty",
+        action="store_true",
+        help="Permit dirty git tree (stamps run git_sha with '-dirty-<ts>').",
+    )
+    p.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        help="Save summary JSON here (default: runs/<run_id>.json).",
+    )
     p.add_argument("--log-level", default="INFO")
     return p.parse_args()
 
@@ -78,6 +95,7 @@ def _resolve_universe(name: str) -> list[str]:
     if name == "custom_smoke":
         return ["AAPL", "MSFT", "GOOGL", "AMZN", "JPM"]
     from quant.universe import get_universe
+
     return get_universe(name)
 
 

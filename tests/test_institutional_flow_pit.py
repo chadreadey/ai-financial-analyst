@@ -48,38 +48,50 @@ class TestIsPitSafeQuarterHelper:
 
         # Q1 2025 ends 2025-03-31 → deadline 2025-05-15.
         # as_of_date 2025-04-01 is before deadline → not safe.
-        assert _is_pit_safe_quarter(
-            quarter_end_date=date(2025, 3, 31),
-            as_of_date=date(2025, 4, 1),
-        ) is False
+        assert (
+            _is_pit_safe_quarter(
+                quarter_end_date=date(2025, 3, 31),
+                as_of_date=date(2025, 4, 1),
+            )
+            is False
+        )
 
     def test_quarter_at_filing_deadline_is_safe(self):
         from quant.institutional_flow import _is_pit_safe_quarter
 
         # quarter_end + 45 days exactly == as_of_date → safe (boundary inclusive)
-        assert _is_pit_safe_quarter(
-            quarter_end_date=date(2025, 3, 31),
-            as_of_date=date(2025, 5, 15),
-        ) is True
+        assert (
+            _is_pit_safe_quarter(
+                quarter_end_date=date(2025, 3, 31),
+                as_of_date=date(2025, 5, 15),
+            )
+            is True
+        )
 
     def test_quarter_past_filing_deadline_is_safe(self):
         from quant.institutional_flow import _is_pit_safe_quarter
 
         # Q4 2024 ends 2024-12-31 → deadline 2025-02-14.
         # as_of_date 2025-03-01 is well past deadline → safe.
-        assert _is_pit_safe_quarter(
-            quarter_end_date=date(2024, 12, 31),
-            as_of_date=date(2025, 3, 1),
-        ) is True
+        assert (
+            _is_pit_safe_quarter(
+                quarter_end_date=date(2024, 12, 31),
+                as_of_date=date(2025, 3, 1),
+            )
+            is True
+        )
 
     def test_one_day_before_deadline_is_unsafe(self):
         from quant.institutional_flow import _is_pit_safe_quarter
 
         # Deadline = 2025-05-15. as_of = 2025-05-14 → not safe.
-        assert _is_pit_safe_quarter(
-            quarter_end_date=date(2025, 3, 31),
-            as_of_date=date(2025, 5, 14),
-        ) is False
+        assert (
+            _is_pit_safe_quarter(
+                quarter_end_date=date(2025, 3, 31),
+                as_of_date=date(2025, 5, 14),
+            )
+            is False
+        )
 
 
 # ── FMP path: full integration through fetch_and_score_institutional_flow ──
@@ -215,9 +227,7 @@ class TestFmpPitGuard:
 
         # Only Q1 2025, which would not be filed until ~2025-05-15.
         # as_of_date = 2025-04-15 (still before deadline).
-        fmp_payload = {
-            "AAPL": _make_quarter_records("2025-03-31", n=10, change=500_000)
-        }
+        fmp_payload = {"AAPL": _make_quarter_records("2025-03-31", n=10, change=500_000)}
         client = _FakeFmpClient(fmp_payload)
 
         score, meta = fetch_and_score_institutional_flow(
@@ -260,13 +270,22 @@ class TestFinnhubPitGuard:
         fh_payload = {
             "AAPL": [
                 # PIT-safe rows
-                {"name": f"Fund{i}", "share": 1_000_000, "change": 50_000,
-                 "filingDate": "2025-02-14"}
+                {
+                    "name": f"Fund{i}",
+                    "share": 1_000_000,
+                    "change": 50_000,
+                    "filingDate": "2025-02-14",
+                }
                 for i in range(3)
-            ] + [
+            ]
+            + [
                 # NOT PIT-safe — filing happens after as_of_date
-                {"name": f"Future{i}", "share": 5_000_000, "change": 1_000_000,
-                 "filingDate": "2025-05-20"}
+                {
+                    "name": f"Future{i}",
+                    "share": 5_000_000,
+                    "change": 1_000_000,
+                    "filingDate": "2025-05-20",
+                }
                 for i in range(3)
             ]
         }
@@ -297,10 +316,8 @@ class TestFinnhubPitGuard:
         fh_payload = {
             "AAPL": [
                 {"name": "NoDate", "share": 1_000_000, "change": 0},  # no filingDate
-                {"name": "BadDate", "share": 1_000_000, "change": 0,
-                 "filingDate": "not-a-date"},
-                {"name": "GoodDate", "share": 1_000_000, "change": 0,
-                 "filingDate": "2025-02-14"},
+                {"name": "BadDate", "share": 1_000_000, "change": 0, "filingDate": "not-a-date"},
+                {"name": "GoodDate", "share": 1_000_000, "change": 0, "filingDate": "2025-02-14"},
             ]
         }
         client = _FakeFinnhubClient(fh_payload)

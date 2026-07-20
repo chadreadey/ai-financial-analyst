@@ -9,8 +9,7 @@ def _sample_signals():
         "downside_risk_pct": -4.2,
         "upside_target": 234.50,
         "confidence_band": [
-            {"step": i + 1, "p10": 218 + i, "p50": 221 + i, "p90": 224 + i}
-            for i in range(10)
+            {"step": i + 1, "p10": 218 + i, "p50": 221 + i, "p90": 224 + i} for i in range(10)
         ],
     }
 

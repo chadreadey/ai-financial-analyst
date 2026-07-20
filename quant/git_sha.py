@@ -13,6 +13,7 @@ In Modal deploy mode, the container image bakes `MODAL_GIT_SHA` via
 `Image.env(...)`; the per-combo function echoes that back so the orchestrator
 can verify image-cache consistency.
 """
+
 from __future__ import annotations
 
 import os
@@ -27,9 +28,7 @@ class DirtyTreeError(RuntimeError):
 
 
 def _run(args: list[str]) -> str:
-    return subprocess.check_output(
-        args, text=True, stderr=subprocess.DEVNULL
-    ).strip()
+    return subprocess.check_output(args, text=True, stderr=subprocess.DEVNULL).strip()
 
 
 def capture_git_sha(allow_dirty: bool = False, short: bool = False) -> str:

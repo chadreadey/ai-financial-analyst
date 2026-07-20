@@ -33,13 +33,12 @@ def _get_redis() -> Redis:
     url = os.environ.get("UPSTASH_REDIS_REST_URL", "").strip()
     token = os.environ.get("UPSTASH_REDIS_REST_TOKEN", "").strip()
     if not url or not token:
-        raise EnvironmentError(
-            "UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must be set."
-        )
+        raise EnvironmentError("UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must be set.")
     return Redis(url=url, token=token)
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
+
 
 def enqueue_filing_update(
     ticker: str,
@@ -141,7 +140,9 @@ def send_to_dead_letter(job: dict, error: str) -> None:
     redis.lpush(DEAD_LETTER_KEY, json.dumps(payload))
     logger.warning(
         "sent to dead letter: ticker=%s accession=%s error=%s",
-        job.get("ticker"), job.get("accession"), error,
+        job.get("ticker"),
+        job.get("accession"),
+        error,
     )
 
 
@@ -153,6 +154,7 @@ def queue_depth() -> int:
 
 # ── Per-ticker Redis metadata helpers ────────────────────────────────────────
 # Used by poll_worker.py to cache CIK + last_accession without DB round-trips.
+
 
 def get_ticker_last_accession(ticker: str) -> str | None:
     """Return the cached last-known accession for a ticker, or None."""

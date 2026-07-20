@@ -55,6 +55,7 @@ sys.path.insert(0, str(_REPO_ROOT))
 # Load .env so PRICE_PROVIDER, FINNHUB_API_KEY, etc. are configured before
 # any quant module reads them at import time.
 from dotenv import load_dotenv  # noqa: E402
+
 load_dotenv(_REPO_ROOT / ".env")
 
 import pandas as pd  # noqa: E402
@@ -109,8 +110,8 @@ EARNINGS_WEIGHT_CONFIGS: dict[str, dict[str, float]] = {
         "dispersion_weight": 0.25,
     },
     "v2": {
-        "erm_weight": float(EARNINGS_BLEND_WEIGHTS["erm"]),         # 0.4846
-        "sue_weight": float(EARNINGS_BLEND_WEIGHTS["sue"]),         # 0.4654
+        "erm_weight": float(EARNINGS_BLEND_WEIGHTS["erm"]),  # 0.4846
+        "sue_weight": float(EARNINGS_BLEND_WEIGHTS["sue"]),  # 0.4654
         "dispersion_weight": float(EARNINGS_BLEND_WEIGHTS["analyst_dispersion"]),  # 0.05
     },
 }
@@ -132,32 +133,32 @@ COMPOSITE_WEIGHT_CONFIGS: dict[str, dict[str, float]] = {
     # (sentiment, regression, arima). Insider stays at 0.
     "v3-ic-tilted": {
         "obv_trend": 0.15,
-        "earnings_rank_score": 0.40,        # boosted — ERM/SUE both significant
-        "institutional_flow_score": 0.10,   # no measured IC; retained at moderate
-        "sentiment_score": 0.025,           # no measured IC; reduced
-        "sector_momentum_score": 0.0,       # already 0
-        "quality_score": 0.25,              # boosted — significant at 1M
-        "price_momentum_score": 0.05,       # near-zero IC; reduced
-        "insider_score": 0.0,               # wrong-sign IC (RISK-2)
-        "event_timing_score": 0.0,          # already 0
-        "price_regression_score": 0.025,    # no IC; very sparse
-        "arima_forecast_score": 0.0,        # no IC; very sparse
+        "earnings_rank_score": 0.40,  # boosted — ERM/SUE both significant
+        "institutional_flow_score": 0.10,  # no measured IC; retained at moderate
+        "sentiment_score": 0.025,  # no measured IC; reduced
+        "sector_momentum_score": 0.0,  # already 0
+        "quality_score": 0.25,  # boosted — significant at 1M
+        "price_momentum_score": 0.05,  # near-zero IC; reduced
+        "insider_score": 0.0,  # wrong-sign IC (RISK-2)
+        "event_timing_score": 0.0,  # already 0
+        "price_regression_score": 0.025,  # no IC; very sparse
+        "arima_forecast_score": 0.0,  # no IC; very sparse
     },
     # v3-no-noise: zero out the unmeasured signals (sentiment, regression,
     # arima) and redistribute their weight proportionally to the others.
     # Tests the "noise signals are dragging in bull years" hypothesis.
     "v3-no-noise": {
-        "obv_trend": 0.214,                 # 0.1667 / 0.778
-        "earnings_rank_score": 0.286,       # 0.2222 / 0.778
+        "obv_trend": 0.214,  # 0.1667 / 0.778
+        "earnings_rank_score": 0.286,  # 0.2222 / 0.778
         "institutional_flow_score": 0.143,  # 0.1111 / 0.778
-        "sentiment_score": 0.0,             # ZEROED
+        "sentiment_score": 0.0,  # ZEROED
         "sector_momentum_score": 0.0,
-        "quality_score": 0.214,             # 0.1667 / 0.778
-        "price_momentum_score": 0.143,      # 0.1111 / 0.778
+        "quality_score": 0.214,  # 0.1667 / 0.778
+        "price_momentum_score": 0.143,  # 0.1111 / 0.778
         "insider_score": 0.0,
         "event_timing_score": 0.0,
-        "price_regression_score": 0.0,      # ZEROED
-        "arima_forecast_score": 0.0,        # ZEROED
+        "price_regression_score": 0.0,  # ZEROED
+        "arima_forecast_score": 0.0,  # ZEROED
     },
     # v3-fundamental-stack: most extreme — only signals with measured
     # significant IC plus institutional. Tests "is the bull-year drag
@@ -169,7 +170,7 @@ COMPOSITE_WEIGHT_CONFIGS: dict[str, dict[str, float]] = {
         "sentiment_score": 0.0,
         "sector_momentum_score": 0.0,
         "quality_score": 0.30,
-        "price_momentum_score": 0.0,        # ZEROED — near-zero IC
+        "price_momentum_score": 0.0,  # ZEROED — near-zero IC
         "insider_score": 0.0,
         "event_timing_score": 0.0,
         "price_regression_score": 0.0,
@@ -190,7 +191,7 @@ COMPOSITE_WEIGHT_CONFIGS: dict[str, dict[str, float]] = {
         "event_timing_score": 0.0,
         "price_regression_score": 0.0,
         "arima_forecast_score": 0.0,
-        "qmj_score": 0.0,                 # NOT enabled
+        "qmj_score": 0.0,  # NOT enabled
     },
     # v4-qmj-only: v3-fundamental-stack base, QMJ replaces quality_score
     # entirely (QMJ subsumes quality at corr ρ=+0.31), short-veto disabled.
@@ -202,13 +203,13 @@ COMPOSITE_WEIGHT_CONFIGS: dict[str, dict[str, float]] = {
         "institutional_flow_score": 0.10,
         "sentiment_score": 0.0,
         "sector_momentum_score": 0.0,
-        "quality_score": 0.0,             # ZEROED — QMJ subsumes
+        "quality_score": 0.0,  # ZEROED — QMJ subsumes
         "price_momentum_score": 0.0,
         "insider_score": 0.0,
         "event_timing_score": 0.0,
         "price_regression_score": 0.0,
         "arima_forecast_score": 0.0,
-        "qmj_score": 0.30,                # takes the 0.30 quality weight
+        "qmj_score": 0.30,  # takes the 0.30 quality weight
     },
     # v4-gold: v3-fundamental-stack base + QMJ at 25% (highest measured
     # IC: 12M IC +0.042 t=4.57; 12M L/S return +11.9% with -9.5% MaxDD
@@ -247,6 +248,7 @@ def progress(msg: str) -> None:
 
 
 # ── BacktestConfig builder ───────────────────────────────────────────────
+
 
 def build_config(
     tickers: list[str],
@@ -304,6 +306,7 @@ def build_config(
 
 # ── Run wrapper ─────────────────────────────────────────────────────────
 
+
 def _load_spy_series() -> pd.Series:
     """Load SPY closing prices from the local price cache for benchmarking."""
     spy_path = PRICE_CACHE_DIR / "SPY.csv"
@@ -340,7 +343,9 @@ def _yearly_breakdown(
         if not curve:
             return pd.Series(dtype=float)
         df = pd.DataFrame(curve)
-        val_col = "equity" if "equity" in df.columns else ("value" if "value" in df.columns else None)
+        val_col = (
+            "equity" if "equity" in df.columns else ("value" if "value" in df.columns else None)
+        )
         if val_col is None:
             return pd.Series(dtype=float)
         df["date"] = pd.to_datetime(df["date"])
@@ -372,12 +377,14 @@ def _yearly_breakdown(
             if len(spy_yr) >= 2:
                 b_ret = float(spy_yr.iloc[-1] / spy_yr.iloc[0] - 1) * 100
 
-        out.append({
-            "year": int(year),
-            "strategy_return_pct": round(s_ret, 2),
-            "benchmark_return_pct": round(b_ret, 2) if b_ret is not None else None,
-            "strategy_beats_benchmark": (b_ret is not None and s_ret > b_ret),
-        })
+        out.append(
+            {
+                "year": int(year),
+                "strategy_return_pct": round(s_ret, 2),
+                "benchmark_return_pct": round(b_ret, 2) if b_ret is not None else None,
+                "strategy_beats_benchmark": (b_ret is not None and s_ret > b_ret),
+            }
+        )
     return out
 
 
@@ -399,8 +406,10 @@ def run_one_config(
     print(f"  tickers={len(cfg.tickers)}")
     print(f"  rebalance={cfg.rebalance_freq} train={cfg.train_months}m test={cfg.test_months}m")
     print(f"  earnings: enable={cfg.enable_earnings_signals} weight={cfg.earnings_signal_weight}")
-    print(f"  earnings sub-blend: erm={cfg.earnings_erm_weight} "
-          f"sue={cfg.earnings_sue_weight} disp={cfg.earnings_dispersion_weight}")
+    print(
+        f"  earnings sub-blend: erm={cfg.earnings_erm_weight} "
+        f"sue={cfg.earnings_sue_weight} disp={cfg.earnings_dispersion_weight}"
+    )
 
     t0 = time.time()
     result = run_walk_forward(cfg, progress_cb=progress)
@@ -426,8 +435,10 @@ def run_one_config(
         print(f"\n  Year-by-year:")
         for y in yearly:
             mk = "+" if y["strategy_beats_benchmark"] else " "
-            print(f"   {mk} {y['year']}: strat={y['strategy_return_pct']:+6.2f}%  "
-                  f"bench={y['benchmark_return_pct'] if y['benchmark_return_pct'] is not None else 'NA'}")
+            print(
+                f"   {mk} {y['year']}: strat={y['strategy_return_pct']:+6.2f}%  "
+                f"bench={y['benchmark_return_pct'] if y['benchmark_return_pct'] is not None else 'NA'}"
+            )
 
     # Walk-forward window summary
     if result.walk_forward:
@@ -481,6 +492,7 @@ def run_one_config(
 
 
 # ── Bonus run: zero insider weight in DEFAULT_COMPOSITE_WEIGHTS ──────────
+
 
 def run_bonus_zero_insider(cfg: BacktestConfig) -> dict:
     """
@@ -551,8 +563,8 @@ def run_with_composite_weights(
     #   - enable_short_fundamental_veto: same as enable_qmj_signal OR v4-* name
     COMPOSITE_FLAG_OVERRIDES = {
         "v4-shortveto-only": {"enable_qmj_signal": False, "enable_short_fundamental_veto": True},
-        "v4-qmj-only":       {"enable_qmj_signal": True,  "enable_short_fundamental_veto": False},
-        "v4-gold":           {"enable_qmj_signal": True,  "enable_short_fundamental_veto": True},
+        "v4-qmj-only": {"enable_qmj_signal": True, "enable_short_fundamental_veto": False},
+        "v4-gold": {"enable_qmj_signal": True, "enable_short_fundamental_veto": True},
     }
 
     if name in COMPOSITE_FLAG_OVERRIDES:
@@ -574,9 +586,13 @@ def run_with_composite_weights(
             mark = "*" if abs(new.get(k, 0.0) - orig.get(k, 0.0)) > 1e-9 else " "
             print(f"     {mark} {k:30s}  {orig.get(k, 0.0):.4f}  ->  {new.get(k, 0.0):.4f}")
     if auto_qmj:
-        print(f"     [auto] enable_qmj_signal=True (qmj_score weight={new.get('qmj_score', 0.0):.4f})")
+        print(
+            f"     [auto] enable_qmj_signal=True (qmj_score weight={new.get('qmj_score', 0.0):.4f})"
+        )
     if auto_short_veto:
-        print(f"     [auto] enable_short_fundamental_veto=True (min_strong_signals={cfg.short_veto_min_strong_signals})")
+        print(
+            f"     [auto] enable_short_fundamental_veto=True (min_strong_signals={cfg.short_veto_min_strong_signals})"
+        )
 
     cs.DEFAULT_COMPOSITE_WEIGHTS = new
     try:
@@ -594,6 +610,7 @@ def run_with_composite_weights(
 
 
 # ── Markdown report ──────────────────────────────────────────────────────
+
 
 def _fmt(v, fmt: str = "{:+.2f}") -> str:
     if v is None:
@@ -637,8 +654,10 @@ def write_markdown_report(
     lines.append("")
     lines.append("## Question")
     lines.append("")
-    lines.append("Does the IC-derived earnings reweight (v2) produce better aggregate "
-                 "strategy alpha than the prior hand-tuned weights (v0)?")
+    lines.append(
+        "Does the IC-derived earnings reweight (v2) produce better aggregate "
+        "strategy alpha than the prior hand-tuned weights (v0)?"
+    )
     lines.append("")
     lines.append("## Earnings sub-blend configs under test")
     lines.append("")
@@ -671,15 +690,15 @@ def write_markdown_report(
     lines.append("")
     lines.append("| Metric | v0 (hand-tuned) | v2 (IC-weighted) | Δ (v2 − v0) |")
     lines.append("|---|---:|---:|---:|")
-    lines.append(_row("Total return %",      "total_return_pct"))
+    lines.append(_row("Total return %", "total_return_pct"))
     lines.append(_row("Annualized return %", "annual_return_pct"))
-    lines.append(_row("Sharpe ratio",        "sharpe", "{:+.3f}"))
-    lines.append(_row("Sortino ratio",       "sortino", "{:+.3f}"))
-    lines.append(_row("Max drawdown %",      "max_drawdown_pct"))
-    lines.append(_row("Win rate %",          "win_rate_pct"))
-    lines.append(_row("Total trades",        "total_trades", "{:.0f}"))
-    lines.append(_row("Avg holding days",    "avg_holding_days", "{:.1f}"))
-    lines.append(_row("Benchmark return %",  "benchmark_return_pct"))
+    lines.append(_row("Sharpe ratio", "sharpe", "{:+.3f}"))
+    lines.append(_row("Sortino ratio", "sortino", "{:+.3f}"))
+    lines.append(_row("Max drawdown %", "max_drawdown_pct"))
+    lines.append(_row("Win rate %", "win_rate_pct"))
+    lines.append(_row("Total trades", "total_trades", "{:.0f}"))
+    lines.append(_row("Avg holding days", "avg_holding_days", "{:.1f}"))
+    lines.append(_row("Benchmark return %", "benchmark_return_pct"))
     lines.append(_row("Alpha vs benchmark %", "alpha_pct"))
     lines.append("")
 
@@ -691,14 +710,22 @@ def write_markdown_report(
         n = len(years)
         if n == 0:
             return None
-        wins = sum(1 for y in years if (y.get("benchmark_return_pct") is not None
-                                         and y["strategy_return_pct"] > y["benchmark_return_pct"]))
+        wins = sum(
+            1
+            for y in years
+            if (
+                y.get("benchmark_return_pct") is not None
+                and y["strategy_return_pct"] > y["benchmark_return_pct"]
+            )
+        )
         return round(wins / n * 100, 1)
 
     hr0 = _hit_rate(v0)
     hr2 = _hit_rate(v2)
     delta_hr = (hr2 - hr0) if (hr0 is not None and hr2 is not None) else None
-    lines.append(f"| Year-by-year hit rate (vs SPY) | {_fmt(hr0, '{:.1f}%')} | {_fmt(hr2, '{:.1f}%')} | {_fmt(delta_hr, '{:+.1f}pp')} |")
+    lines.append(
+        f"| Year-by-year hit rate (vs SPY) | {_fmt(hr0, '{:.1f}%')} | {_fmt(hr2, '{:.1f}%')} | {_fmt(delta_hr, '{:+.1f}pp')} |"
+    )
     lines.append("")
 
     # ── Bonus row ────────────────────────────────────────────────────────
@@ -708,13 +735,13 @@ def write_markdown_report(
         lines.append("| Metric | v2 (IC-weighted) | v2-no-insider | Δ (no-insider − v2) |")
         lines.append("|---|---:|---:|---:|")
         for label, key, fmt in [
-            ("Total return %",      "total_return_pct",      "{:+.2f}"),
-            ("Annualized return %", "annual_return_pct",     "{:+.2f}"),
-            ("Sharpe ratio",        "sharpe",                "{:+.3f}"),
-            ("Sortino ratio",       "sortino",               "{:+.3f}"),
-            ("Max drawdown %",      "max_drawdown_pct",      "{:+.2f}"),
-            ("Win rate %",          "win_rate_pct",          "{:+.2f}"),
-            ("Alpha vs benchmark %", "alpha_pct",            "{:+.2f}"),
+            ("Total return %", "total_return_pct", "{:+.2f}"),
+            ("Annualized return %", "annual_return_pct", "{:+.2f}"),
+            ("Sharpe ratio", "sharpe", "{:+.3f}"),
+            ("Sortino ratio", "sortino", "{:+.3f}"),
+            ("Max drawdown %", "max_drawdown_pct", "{:+.2f}"),
+            ("Win rate %", "win_rate_pct", "{:+.2f}"),
+            ("Alpha vs benchmark %", "alpha_pct", "{:+.2f}"),
         ]:
             v2v = (v2 or {}).get("metrics", {}).get(key)
             bv = bonus["metrics"].get(key)
@@ -754,7 +781,8 @@ def write_markdown_report(
         spy = None
         for src in (y2, y0, yb):
             if src and src.get("benchmark_return_pct") is not None:
-                spy = src["benchmark_return_pct"]; break
+                spy = src["benchmark_return_pct"]
+                break
         row = [str(year)]
         row.append(_fmt(y0["strategy_return_pct"] if y0 else None, "{:+.2f}%"))
         row.append(_fmt(y2["strategy_return_pct"] if y2 else None, "{:+.2f}%"))
@@ -768,49 +796,78 @@ def write_markdown_report(
     lines.append("## Interpretation")
     lines.append("")
     if v0 and v2:
-        delta_sharpe = ((v2["metrics"]["sharpe"] or 0) - (v0["metrics"]["sharpe"] or 0))
-        delta_alpha = (v2["metrics"]["alpha_pct"] - v0["metrics"]["alpha_pct"])
-        delta_dd = (v2["metrics"]["max_drawdown_pct"] - v0["metrics"]["max_drawdown_pct"])
-        v2_beats_v0 = (delta_sharpe > 0 and delta_alpha > 0)
+        delta_sharpe = (v2["metrics"]["sharpe"] or 0) - (v0["metrics"]["sharpe"] or 0)
+        delta_alpha = v2["metrics"]["alpha_pct"] - v0["metrics"]["alpha_pct"]
+        delta_dd = v2["metrics"]["max_drawdown_pct"] - v0["metrics"]["max_drawdown_pct"]
+        v2_beats_v0 = delta_sharpe > 0 and delta_alpha > 0
         v2_beats_spy = v2["metrics"]["alpha_pct"] > 0
         v0_beats_spy = v0["metrics"]["alpha_pct"] > 0
 
-        lines.append(f"- **v2 vs v0**: Sharpe Δ {delta_sharpe:+.3f}, Alpha Δ {delta_alpha:+.2f}pp, "
-                     f"MaxDD Δ {delta_dd:+.2f}pp. "
-                     + ("**v2 strictly beats v0**" if v2_beats_v0 else
-                        "**v2 does NOT strictly beat v0**") + ".")
-        lines.append(f"- **v2 vs SPY**: Alpha {v2['metrics']['alpha_pct']:+.2f}%. "
-                     + ("Positive alpha." if v2_beats_spy else "Negative alpha — strategy underperforms buy-and-hold."))
-        lines.append(f"- **v0 vs SPY**: Alpha {v0['metrics']['alpha_pct']:+.2f}%. "
-                     + ("Positive alpha." if v0_beats_spy else "Negative alpha — strategy underperforms buy-and-hold."))
+        lines.append(
+            f"- **v2 vs v0**: Sharpe Δ {delta_sharpe:+.3f}, Alpha Δ {delta_alpha:+.2f}pp, "
+            f"MaxDD Δ {delta_dd:+.2f}pp. "
+            + ("**v2 strictly beats v0**" if v2_beats_v0 else "**v2 does NOT strictly beat v0**")
+            + "."
+        )
+        lines.append(
+            f"- **v2 vs SPY**: Alpha {v2['metrics']['alpha_pct']:+.2f}%. "
+            + (
+                "Positive alpha."
+                if v2_beats_spy
+                else "Negative alpha — strategy underperforms buy-and-hold."
+            )
+        )
+        lines.append(
+            f"- **v0 vs SPY**: Alpha {v0['metrics']['alpha_pct']:+.2f}%. "
+            + (
+                "Positive alpha."
+                if v0_beats_spy
+                else "Negative alpha — strategy underperforms buy-and-hold."
+            )
+        )
         # Economic significance heuristic — Δ Sharpe < 0.05 is noise on a 10-year sample.
         if abs(delta_sharpe) < 0.05 and abs(delta_alpha) < 1.0:
-            lines.append("- **Economic significance**: Δ Sharpe and Δ Alpha both small. "
-                         "The IC-level signal advantage is largely **invisible at the composite level** — "
-                         "consistent with the fact that earnings is a 30%-weight overlay on a 10-signal "
-                         "composite and the dispersion contribution that v0 contained was already weak (NO_SIGNAL "
-                         "at 1M, marginal at 6M).")
+            lines.append(
+                "- **Economic significance**: Δ Sharpe and Δ Alpha both small. "
+                "The IC-level signal advantage is largely **invisible at the composite level** — "
+                "consistent with the fact that earnings is a 30%-weight overlay on a 10-signal "
+                "composite and the dispersion contribution that v0 contained was already weak (NO_SIGNAL "
+                "at 1M, marginal at 6M)."
+            )
         else:
-            lines.append("- **Economic significance**: Δ Sharpe ≥ 0.05 or Δ Alpha ≥ 1pp suggests the reweight "
-                         "is meaningful at the composite level.")
+            lines.append(
+                "- **Economic significance**: Δ Sharpe ≥ 0.05 or Δ Alpha ≥ 1pp suggests the reweight "
+                "is meaningful at the composite level."
+            )
     if bonus is not None and v2:
         d_sharpe = (bonus["metrics"]["sharpe"] or 0) - (v2["metrics"]["sharpe"] or 0)
         d_alpha = bonus["metrics"]["alpha_pct"] - v2["metrics"]["alpha_pct"]
-        lines.append(f"- **Bonus (v2-no-insider)**: Sharpe Δ {d_sharpe:+.3f}, Alpha Δ {d_alpha:+.2f}pp vs v2. "
-                     + ("Removing insider_mspr **helps**." if (d_sharpe > 0 or d_alpha > 0)
-                        else "Removing insider_mspr does NOT help on this universe."))
+        lines.append(
+            f"- **Bonus (v2-no-insider)**: Sharpe Δ {d_sharpe:+.3f}, Alpha Δ {d_alpha:+.2f}pp vs v2. "
+            + (
+                "Removing insider_mspr **helps**."
+                if (d_sharpe > 0 or d_alpha > 0)
+                else "Removing insider_mspr does NOT help on this universe."
+            )
+        )
 
     lines.append("")
     lines.append("## Methodology notes")
     lines.append("")
     lines.append("- **Walk-forward only** via `run_walk_forward()`. `run_cpcv()` is never called.")
-    lines.append("- Universe: WRDS PIT cache ∩ local price cache (matches `scripts/run_audit_ic.py:get_audit_universe`).")
-    lines.append("- Earnings sub-blend weights are passed via new `BacktestConfig.earnings_*_weight` "
-                 "fields, threaded through to `compute_earnings_signal_scores()` at the run_walk_forward "
-                 "call site (quant/backtest.py). The committed `EARNINGS_BLEND_WEIGHTS` constant is unchanged.")
-    lines.append("- Bonus run zeroes `insider_score` in `DEFAULT_COMPOSITE_WEIGHTS` (in-process mutation, "
-                 "restored after the run) and redistributes its 10% proportionally to the other "
-                 "non-zero composite weights.")
+    lines.append(
+        "- Universe: WRDS PIT cache ∩ local price cache (matches `scripts/run_audit_ic.py:get_audit_universe`)."
+    )
+    lines.append(
+        "- Earnings sub-blend weights are passed via new `BacktestConfig.earnings_*_weight` "
+        "fields, threaded through to `compute_earnings_signal_scores()` at the run_walk_forward "
+        "call site (quant/backtest.py). The committed `EARNINGS_BLEND_WEIGHTS` constant is unchanged."
+    )
+    lines.append(
+        "- Bonus run zeroes `insider_score` in `DEFAULT_COMPOSITE_WEIGHTS` (in-process mutation, "
+        "restored after the run) and redistributes its 10% proportionally to the other "
+        "non-zero composite weights."
+    )
     lines.append("")
 
     out_path.write_text("\n".join(lines) + "\n")
@@ -818,10 +875,15 @@ def write_markdown_report(
 
 # ── Main ─────────────────────────────────────────────────────────────────
 
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Audit Session 2 — Walk-forward earnings weight comparison")
+    parser = argparse.ArgumentParser(
+        description="Audit Session 2 — Walk-forward earnings weight comparison"
+    )
     parser.add_argument(
-        "--config", choices=["v0", "v2", "both"], default="both",
+        "--config",
+        choices=["v0", "v2", "both"],
+        default="both",
         help="Which earnings sub-blend config(s) to run (default: both)",
     )
     parser.add_argument("--start", default="2015-01-01", help="Backtest window start")
@@ -829,30 +891,41 @@ def main() -> None:
     parser.add_argument("--train-months", type=int, default=24)
     parser.add_argument("--test-months", type=int, default=6)
     parser.add_argument(
-        "--limit-tickers", type=int, default=0,
+        "--limit-tickers",
+        type=int,
+        default=0,
         help="Cap universe size (top-N alphabetical) for runtime control. 0 = no cap.",
     )
     parser.add_argument(
-        "--bonus", action="store_true",
+        "--bonus",
+        action="store_true",
         help="If both v0 and v2 succeed, also run v2 with insider_mspr zeroed in DEFAULT_COMPOSITE_WEIGHTS.",
     )
     parser.add_argument(
-        "--composite-config", choices=list(COMPOSITE_WEIGHT_CONFIGS.keys()), default="",
+        "--composite-config",
+        choices=list(COMPOSITE_WEIGHT_CONFIGS.keys()),
+        default="",
         help="Run a single Session 3 v3-* composite-reweight config with v2 earnings weights "
-             "(overrides --config and --bonus when set). Each config writes its own output files.",
+        "(overrides --config and --bonus when set). Each config writes its own output files.",
     )
     parser.add_argument(
-        "--max-short-positions", type=int, default=0,
+        "--max-short-positions",
+        type=int,
+        default=0,
         help="Override BacktestConfig.max_short_positions. Default 0 matches "
-             "production (long-only since 2026-04-28). Set to 10 to test "
-             "long/short variants.",
+        "production (long-only since 2026-04-28). Set to 10 to test "
+        "long/short variants.",
     )
     parser.add_argument(
-        "--max-long-positions", type=int, default=10,
+        "--max-long-positions",
+        type=int,
+        default=10,
         help="Override BacktestConfig.max_long_positions (default 10).",
     )
     parser.add_argument(
-        "--max-per-sector", type=int, default=3,
+        "--max-per-sector",
+        type=int,
+        default=3,
         help="Override BacktestConfig.max_per_sector (default 3).",
     )
     parser.add_argument("--output-md", default="", help="Override markdown output path")
@@ -867,7 +940,9 @@ def main() -> None:
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    json_path = Path(args.output_json) if args.output_json else (OUT_DIR / "walkforward-results.json")
+    json_path = (
+        Path(args.output_json) if args.output_json else (OUT_DIR / "walkforward-results.json")
+    )
     md_path = Path(args.output_md) if args.output_md else (OUT_DIR / "walkforward-comparison.md")
 
     # Build universe
@@ -875,7 +950,9 @@ def main() -> None:
     universe_strategy = "WRDS ∩ price-cache"
     if args.limit_tickers and args.limit_tickers < len(full_universe):
         tickers = full_universe[: args.limit_tickers]
-        universe_strategy = f"WRDS ∩ price-cache, top-{args.limit_tickers} alphabetical (sample reduction)"
+        universe_strategy = (
+            f"WRDS ∩ price-cache, top-{args.limit_tickers} alphabetical (sample reduction)"
+        )
     else:
         tickers = full_universe
 
@@ -885,7 +962,9 @@ def main() -> None:
     print("*" * 70)
     print(f"  Universe: {len(tickers)} tickers ({universe_strategy})")
     print(f"  Window:   {args.start} → {args.end}")
-    print(f"  Configs:  {args.config}{' + composite=' + args.composite_config if args.composite_config else ''}")
+    print(
+        f"  Configs:  {args.config}{' + composite=' + args.composite_config if args.composite_config else ''}"
+    )
     print(f"  WF:       train={args.train_months}m / test={args.test_months}m")
     print(f"  Bonus:    {'YES' if args.bonus else 'no'}")
     print("*" * 70)
@@ -912,11 +991,17 @@ def main() -> None:
         except Exception as exc:
             logger.exception("Composite config %s FAILED", cc_name)
             summary = {
-                "name": cc_name, "status": "error",
+                "name": cc_name,
+                "status": "error",
                 "error": f"{type(exc).__name__}: {exc}",
-                "config": {"start_date": cfg.start_date, "end_date": cfg.end_date,
-                           "n_tickers": len(cfg.tickers)},
-                "metrics": {}, "yearly": [], "n_windows": 0,
+                "config": {
+                    "start_date": cfg.start_date,
+                    "end_date": cfg.end_date,
+                    "n_tickers": len(cfg.tickers),
+                },
+                "metrics": {},
+                "yearly": [],
+                "n_windows": 0,
             }
         payload = {
             "generated_at": datetime.utcnow().isoformat() + "Z",
@@ -965,40 +1050,46 @@ def main() -> None:
             runs.append(summary)
         except Exception as exc:
             logger.exception("Config %s FAILED", cfg_name)
-            runs.append({
-                "name": cfg_name,
-                "status": "error",
-                "error": f"{type(exc).__name__}: {exc}",
-                "config": {
-                    "start_date": cfg.start_date,
-                    "end_date": cfg.end_date,
-                    "n_tickers": len(cfg.tickers),
-                    "earnings_erm_weight": cfg.earnings_erm_weight,
-                    "earnings_sue_weight": cfg.earnings_sue_weight,
-                    "earnings_dispersion_weight": cfg.earnings_dispersion_weight,
-                },
-                "metrics": {},
-                "yearly": [],
-                "n_windows": 0,
-            })
+            runs.append(
+                {
+                    "name": cfg_name,
+                    "status": "error",
+                    "error": f"{type(exc).__name__}: {exc}",
+                    "config": {
+                        "start_date": cfg.start_date,
+                        "end_date": cfg.end_date,
+                        "n_tickers": len(cfg.tickers),
+                        "earnings_erm_weight": cfg.earnings_erm_weight,
+                        "earnings_sue_weight": cfg.earnings_sue_weight,
+                        "earnings_dispersion_weight": cfg.earnings_dispersion_weight,
+                    },
+                    "metrics": {},
+                    "yearly": [],
+                    "n_windows": 0,
+                }
+            )
 
     # Bonus only if both v0 and v2 ran cleanly.
     if args.bonus and cfg_for_bonus is not None:
-        clean = {r["name"] for r in runs if r.get("status") not in ("error", None) and r.get("metrics")}
+        clean = {
+            r["name"] for r in runs if r.get("status") not in ("error", None) and r.get("metrics")
+        }
         if {"v0", "v2"}.issubset(clean):
             try:
                 bonus_summary = run_bonus_zero_insider(cfg_for_bonus)
                 runs.append(bonus_summary)
             except Exception as exc:
                 logger.exception("Bonus run FAILED")
-                runs.append({
-                    "name": "v2-no-insider",
-                    "status": "error",
-                    "error": f"{type(exc).__name__}: {exc}",
-                    "metrics": {},
-                    "yearly": [],
-                    "n_windows": 0,
-                })
+                runs.append(
+                    {
+                        "name": "v2-no-insider",
+                        "status": "error",
+                        "error": f"{type(exc).__name__}: {exc}",
+                        "metrics": {},
+                        "yearly": [],
+                        "n_windows": 0,
+                    }
+                )
         else:
             print()
             print("  [bonus] skipped — v0 and v2 must both finish cleanly first.")

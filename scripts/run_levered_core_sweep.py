@@ -16,6 +16,7 @@ Outputs (default):
   docs/audit/2026-07-12-levered-core-sweep.md
   docs/audit/session-4/levered-sweep/<variant>-<spread_bps>.json
 """
+
 from __future__ import annotations
 
 import argparse
@@ -33,6 +34,7 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
 from dotenv import load_dotenv  # noqa: E402
+
 load_dotenv(REPO / ".env")
 
 import pandas as pd  # noqa: E402
@@ -56,9 +58,9 @@ def get_audit_universe() -> list[str]:
     if not WRDS_DB_PATH.exists() or not PRICE_CACHE_DIR.exists():
         return []
     conn = sqlite3.connect(str(WRDS_DB_PATH))
-    wrds = {r[0] for r in conn.execute(
-        "SELECT DISTINCT ticker FROM compustat_quarterly"
-    ).fetchall()}
+    wrds = {
+        r[0] for r in conn.execute("SELECT DISTINCT ticker FROM compustat_quarterly").fetchall()
+    }
     conn.close()
     cache = {p.stem for p in PRICE_CACHE_DIR.iterdir() if p.suffix == ".csv"}
     return sorted(wrds & cache)
@@ -105,14 +107,14 @@ def build_gold_config(
         enable_regime_filter=True,
         enable_ic_calibration=True,
         max_long_positions=10,
-        max_short_positions=0,       # long-only per production
+        max_short_positions=0,  # long-only per production
         max_per_sector=5,
         train_months=train_months,
         test_months=test_months,
         # Signals — earnings + QMJ + institutional flow
         enable_earnings_signals=True,
         earnings_signal_weight=0.30,
-        enable_news_sentiment=False,   # v4-qmj-only has sentiment_score=0
+        enable_news_sentiment=False,  # v4-qmj-only has sentiment_score=0
         enable_institutional_flow=False,  # weight in composite, not blended
         enable_qmj_signal=True,
         enable_short_fundamental_veto=False,
@@ -130,6 +132,7 @@ def build_gold_config(
 
 # ── sweep runners ──────────────────────────────────────────────────────
 
+
 def run_variant_walkforward(
     variant_name: str,
     tickers: list[str],
@@ -145,7 +148,9 @@ def run_variant_walkforward(
         tickers = tickers[:limit_tickers]
 
     cfg = build_gold_config(
-        tickers=tickers, start=start, end=end,
+        tickers=tickers,
+        start=start,
+        end=end,
         gross_exposure=gross_exposure,
         financing_spread_bps=financing_spread_bps,
         guardrails=guardrails,
@@ -215,7 +220,9 @@ def run_variant_cpcv(
         tickers = tickers[:limit_tickers]
 
     cfg = build_gold_config(
-        tickers=tickers, start=start, end=end,
+        tickers=tickers,
+        start=start,
+        end=end,
         gross_exposure=gross_exposure,
         financing_spread_bps=financing_spread_bps,
         guardrails=guardrails,
@@ -274,6 +281,7 @@ def run_variant_cpcv(
 
 # ── report writer ──────────────────────────────────────────────────────
 
+
 def _fmt(v, fmt: str = "{:+.2f}") -> str:
     if v is None:
         return "—"
@@ -286,7 +294,7 @@ def _fmt(v, fmt: str = "{:+.2f}") -> str:
 def write_markdown_report(
     variant_runs: list[dict],
     sensitivity_runs: dict[str, dict],  # keyed by variant name -> {"minus": row, "plus": row}
-    cpcv_runs: dict[str, dict],         # keyed by variant name (optional)
+    cpcv_runs: dict[str, dict],  # keyed by variant name (optional)
     guardrails: dict,
     universe_size: int,
     window: tuple[str, str],
@@ -319,7 +327,9 @@ def write_markdown_report(
         f"{guardrails.get('financing_cost_cap_frac_of_excess_return', 0):.0%} "
         f"of realized excess return vs SPY"
     )
-    lines.append(f"- **CPCV path fail threshold**: >{guardrail_fail_threshold:.0%} of paths failing => variant FAILED")
+    lines.append(
+        f"- **CPCV path fail threshold**: >{guardrail_fail_threshold:.0%} of paths failing => variant FAILED"
+    )
     lines.append("")
 
     # Interpretation section (leave for post-run insertion)
@@ -336,25 +346,34 @@ def write_markdown_report(
         pbo = l15_cpcv["cpcv"]["pbo"]
         dsr = l15_cpcv["cpcv"]["dsr"]
         pr = l15_cpcv["guardrail_pass_rate"]
-        q1 = (f"L-1.5 CPCV: PBO {pbo:.1%}, DSR {dsr:.3f}, guardrail pass rate {pr:.1%}. "
-              f"{'CLEARS' if (pbo < 0.25 and dsr > 0 and pr >= 1 - guardrail_fail_threshold) else 'DOES NOT CLEAR'} the gate.")
+        q1 = (
+            f"L-1.5 CPCV: PBO {pbo:.1%}, DSR {dsr:.3f}, guardrail pass rate {pr:.1%}. "
+            f"{'CLEARS' if (pbo < 0.25 and dsr > 0 and pr >= 1 - guardrail_fail_threshold) else 'DOES NOT CLEAR'} the gate."
+        )
     lines.append(f"1. **Does L-1.5 clear CPCV after financing?** {q1}")
 
     # Q2: monotonic decay
-    sharpes = [(r["gross_exposure"], r["metrics"]["sharpe"]) for r in variant_runs_sorted if r["metrics"]["sharpe"] is not None]
+    sharpes = [
+        (r["gross_exposure"], r["metrics"]["sharpe"])
+        for r in variant_runs_sorted
+        if r["metrics"]["sharpe"] is not None
+    ]
     q2 = "insufficient data"
     if len(sharpes) >= 3:
         vals = [s for _, s in sharpes]
         max_idx = vals.index(max(vals))
         max_gross = sharpes[max_idx][0]
-        monotone_up_then_down = all(
-            vals[i] <= vals[i + 1] for i in range(max_idx)
-        ) and all(vals[i] >= vals[i + 1] for i in range(max_idx, len(vals) - 1))
+        monotone_up_then_down = all(vals[i] <= vals[i + 1] for i in range(max_idx)) and all(
+            vals[i] >= vals[i + 1] for i in range(max_idx, len(vals) - 1)
+        )
         seq = ", ".join(f"L-{g:.2f}={s:.2f}" for g, s in sharpes)
         q2 = (
             f"Sharpe peaks at L-{max_gross:.2f} (Sharpe={vals[max_idx]:.2f}). Sequence: {seq}. "
-            + ("Monotone rise-then-fall — clear optimum." if monotone_up_then_down
-               else "Non-monotone (some ordering violation in the interior).")
+            + (
+                "Monotone rise-then-fall — clear optimum."
+                if monotone_up_then_down
+                else "Non-monotone (some ordering violation in the interior)."
+            )
         )
     lines.append(f"2. **Is there a Sharpe optimum in the sweep?** {q2}")
 
@@ -365,21 +384,31 @@ def write_markdown_report(
         if v in sensitivity_runs:
             base_pass = bool(r["guardrail_passed"]) if r["guardrail_passed"] is not None else True
             for tag, sens in sensitivity_runs[v].items():
-                sens_pass = bool(sens["guardrail_passed"]) if sens["guardrail_passed"] is not None else True
+                sens_pass = (
+                    bool(sens["guardrail_passed"]) if sens["guardrail_passed"] is not None else True
+                )
                 if base_pass != sens_pass:
                     flip_variants.append((v, tag, base_pass, sens_pass))
-    q3 = "None." if not flip_variants else "; ".join(
-        f"{v} flips pass={base}→{sens} at {tag}" for v, tag, base, sens in flip_variants
+    q3 = (
+        "None."
+        if not flip_variants
+        else "; ".join(
+            f"{v} flips pass={base}→{sens} at {tag}" for v, tag, base, sens in flip_variants
+        )
     )
     lines.append(f"3. **Financing sensitivity flips (base vs ±200bp)?** {q3}")
 
     # Q4: recommended next
-    passers = [r for r in variant_runs_sorted if (r["guardrail_passed"] is None or r["guardrail_passed"])]
+    passers = [
+        r for r in variant_runs_sorted if (r["guardrail_passed"] is None or r["guardrail_passed"])
+    ]
     if not passers:
         q4 = "None. All variants fail at least one guardrail. Do NOT promote to phase 2."
     else:
         # Highest Sharpe among passers with gross > 1.0
-        levered_pass = [r for r in passers if r["gross_exposure"] > 1.0 and r["metrics"]["sharpe"] is not None]
+        levered_pass = [
+            r for r in passers if r["gross_exposure"] > 1.0 and r["metrics"]["sharpe"] is not None
+        ]
         if not levered_pass:
             q4 = "L-1.0 (baseline) is the only variant that passes. Leverage is not additive on this composite."
         else:
@@ -491,17 +520,27 @@ def write_markdown_report(
     # Methodology
     lines.append("## Methodology")
     lines.append("")
-    lines.append("- **Financing model**: FRED SOFR90DAYAVG (3M SOFR) + `financing_spread_bps`, "
-                 "accrued daily as `borrowed_dollars * (ann_rate + spread) / 252`, where "
-                 "`borrowed_dollars = (gross_exposure - 1.0) * NAV_start_of_day`. Fallback "
-                 "to overnight SOFR → DGS3MO T-bill → hardcoded 2% broker-call proxy.")
-    lines.append("- **Financing sensitivity**: `financing_spread_bps` swept at base − 200bp, "
-                 "base, base + 200bp.")
-    lines.append("- **Guardrails**: `LeverageGuardrails` dataclass, evaluated post-simulation. "
-                 "Breach fails the run (or CPCV path) structurally — no re-tuning against the gate.")
-    lines.append("- **Composite**: v4-qmj-only (docs/audit/session-3/v4-qmj-only-results.json), "
-                 "long-only, monthly rebalance, `max_long_positions=10`, `max_per_sector=5`.")
-    lines.append("- **No sleeve**, **no beta completion**, **no vol-target**, **no regime-conditional gearing**.")
+    lines.append(
+        "- **Financing model**: FRED SOFR90DAYAVG (3M SOFR) + `financing_spread_bps`, "
+        "accrued daily as `borrowed_dollars * (ann_rate + spread) / 252`, where "
+        "`borrowed_dollars = (gross_exposure - 1.0) * NAV_start_of_day`. Fallback "
+        "to overnight SOFR → DGS3MO T-bill → hardcoded 2% broker-call proxy."
+    )
+    lines.append(
+        "- **Financing sensitivity**: `financing_spread_bps` swept at base − 200bp, "
+        "base, base + 200bp."
+    )
+    lines.append(
+        "- **Guardrails**: `LeverageGuardrails` dataclass, evaluated post-simulation. "
+        "Breach fails the run (or CPCV path) structurally — no re-tuning against the gate."
+    )
+    lines.append(
+        "- **Composite**: v4-qmj-only (docs/audit/session-3/v4-qmj-only-results.json), "
+        "long-only, monthly rebalance, `max_long_positions=10`, `max_per_sector=5`."
+    )
+    lines.append(
+        "- **No sleeve**, **no beta completion**, **no vol-target**, **no regime-conditional gearing**."
+    )
     lines.append("")
 
     out_path.write_text("\n".join(lines) + "\n")
@@ -509,17 +548,25 @@ def write_markdown_report(
 
 # ── main ───────────────────────────────────────────────────────────────
 
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", choices=["walkforward", "cpcv", "both"], default="walkforward")
     parser.add_argument("--start", default="2015-01-01")
     parser.add_argument("--end", default="2024-12-31")
-    parser.add_argument("--limit-tickers", type=int, default=200,
-                        help="Cap universe. Match audit session-3 for comparability. 0=uncapped.")
-    parser.add_argument("--gross", type=float, nargs="+",
-                        default=[1.0, 1.2, 1.5, 1.75, 2.0])
-    parser.add_argument("--sensitivity-only", nargs="*", default=["1.5"],
-                        help="Which gross variants to run financing sensitivity on.")
+    parser.add_argument(
+        "--limit-tickers",
+        type=int,
+        default=200,
+        help="Cap universe. Match audit session-3 for comparability. 0=uncapped.",
+    )
+    parser.add_argument("--gross", type=float, nargs="+", default=[1.0, 1.2, 1.5, 1.75, 2.0])
+    parser.add_argument(
+        "--sensitivity-only",
+        nargs="*",
+        default=["1.5"],
+        help="Which gross variants to run financing sensitivity on.",
+    )
     parser.add_argument("--base-spread-bps", type=float, default=150.0)
     parser.add_argument("--sensitivity-delta-bps", type=float, default=200.0)
     parser.add_argument("--max-dd-cap", type=float, default=0.25)
@@ -528,10 +575,17 @@ def main() -> None:
     parser.add_argument("--fin-cap-frac", type=float, default=0.30)
     parser.add_argument("--guardrail-fail-threshold", type=float, default=0.25)
     parser.add_argument("--cpcv-groups", type=int, default=12)
-    parser.add_argument("--cpcv-max-combinations", type=int, default=100,
-                        help="Cap CPCV combos per variant. Default 100 (provisional). Set 0 for full 252.")
-    parser.add_argument("--variants-file", default="",
-                        help="Skip WF/CPCV, only regenerate the markdown from existing JSON dumps.")
+    parser.add_argument(
+        "--cpcv-max-combinations",
+        type=int,
+        default=100,
+        help="Cap CPCV combos per variant. Default 100 (provisional). Set 0 for full 252.",
+    )
+    parser.add_argument(
+        "--variants-file",
+        default="",
+        help="Skip WF/CPCV, only regenerate the markdown from existing JSON dumps.",
+    )
     parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args()
 
@@ -560,7 +614,9 @@ def main() -> None:
 
     # Regenerate-only path: reload JSONs and rewrite markdown.
     if args.variants_file:
-        variant_runs, sensitivity_runs, cpcv_runs = _load_saved(OUT_JSON_DIR, args.gross, args.sensitivity_only)
+        variant_runs, sensitivity_runs, cpcv_runs = _load_saved(
+            OUT_JSON_DIR, args.gross, args.sensitivity_only
+        )
         write_markdown_report(
             variant_runs=variant_runs,
             sensitivity_runs=sensitivity_runs,
@@ -586,8 +642,10 @@ def main() -> None:
             variant = variant + ".0"
         print(f"\n=== {variant} base run (spread={args.base_spread_bps}bp) ===")
         base = run_variant_walkforward(
-            variant_name=variant, tickers=tickers,
-            start=args.start, end=args.end,
+            variant_name=variant,
+            tickers=tickers,
+            start=args.start,
+            end=args.end,
             gross_exposure=gross,
             financing_spread_bps=args.base_spread_bps,
             guardrails=guardrails,
@@ -595,17 +653,21 @@ def main() -> None:
         variant_runs.append(base)
         out_path = OUT_JSON_DIR / f"{variant}-base-{int(args.base_spread_bps)}bp.json"
         out_path.write_text(json.dumps(base, indent=2, default=str))
-        print(f"  → {out_path.name}: Sharpe={base['metrics']['sharpe']} "
-              f"Return={base['metrics']['annual_return_pct']}% "
-              f"MaxDD={base['metrics']['max_drawdown_pct']}% "
-              f"Fin={base['financing_dollars_paid']}$ "
-              f"Guardrail={base['guardrail_passed']}")
+        print(
+            f"  → {out_path.name}: Sharpe={base['metrics']['sharpe']} "
+            f"Return={base['metrics']['annual_return_pct']}% "
+            f"MaxDD={base['metrics']['max_drawdown_pct']}% "
+            f"Fin={base['financing_dollars_paid']}$ "
+            f"Guardrail={base['guardrail_passed']}"
+        )
 
         # Financing sensitivity: skip for L-1.0 (no borrowing → no financing exposure)
         if gross <= 1.0:
             continue
-        do_sens = str(gross) in [s for s in args.sensitivity_only] or str(int(gross)) in args.sensitivity_only or (
-            f"{gross:.1f}" in args.sensitivity_only
+        do_sens = (
+            str(gross) in [s for s in args.sensitivity_only]
+            or str(int(gross)) in args.sensitivity_only
+            or (f"{gross:.1f}" in args.sensitivity_only)
         )
         if not do_sens:
             continue
@@ -615,8 +677,10 @@ def main() -> None:
         ):
             print(f"\n=== {variant} financing sensitivity {tag} (spread={spread}bp) ===")
             sens = run_variant_walkforward(
-                variant_name=variant, tickers=tickers,
-                start=args.start, end=args.end,
+                variant_name=variant,
+                tickers=tickers,
+                start=args.start,
+                end=args.end,
                 gross_exposure=gross,
                 financing_spread_bps=spread,
                 guardrails=guardrails,
@@ -631,8 +695,10 @@ def main() -> None:
             max_combos = args.cpcv_max_combinations if args.cpcv_max_combinations > 0 else None
             print(f"\n=== {variant} CPCV (groups={args.cpcv_groups}, max_combos={max_combos}) ===")
             cpcv = run_variant_cpcv(
-                variant_name=variant, tickers=tickers,
-                start=args.start, end=args.end,
+                variant_name=variant,
+                tickers=tickers,
+                start=args.start,
+                end=args.end,
                 gross_exposure=gross,
                 financing_spread_bps=args.base_spread_bps,
                 guardrails=guardrails,
@@ -642,8 +708,10 @@ def main() -> None:
             cpcv_runs[variant] = cpcv
             cpcv_path = OUT_JSON_DIR / f"{variant}-cpcv.json"
             cpcv_path.write_text(json.dumps(cpcv, indent=2, default=str))
-            print(f"  → {cpcv_path.name}: PBO={cpcv['cpcv']['pbo']:.1%} DSR={cpcv['cpcv']['dsr']} "
-                  f"pass_rate={cpcv['guardrail_pass_rate']:.1%}")
+            print(
+                f"  → {cpcv_path.name}: PBO={cpcv['cpcv']['pbo']:.1%} DSR={cpcv['cpcv']['dsr']} "
+                f"pass_rate={cpcv['guardrail_pass_rate']:.1%}"
+            )
 
     write_markdown_report(
         variant_runs=variant_runs,
@@ -658,7 +726,9 @@ def main() -> None:
     print(f"\nWrote {OUT_MD_PATH}")
 
 
-def _load_saved(json_dir: Path, gross_list: list[float], sensitivity_only: list[str]) -> tuple[list[dict], dict, dict]:
+def _load_saved(
+    json_dir: Path, gross_list: list[float], sensitivity_only: list[str]
+) -> tuple[list[dict], dict, dict]:
     """Reload per-variant JSON dumps for report regeneration."""
     variant_runs: list[dict] = []
     sensitivity_runs: dict[str, dict] = {}
@@ -673,7 +743,9 @@ def _load_saved(json_dir: Path, gross_list: list[float], sensitivity_only: list[
         for tag in ("minus", "plus"):
             sens_files = sorted(json_dir.glob(f"{variant}-sens-{tag}-*.json"))
             if sens_files:
-                sensitivity_runs.setdefault(variant, {})[tag] = json.loads(sens_files[-1].read_text())
+                sensitivity_runs.setdefault(variant, {})[tag] = json.loads(
+                    sens_files[-1].read_text()
+                )
         cpcv_files = sorted(json_dir.glob(f"{variant}-cpcv.json"))
         if cpcv_files:
             cpcv_runs[variant] = json.loads(cpcv_files[-1].read_text())

@@ -28,19 +28,28 @@ class FundamentalProvider(Protocol):
     """
 
     def get_balance_sheet_quarterly(
-        self, ticker: str, limit: int = 4, as_of_date: Optional[date] = None,
+        self,
+        ticker: str,
+        limit: int = 4,
+        as_of_date: Optional[date] = None,
     ) -> list[dict]:
         """Return quarterly balance sheet data, most recent first."""
         ...
 
     def get_income_statement_quarterly(
-        self, ticker: str, limit: int = 8, as_of_date: Optional[date] = None,
+        self,
+        ticker: str,
+        limit: int = 8,
+        as_of_date: Optional[date] = None,
     ) -> list[dict]:
         """Return quarterly income statement data, most recent first."""
         ...
 
     def get_analyst_estimates(
-        self, ticker: str, limit: int = 4, as_of_date: Optional[date] = None,
+        self,
+        ticker: str,
+        limit: int = 4,
+        as_of_date: Optional[date] = None,
     ) -> list[dict]:
         """Return analyst consensus estimates, most recent first."""
         ...
@@ -59,6 +68,7 @@ class WRDSFundamentalProvider:
 
     def __init__(self, store) -> None:
         from quant.wrds_store import WRDSPointInTimeStore
+
         self._store: WRDSPointInTimeStore = store
         self._ibes_map: dict[str, str] = {}  # our_ticker → ibes_ticker
         self._build_ibes_map()
@@ -66,6 +76,7 @@ class WRDSFundamentalProvider:
     def _build_ibes_map(self) -> None:
         """Build ticker → IBES ticker mapping from the link table."""
         import sqlite3
+
         conn = sqlite3.connect(self._store._db_path)
         rows = conn.execute(
             "SELECT ticker, ibes_ticker FROM ticker_link WHERE ibes_ticker IS NOT NULL"
@@ -80,13 +91,19 @@ class WRDSFundamentalProvider:
         return self._ibes_map.get(ticker.upper(), ticker.upper())
 
     def get_balance_sheet_quarterly(
-        self, ticker: str, limit: int = 4, as_of_date: Optional[date] = None,
+        self,
+        ticker: str,
+        limit: int = 4,
+        as_of_date: Optional[date] = None,
     ) -> list[dict]:
         date_str = str(as_of_date) if as_of_date else "2099-12-31"
         return self._store.get_fundamentals_as_of(ticker, date_str, n_quarters=limit)
 
     def get_income_statement_quarterly(
-        self, ticker: str, limit: int = 8, as_of_date: Optional[date] = None,
+        self,
+        ticker: str,
+        limit: int = 8,
+        as_of_date: Optional[date] = None,
     ) -> list[dict]:
         # Compustat fundq has both balance sheet and income in one row
         # get_fundamentals_as_of already returns FMP-compatible dicts with both
@@ -94,7 +111,10 @@ class WRDSFundamentalProvider:
         return self._store.get_fundamentals_as_of(ticker, date_str, n_quarters=limit)
 
     def get_analyst_estimates(
-        self, ticker: str, limit: int = 4, as_of_date: Optional[date] = None,
+        self,
+        ticker: str,
+        limit: int = 4,
+        as_of_date: Optional[date] = None,
     ) -> list[dict]:
         date_str = str(as_of_date) if as_of_date else "2099-12-31"
         # Try our ticker first, then IBES ticker if different
@@ -103,13 +123,16 @@ class WRDSFundamentalProvider:
         if not rows and ibes_tk != ticker.upper():
             rows = self._store.get_ibes_consensus_as_of(ibes_tk, date_str, n_periods=limit)
         # Convert IBES fields to FMP-compatible names
-        return [{
-            "date": r.get("statpers", ""),
-            "fpedats": r.get("fpedats", ""),
-            "epsAvg": r.get("meanest"),
-            "epsMedian": r.get("medest"),
-            "numAnalystsEps": r.get("numest"),
-            "epsStdev": r.get("stdev"),
-            "numUp": r.get("numup"),
-            "numDown": r.get("numdown"),
-        } for r in rows]
+        return [
+            {
+                "date": r.get("statpers", ""),
+                "fpedats": r.get("fpedats", ""),
+                "epsAvg": r.get("meanest"),
+                "epsMedian": r.get("medest"),
+                "numAnalystsEps": r.get("numest"),
+                "epsStdev": r.get("stdev"),
+                "numUp": r.get("numup"),
+                "numDown": r.get("numdown"),
+            }
+            for r in rows
+        ]

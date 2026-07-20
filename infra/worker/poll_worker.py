@@ -29,6 +29,7 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 from dotenv import load_dotenv
+
 load_dotenv(os.path.join(_PROJECT_ROOT, ".env"))
 
 from infra.worker.queue_client import (
@@ -57,12 +58,14 @@ SEC_MIN_INTERVAL = 0.125
 # Database access — Supabase or SQLite fallback
 # =============================================================================
 
+
 def _load_tickers_sqlite() -> list[dict]:
     """
     Load tracked tickers from the local SQLite warehouse DB.
     Returns list of dicts: [{ticker, cik, last_accession}, ...]
     """
     import sqlite3
+
     db_path = os.environ.get("WAREHOUSE_DB_PATH", ".warehouse.db")
     # Resolve relative to project root
     if not os.path.isabs(db_path):
@@ -169,15 +172,16 @@ def update_last_checked(ticker: str, accession: str) -> None:
 # SEC EDGAR polling
 # =============================================================================
 
+
 def _make_session() -> requests.Session:
-    user_agent = os.environ.get(
-        "SEC_USER_AGENT", "AIFinancialAnalyst admin@example.com"
-    )
+    user_agent = os.environ.get("SEC_USER_AGENT", "AIFinancialAnalyst admin@example.com")
     session = requests.Session()
-    session.headers.update({
-        "User-Agent": user_agent,
-        "Accept": "application/json",
-    })
+    session.headers.update(
+        {
+            "User-Agent": user_agent,
+            "Accept": "application/json",
+        }
+    )
     return session
 
 
@@ -226,6 +230,7 @@ def fetch_latest_accession(
 # =============================================================================
 # Main poll loop
 # =============================================================================
+
 
 def run_sweep(session: requests.Session, last_request_time: list) -> None:
     """
@@ -284,7 +289,10 @@ def run_sweep(session: requests.Session, last_request_time: list) -> None:
         # New filing detected
         logger.info(
             "new accession for %s: %s (form=%s, date=%s)",
-            ticker, latest_accession, form, filing_date,
+            ticker,
+            latest_accession,
+            form,
+            filing_date,
         )
 
         # Dedup: skip if already being processed by another worker
@@ -292,7 +300,8 @@ def run_sweep(session: requests.Session, last_request_time: list) -> None:
             if is_processing(latest_accession):
                 logger.info(
                     "%s accession %s already processing — skipping enqueue",
-                    ticker, latest_accession,
+                    ticker,
+                    latest_accession,
                 )
                 continue
         except Exception as exc:
@@ -318,9 +327,7 @@ def run_sweep(session: requests.Session, last_request_time: list) -> None:
 
 
 def main() -> None:
-    logger.info(
-        "poll worker starting (POLL_INTERVAL=%ds)", POLL_INTERVAL
-    )
+    logger.info("poll worker starting (POLL_INTERVAL=%ds)", POLL_INTERVAL)
     session = _make_session()
     last_request_time = [0.0]  # mutable reference for rate-limit tracking
 

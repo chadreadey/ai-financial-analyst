@@ -16,12 +16,13 @@ def _validate_eod_bar(bar: dict, symbol: str) -> dict:
     """Log warning if required EOD fields are missing. Returns bar unchanged."""
     missing = [k for k in _REQUIRED_EOD_FIELDS if k not in bar]
     if missing:
-        logger.warning("schema: eod_bar response for %s missing fields: %s", symbol, ", ".join(missing))
+        logger.warning(
+            "schema: eod_bar response for %s missing fields: %s", symbol, ", ".join(missing)
+        )
     return bar
 
 
 class TiingoClient:
-
     def __init__(self, api_key: str) -> None:
         self._session = requests.Session()
         self._session.headers["Authorization"] = f"Token {api_key}"
@@ -30,11 +31,13 @@ class TiingoClient:
         endpoint = f"tiingo/daily/{symbol}/prices"
         try:
             resp = self._session.get(
-                f"https://api.tiingo.com/{endpoint}", timeout=(5, 15),
+                f"https://api.tiingo.com/{endpoint}",
+                timeout=(5, 15),
             )
             if resp.status_code >= 500:
                 resp = self._session.get(
-                    f"https://api.tiingo.com/{endpoint}", timeout=(5, 15),
+                    f"https://api.tiingo.com/{endpoint}",
+                    timeout=(5, 15),
                 )
             resp.raise_for_status()
             data = resp.json()
@@ -42,7 +45,8 @@ class TiingoClient:
         except requests.ConnectionError:
             try:
                 resp = self._session.get(
-                    f"https://api.tiingo.com/{endpoint}", timeout=(5, 15),
+                    f"https://api.tiingo.com/{endpoint}",
+                    timeout=(5, 15),
                 )
                 resp.raise_for_status()
                 data = resp.json()
@@ -58,18 +62,21 @@ class TiingoClient:
         endpoint = f"tiingo/daily/{symbol}"
         try:
             resp = self._session.get(
-                f"https://api.tiingo.com/{endpoint}", timeout=(5, 15),
+                f"https://api.tiingo.com/{endpoint}",
+                timeout=(5, 15),
             )
             if resp.status_code >= 500:
                 resp = self._session.get(
-                    f"https://api.tiingo.com/{endpoint}", timeout=(5, 15),
+                    f"https://api.tiingo.com/{endpoint}",
+                    timeout=(5, 15),
                 )
             resp.raise_for_status()
             return resp.json()
         except requests.ConnectionError:
             try:
                 resp = self._session.get(
-                    f"https://api.tiingo.com/{endpoint}", timeout=(5, 15),
+                    f"https://api.tiingo.com/{endpoint}",
+                    timeout=(5, 15),
                 )
                 resp.raise_for_status()
                 return resp.json()
@@ -80,7 +87,9 @@ class TiingoClient:
             logger.debug("tiingo %s failed: %s", endpoint, exc, exc_info=True)
             return {}
 
-    def get_fundamentals_statements(self, symbol: str, start_date: str = "2020-01-01") -> list[dict]:
+    def get_fundamentals_statements(
+        self, symbol: str, start_date: str = "2020-01-01"
+    ) -> list[dict]:
         endpoint = f"tiingo/fundamentals/{symbol}/statements"
         try:
             resp = self._session.get(

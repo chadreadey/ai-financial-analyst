@@ -58,7 +58,9 @@ class FMPFundamentalCache:
     # Default TTL: 7 days for live analysis. Pass max_age_seconds=0 to disable (backtesting).
     DEFAULT_MAX_AGE = 7 * 24 * 3600  # 604800 seconds
 
-    def _get(self, ticker: str, data_type: str, max_age_seconds: float = -1) -> Optional[list[dict]]:
+    def _get(
+        self, ticker: str, data_type: str, max_age_seconds: float = -1
+    ) -> Optional[list[dict]]:
         """Fetch cached data. Returns None if missing or stale.
 
         Args:
@@ -78,8 +80,13 @@ class FMPFundamentalCache:
         if max_age_seconds > 0:
             age = time.time() - row["updated_at"]
             if age > max_age_seconds:
-                logger.info("FMP cache stale for %s/%s (age=%.0fs, max=%.0fs)",
-                            ticker, data_type, age, max_age_seconds)
+                logger.info(
+                    "FMP cache stale for %s/%s (age=%.0fs, max=%.0fs)",
+                    ticker,
+                    data_type,
+                    age,
+                    max_age_seconds,
+                )
                 return None
         try:
             return json.loads(row["data_json"])
@@ -112,7 +119,9 @@ class FMPFundamentalCache:
             return data[0] if isinstance(data, list) else data
         return None
 
-    def get_institutional_quarterly(self, ticker: str, max_age_seconds: float = -1) -> Optional[list[dict]]:
+    def get_institutional_quarterly(
+        self, ticker: str, max_age_seconds: float = -1
+    ) -> Optional[list[dict]]:
         """Get cached institutional ownership data."""
         return self._get(ticker, "institutional_q", max_age_seconds)
 
@@ -146,8 +155,12 @@ class FMPFundamentalCache:
         for i, ticker in enumerate(tickers):
             sym = ticker.upper()
             if (i + 1) % 10 == 0:
-                logger.info("FMP prefetch: %d/%d tickers, %d API calls",
-                            i + 1, len(tickers), stats["api_calls"])
+                logger.info(
+                    "FMP prefetch: %d/%d tickers, %d API calls",
+                    i + 1,
+                    len(tickers),
+                    stats["api_calls"],
+                )
 
             for data_type, fetch_fn, limit in [
                 ("income_q", fmp_client.get_income_statement_quarterly, 8),
@@ -171,8 +184,12 @@ class FMPFundamentalCache:
                     logger.debug("FMP prefetch %s/%s failed: %s", sym, data_type, exc)
                     stats["errors"] += 1
 
-        logger.info("FMP prefetch complete: %d API calls, %d cached, %d errors",
-                     stats["api_calls"], stats["cached"], stats["errors"])
+        logger.info(
+            "FMP prefetch complete: %d API calls, %d cached, %d errors",
+            stats["api_calls"],
+            stats["cached"],
+            stats["errors"],
+        )
         return stats
 
     def prefetch_from_tiingo(
@@ -189,8 +206,11 @@ class FMPFundamentalCache:
         backtest engine can use the same cache regardless of source.
         """
         from fmp_client import (
-            _REQUIRED_INCOME_FIELDS, _REQUIRED_BALANCE_FIELDS, _validate_fmp_record,
+            _REQUIRED_INCOME_FIELDS,
+            _REQUIRED_BALANCE_FIELDS,
+            _validate_fmp_record,
         )
+
         stats = {"api_calls": 0, "cached": 0, "errors": 0}
 
         for i, ticker in enumerate(tickers):
@@ -220,39 +240,52 @@ class FMPFundamentalCache:
                     sd = quarter.get("statementData", {})
 
                     # Convert income statement
-                    inc = {item["dataCode"]: item["value"] for item in sd.get("incomeStatement", [])}
+                    inc = {
+                        item["dataCode"]: item["value"] for item in sd.get("incomeStatement", [])
+                    }
                     overview = {item["dataCode"]: item["value"] for item in sd.get("overview", [])}
-                    income_records.append({
-                        "date": date,
-                        "symbol": sym,
-                        "netIncome": inc.get("consolidatedIncome") or inc.get("netInc", 0),
-                        "revenue": inc.get("revenue", 0),
-                        "grossProfit": inc.get("grossProfit", 0),
-                        "ebitda": inc.get("ebitda", 0),
-                        "eps": inc.get("eps", 0),
-                        "epsDil": inc.get("epsDil", 0),
-                    })
+                    income_records.append(
+                        {
+                            "date": date,
+                            "symbol": sym,
+                            "netIncome": inc.get("consolidatedIncome") or inc.get("netInc", 0),
+                            "revenue": inc.get("revenue", 0),
+                            "grossProfit": inc.get("grossProfit", 0),
+                            "ebitda": inc.get("ebitda", 0),
+                            "eps": inc.get("eps", 0),
+                            "epsDil": inc.get("epsDil", 0),
+                        }
+                    )
 
                     # Convert balance sheet
                     bs = {item["dataCode"]: item["value"] for item in sd.get("balanceSheet", [])}
-                    balance_records.append({
-                        "date": date,
-                        "symbol": sym,
-                        "totalAssets": bs.get("totalAssets", 0),
-                        "totalCurrentAssets": bs.get("assetsCurrent", 0),
-                        "totalCurrentLiabilities": (bs.get("debtCurrent", 0) or 0) + (bs.get("payables", 0) or 0) + (bs.get("acctPay", 0) or 0),
-                        "totalStockholdersEquity": bs.get("equity", 0),
-                        "totalDebt": (bs.get("debtCurrent", 0) or 0) + (bs.get("debtNonCurrent", 0) or 0),
-                        "cashAndCashEquivalents": bs.get("cashAndEq", 0),
-                        "retainedEarnings": bs.get("retainedEarnings", 0),
-                        "totalLiabilities": bs.get("totalLiabilities", 0),
-                    })
+                    balance_records.append(
+                        {
+                            "date": date,
+                            "symbol": sym,
+                            "totalAssets": bs.get("totalAssets", 0),
+                            "totalCurrentAssets": bs.get("assetsCurrent", 0),
+                            "totalCurrentLiabilities": (bs.get("debtCurrent", 0) or 0)
+                            + (bs.get("payables", 0) or 0)
+                            + (bs.get("acctPay", 0) or 0),
+                            "totalStockholdersEquity": bs.get("equity", 0),
+                            "totalDebt": (bs.get("debtCurrent", 0) or 0)
+                            + (bs.get("debtNonCurrent", 0) or 0),
+                            "cashAndCashEquivalents": bs.get("cashAndEq", 0),
+                            "retainedEarnings": bs.get("retainedEarnings", 0),
+                            "totalLiabilities": bs.get("totalLiabilities", 0),
+                        }
+                    )
 
                 # Validate translated records before caching
                 for rec in income_records:
-                    _validate_fmp_record(rec, _REQUIRED_INCOME_FIELDS, "tiingo_translated_income", sym)
+                    _validate_fmp_record(
+                        rec, _REQUIRED_INCOME_FIELDS, "tiingo_translated_income", sym
+                    )
                 for rec in balance_records:
-                    _validate_fmp_record(rec, _REQUIRED_BALANCE_FIELDS, "tiingo_translated_balance", sym)
+                    _validate_fmp_record(
+                        rec, _REQUIRED_BALANCE_FIELDS, "tiingo_translated_balance", sym
+                    )
 
                 self._set(sym, "income_q", income_records)
                 self._set(sym, "balance_q", balance_records)
@@ -261,30 +294,35 @@ class FMPFundamentalCache:
                 if len(income_records) >= 2:
                     estimates = []
                     for rec in income_records[:4]:
-                        estimates.append({
-                            "symbol": sym,
-                            "date": rec["date"],
-                            "epsAvg": rec.get("epsDil") or rec.get("eps", 0),
-                            "revenueAvg": rec.get("revenue", 0),
-                        })
+                        estimates.append(
+                            {
+                                "symbol": sym,
+                                "date": rec["date"],
+                                "epsAvg": rec.get("epsDil") or rec.get("eps", 0),
+                                "revenueAvg": rec.get("revenue", 0),
+                            }
+                        )
                     self._set(sym, "estimates", estimates)
 
                 import time as _time
+
                 _time.sleep(rate_limit_sleep)
 
             except Exception as exc:
                 logger.debug("Tiingo prefetch %s failed: %s", sym, exc)
                 stats["errors"] += 1
 
-        logger.info("Tiingo prefetch complete: %d API calls, %d cached, %d errors",
-                     stats["api_calls"], stats["cached"], stats["errors"])
+        logger.info(
+            "Tiingo prefetch complete: %d API calls, %d cached, %d errors",
+            stats["api_calls"],
+            stats["cached"],
+            stats["errors"],
+        )
         return stats
 
     def ticker_count(self) -> int:
         conn = self._conn()
-        count = conn.execute(
-            "SELECT COUNT(DISTINCT ticker) FROM fmp_fundamentals"
-        ).fetchone()[0]
+        count = conn.execute("SELECT COUNT(DISTINCT ticker) FROM fmp_fundamentals").fetchone()[0]
         conn.close()
         return count
 

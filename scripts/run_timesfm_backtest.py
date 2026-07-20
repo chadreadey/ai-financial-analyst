@@ -105,9 +105,11 @@ def print_comparison(baseline: BacktestResult, overlay: BacktestResult, weight: 
         print("  " + "-" * 57)
         for bw, ow in zip(baseline.walk_forward, overlay.walk_forward):
             period = f"{bw['test_start']} → {bw['test_end'][:7]}"
-            delta = ow['return_pct'] - bw['return_pct']
+            delta = ow["return_pct"] - bw["return_pct"]
             sign = "+" if delta >= 0 else ""
-            print(f"  {period:<25s} {bw['return_pct']:>9.2f}% {ow['return_pct']:>9.2f}% {sign}{delta:>8.2f}%")
+            print(
+                f"  {period:<25s} {bw['return_pct']:>9.2f}% {ow['return_pct']:>9.2f}% {sign}{delta:>8.2f}%"
+            )
 
     print("\n" + "=" * 74)
 
@@ -134,6 +136,7 @@ def run_comparison(config_base: BacktestConfig, walk_forward: bool, weight: floa
     print("\n--- Phase 2: Quant + TimesFM Overlay ---")
     # Copy all config from baseline, just enable TimesFM overlay
     from dataclasses import asdict
+
     overlay_kwargs = asdict(config_base)
     overlay_kwargs["enable_timesfm"] = True
     overlay_kwargs["timesfm_weight"] = weight
@@ -152,22 +155,30 @@ def run_comparison(config_base: BacktestConfig, walk_forward: bool, weight: floa
 
 def main():
     parser = argparse.ArgumentParser(description="TimesFM overlay backtest comparison")
-    parser.add_argument("--universe", default="liquid_10",
-                        help="Universe name (default: liquid_10)")
-    parser.add_argument("--tickers", default="",
-                        help="Comma-separated tickers (overrides --universe)")
-    parser.add_argument("--start", default="2022-01-01",
-                        help="Start date (default: 2022-01-01)")
+    parser.add_argument(
+        "--universe", default="liquid_10", help="Universe name (default: liquid_10)"
+    )
+    parser.add_argument(
+        "--tickers", default="", help="Comma-separated tickers (overrides --universe)"
+    )
+    parser.add_argument("--start", default="2022-01-01", help="Start date (default: 2022-01-01)")
     parser.add_argument("--end", default="", help="End date (default: today)")
     parser.add_argument("--rebalance", default="monthly", choices=["weekly", "monthly"])
-    parser.add_argument("--walk-forward", action="store_true",
-                        help="Use walk-forward validation")
-    parser.add_argument("--timesfm-weight", type=float, default=0.15,
-                        help="Weight for TimesFM signal (default: 0.15)")
-    parser.add_argument("--sweep-weights", action="store_true",
-                        help="Sweep TimesFM weights: 0.05, 0.10, 0.15, 0.20, 0.25")
-    parser.add_argument("--skip-baseline", action="store_true",
-                        help="Skip baseline, only run TimesFM overlay")
+    parser.add_argument("--walk-forward", action="store_true", help="Use walk-forward validation")
+    parser.add_argument(
+        "--timesfm-weight",
+        type=float,
+        default=0.15,
+        help="Weight for TimesFM signal (default: 0.15)",
+    )
+    parser.add_argument(
+        "--sweep-weights",
+        action="store_true",
+        help="Sweep TimesFM weights: 0.05, 0.10, 0.15, 0.20, 0.25",
+    )
+    parser.add_argument(
+        "--skip-baseline", action="store_true", help="Skip baseline, only run TimesFM overlay"
+    )
     parser.add_argument("--output", default="", help="Save results to JSON file")
     parser.add_argument("--verbose", "-v", action="store_true")
 
@@ -182,6 +193,7 @@ def main():
     has_model = False
     try:
         import timesfm  # noqa: F401
+
         print("TimesFM package: found (preferred)")
         has_model = True
     except ImportError:
@@ -189,6 +201,7 @@ def main():
     if not has_model:
         try:
             from chronos import ChronosPipeline  # noqa: F401
+
             print("Chronos package: found (fallback)")
             has_model = True
         except ImportError:
@@ -200,8 +213,11 @@ def main():
         print("    pip install chronos-forecasting torch  # fallback, CPU OK")
         sys.exit(1)
 
-    tickers = ([t.strip().upper() for t in args.tickers.split(",") if t.strip()]
-               if args.tickers else get_universe(args.universe))
+    tickers = (
+        [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
+        if args.tickers
+        else get_universe(args.universe)
+    )
 
     print(f"\nTimesFM Backtest: {len(tickers)} tickers, {args.start} to {args.end or 'today'}")
     print(f"Rebalance: {args.rebalance}")
@@ -234,15 +250,22 @@ def main():
 
         # Sweep
         print("\n--- Weight Sweep ---")
-        print(f"  {'Weight':>8s} {'Sharpe':>8s} {'Return':>10s} {'Alpha':>10s} {'Win%':>8s} {'Trades':>8s}")
+        print(
+            f"  {'Weight':>8s} {'Sharpe':>8s} {'Return':>10s} {'Alpha':>10s} {'Win%':>8s} {'Trades':>8s}"
+        )
         print("  " + "-" * 56)
 
         for w in weights:
             config_w = BacktestConfig(
-                tickers=tickers, start_date=args.start, end_date=args.end,
-                rebalance_freq=args.rebalance, enable_timesfm=True, timesfm_weight=w,
+                tickers=tickers,
+                start_date=args.start,
+                end_date=args.end,
+                rebalance_freq=args.rebalance,
+                enable_timesfm=True,
+                timesfm_weight=w,
                 initial_capital=config.initial_capital,
-                train_months=config.train_months, test_months=config.test_months,
+                train_months=config.train_months,
+                test_months=config.test_months,
             )
             if args.walk_forward:
                 result = run_walk_forward(config_w, progress_cb=progress)
@@ -250,8 +273,10 @@ def main():
                 result = run_backtest(config_w, progress_cb=progress)
 
             sharpe_str = f"{result.sharpe:.2f}" if result.sharpe else "N/A"
-            print(f"  {w:>8.0%} {sharpe_str:>8s} {result.total_return_pct:>9.2f}% "
-                  f"{result.alpha_pct:>9.2f}% {result.win_rate_pct:>7.1f}% {result.total_trades:>8d}")
+            print(
+                f"  {w:>8.0%} {sharpe_str:>8s} {result.total_return_pct:>9.2f}% "
+                f"{result.alpha_pct:>9.2f}% {result.win_rate_pct:>7.1f}% {result.total_trades:>8d}"
+            )
 
             all_results[f"weight_{w:.2f}"] = result.to_dict()
 
@@ -266,8 +291,10 @@ def main():
             overlay = run_backtest(config, progress_cb=progress)
 
         all_results["overlay"] = overlay.to_dict()
-        print(f"\n  Sharpe: {overlay.sharpe}, Return: {overlay.total_return_pct}%, "
-              f"Alpha: {overlay.alpha_pct}%")
+        print(
+            f"\n  Sharpe: {overlay.sharpe}, Return: {overlay.total_return_pct}%, "
+            f"Alpha: {overlay.alpha_pct}%"
+        )
 
     else:
         # Standard A/B comparison

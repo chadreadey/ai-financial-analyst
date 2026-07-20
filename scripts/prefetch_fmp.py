@@ -17,6 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 import os
@@ -27,14 +28,16 @@ from quant.universe import get_universe
 
 def main():
     parser = argparse.ArgumentParser(description="Prefetch FMP fundamental data to cache")
-    parser.add_argument("--universe", default="liquid_10",
-                        help="Universe name (default: liquid_10)")
-    parser.add_argument("--tickers", default="",
-                        help="Comma-separated tickers (overrides --universe)")
-    parser.add_argument("--force", action="store_true",
-                        help="Re-fetch even if cached")
-    parser.add_argument("--sleep", type=float, default=0.5,
-                        help="Seconds between API calls (default: 0.5)")
+    parser.add_argument(
+        "--universe", default="liquid_10", help="Universe name (default: liquid_10)"
+    )
+    parser.add_argument(
+        "--tickers", default="", help="Comma-separated tickers (overrides --universe)"
+    )
+    parser.add_argument("--force", action="store_true", help="Re-fetch even if cached")
+    parser.add_argument(
+        "--sleep", type=float, default=0.5, help="Seconds between API calls (default: 0.5)"
+    )
 
     args = parser.parse_args()
 

@@ -45,7 +45,10 @@ def compute_institutional_flow_score(
         (score in [-1, +1], metadata dict)
     """
     if not current_snapshot or len(current_snapshot) < MIN_INSTITUTIONS:
-        return 0.0, {"error": "insufficient institutions", "n_institutions": len(current_snapshot) if current_snapshot else 0}
+        return 0.0, {
+            "error": "insufficient institutions",
+            "n_institutions": len(current_snapshot) if current_snapshot else 0,
+        }
 
     # --- Sub-signal 1: Holder count change ---
     n_current = len(current_snapshot)
@@ -61,7 +64,9 @@ def compute_institutional_flow_score(
 
     # --- Sub-signal 2: Shares flow ---
     current_total = sum(h.get("sharesNumber", 0) for h in current_snapshot)
-    prior_total = sum(h.get("sharesNumber", 0) for h in prior_snapshot) if prior_snapshot else current_total
+    prior_total = (
+        sum(h.get("sharesNumber", 0) for h in prior_snapshot) if prior_snapshot else current_total
+    )
 
     if prior_total > 0:
         shares_flow_pct = (current_total - prior_total) / prior_total
@@ -439,9 +444,7 @@ def fetch_and_score_institutional_flow(
         pit_safe_quarters: list[str] = [
             qkey
             for qkey in sorted(quarters.keys(), reverse=True)
-            if _is_pit_safe_quarter(
-                quarter_end_dates[qkey], as_of_date, filing_lag_days
-            )
+            if _is_pit_safe_quarter(quarter_end_dates[qkey], as_of_date, filing_lag_days)
         ]
 
         if len(pit_safe_quarters) >= 1:
@@ -528,8 +531,13 @@ def prefetch_institutional_data(
         n = len(wrds_data) + len(fmp_data) + len(fh_data)
         if n > 0:
             stats[ticker] = n
-        logger.debug("Prefetched %s: %d WRDS + %d FMP + %d Finnhub records",
-                     ticker, len(wrds_data), len(fmp_data), len(fh_data))
+        logger.debug(
+            "Prefetched %s: %d WRDS + %d FMP + %d Finnhub records",
+            ticker,
+            len(wrds_data),
+            len(fmp_data),
+            len(fh_data),
+        )
     return stats
 
 

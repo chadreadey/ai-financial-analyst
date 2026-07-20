@@ -70,6 +70,7 @@ def make_volatility_tier_fn(
 
     return tier_fn
 
+
 MIN_CROSS_SECTION = 10
 WINSORIZE_LOW = 2.5
 WINSORIZE_HIGH = 97.5
@@ -134,15 +135,15 @@ DEFAULT_COMPOSITE_WEIGHTS = {
     "obv_trend": 0.20,
     "earnings_rank_score": 0.40,
     "institutional_flow_score": 0.10,
-    "sentiment_score": 0.0,           # zeroed 2026-04-28 (v4-qmj-only ship)
-    "sector_momentum_score": 0.0,     # already 0
-    "quality_score": 0.0,             # zeroed — QMJ subsumes (corr ρ=+0.31)
-    "price_momentum_score": 0.0,      # zeroed — 3M IC near zero
-    "insider_score": 0.0,             # zeroed earlier (RISK-2, wrong-sign IC)
-    "event_timing_score": 0.0,        # PEAD data sparse; orthogonal but noisy
-    "price_regression_score": 0.0,    # zeroed — no measured IC, sparse
-    "arima_forecast_score": 0.0,      # zeroed — no measured IC, sparse
-    "qmj_score": 0.30,                # NEW production signal — strongest measured IC
+    "sentiment_score": 0.0,  # zeroed 2026-04-28 (v4-qmj-only ship)
+    "sector_momentum_score": 0.0,  # already 0
+    "quality_score": 0.0,  # zeroed — QMJ subsumes (corr ρ=+0.31)
+    "price_momentum_score": 0.0,  # zeroed — 3M IC near zero
+    "insider_score": 0.0,  # zeroed earlier (RISK-2, wrong-sign IC)
+    "event_timing_score": 0.0,  # PEAD data sparse; orthogonal but noisy
+    "price_regression_score": 0.0,  # zeroed — no measured IC, sparse
+    "arima_forecast_score": 0.0,  # zeroed — no measured IC, sparse
+    "qmj_score": 0.30,  # NEW production signal — strongest measured IC
 }
 
 
@@ -155,7 +156,9 @@ def _get_signal_score(sv: SignalVector, field_name: str, sub_attr: str | None) -
     return 0.0
 
 
-def _set_signal_score(sv: SignalVector, field_name: str, sub_attr: str | None, value: float) -> None:
+def _set_signal_score(
+    sv: SignalVector, field_name: str, sub_attr: str | None, value: float
+) -> None:
     if sub_attr is not None:
         sr = getattr(sv, field_name)
         if isinstance(sr, SignalResult):
@@ -184,13 +187,17 @@ def normalize_signals_cross_sectionally(
     n = len(tickers)
 
     if n < MIN_CROSS_SECTION:
-        logger.debug("Cross-section too small (%d < %d) — skipping normalization", n, MIN_CROSS_SECTION)
+        logger.debug(
+            "Cross-section too small (%d < %d) — skipping normalization", n, MIN_CROSS_SECTION
+        )
         return signals
 
     sectors = {t: sector_fn(t) for t in tickers}
 
     for field_name, sub_attr in SIGNAL_FIELDS:
-        raw_scores = np.array([_get_signal_score(signals[t], field_name, sub_attr) for t in tickers])
+        raw_scores = np.array(
+            [_get_signal_score(signals[t], field_name, sub_attr) for t in tickers]
+        )
 
         if np.all(raw_scores == 0.0):
             continue
@@ -203,7 +210,9 @@ def normalize_signals_cross_sectionally(
                 sec_mask = np.array([sectors[tt] == sec for tt in tickers])
                 sector_means[sec] = np.mean(raw_scores[sec_mask])
 
-        adjusted = np.array([raw_scores[i] - sector_means[sectors[t]] for i, t in enumerate(tickers)])
+        adjusted = np.array(
+            [raw_scores[i] - sector_means[sectors[t]] for i, t in enumerate(tickers)]
+        )
 
         # Winsorize
         adjusted = _winsorize(adjusted, WINSORIZE_LOW, WINSORIZE_HIGH)

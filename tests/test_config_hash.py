@@ -1,4 +1,5 @@
 """Tests for quant/config_hash.py — deterministic config hashing for reproducibility."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -80,7 +81,9 @@ def test_extra_excluded_fields():
     a = _FakeConfig(tickers=["AAPL"], end_date="2026-01-01")
     b = _FakeConfig(tickers=["AAPL"], end_date="2026-04-01")
     assert config_hash(a) != config_hash(b)
-    assert config_hash(a, extra_excluded=["end_date"]) == config_hash(b, extra_excluded=["end_date"])
+    assert config_hash(a, extra_excluded=["end_date"]) == config_hash(
+        b, extra_excluded=["end_date"]
+    )
 
 
 def test_numpy_scalar_coercion():

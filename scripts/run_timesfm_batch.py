@@ -11,6 +11,7 @@ Verification:
     # Scheduled:
     python scripts/run_timesfm_batch.py --hour 23
 """
+
 import argparse
 import logging
 import os
@@ -19,6 +20,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 logging.basicConfig(
@@ -47,6 +49,7 @@ def run_job():
         return
 
     from quant.timesfm.batch import run_batch
+
     results = run_batch(tickers)
     ok_count = sum(1 for v in results.values() if v == "ok")
     logger.info("TimesFM batch complete: %d/%d tickers OK", ok_count, len(results))

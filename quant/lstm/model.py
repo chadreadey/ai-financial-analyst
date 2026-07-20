@@ -23,26 +23,35 @@ logger = logging.getLogger(__name__)
 
 # Feature list — must stay in sync with build_features()
 FEATURE_NAMES = [
-    "sma_trend", "mean_reversion_z", "bollinger_pctb", "rsi", "obv_trend",
-    "return_5d", "return_20d", "volatility_20d", "volume_ratio",
-    "price_vs_sma50", "price_vs_sma200",
+    "sma_trend",
+    "mean_reversion_z",
+    "bollinger_pctb",
+    "rsi",
+    "obv_trend",
+    "return_5d",
+    "return_20d",
+    "volatility_20d",
+    "volume_ratio",
+    "price_vs_sma50",
+    "price_vs_sma200",
 ]
 
 
 @dataclass
 class LSTMConfig:
     """Hyperparameters for the LSTM model."""
+
     hidden_size: int = 64
     num_layers: int = 2
     dropout: float = 0.3
-    lookback_days: int = 60        # sequence length (trading days)
-    forecast_horizon: int = 20     # predict N-day forward return
+    lookback_days: int = 60  # sequence length (trading days)
+    forecast_horizon: int = 20  # predict N-day forward return
     learning_rate: float = 1e-3
     batch_size: int = 32
     max_epochs: int = 100
-    patience: int = 10             # early stopping patience
+    patience: int = 10  # early stopping patience
     validation_split: float = 0.15
-    target_type: str = "return"    # "return" (MSE) or "direction" (BCE)
+    target_type: str = "return"  # "return" (MSE) or "direction" (BCE)
 
 
 def build_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -193,7 +202,10 @@ class ReturnForecaster:
 
         optimizer = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode="min", factor=0.5, patience=5,
+            optimizer,
+            mode="min",
+            factor=0.5,
+            patience=5,
         )
 
         train_ds = TensorDataset(torch.from_numpy(X_train), torch.from_numpy(y_train))

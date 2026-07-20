@@ -33,6 +33,7 @@ if _PROJECT_ROOT not in sys.path:
     sys.path.insert(0, _PROJECT_ROOT)
 
 from dotenv import load_dotenv
+
 load_dotenv(os.path.join(_PROJECT_ROOT, ".env"))
 
 from infra.worker.queue_client import (
@@ -84,6 +85,7 @@ def _get_pinecone_index():
 
 # ── Database helpers ──────────────────────────────────────────────────────────
 
+
 def build_db():
     """
     Return a WarehouseDB instance.
@@ -103,13 +105,12 @@ def build_db():
 def build_sec_client():
     from sec.client import SECClient
 
-    user_agent = os.environ.get(
-        "SEC_USER_AGENT", "AIFinancialAnalyst admin@example.com"
-    )
+    user_agent = os.environ.get("SEC_USER_AGENT", "AIFinancialAnalyst admin@example.com")
     return SECClient(user_agent=user_agent)
 
 
 # ── Pinecone re-seed for a single ticker ─────────────────────────────────────
+
 
 def reseed_ticker(ticker: str, db_path: str) -> int:
     """
@@ -134,6 +135,7 @@ def reseed_ticker(ticker: str, db_path: str) -> int:
 
 # ── Job processor ─────────────────────────────────────────────────────────────
 
+
 def process_job(job: dict) -> None:
     """
     Process a single filing update job.
@@ -156,9 +158,7 @@ def process_job(job: dict) -> None:
     logger.info("processing job: ticker=%s accession=%s form=%s", ticker, accession, form)
 
     if is_processing(accession):
-        logger.info(
-            "accession %s already processing (duplicate job) — skipping", accession
-        )
+        logger.info("accession %s already processing (duplicate job) — skipping", accession)
         return
 
     mark_processing(accession)
@@ -171,7 +171,10 @@ def process_job(job: dict) -> None:
         result = incremental_update(ticker, db, sec_client)
         logger.info(
             "incremental_update %s: had_changes=%s new_filings=%d elapsed=%.1fs",
-            ticker, result.had_changes, result.new_filing_count, result.elapsed_s,
+            ticker,
+            result.had_changes,
+            result.new_filing_count,
+            result.elapsed_s,
         )
 
         if result.had_changes:
@@ -190,6 +193,7 @@ def process_job(job: dict) -> None:
 
 
 # ── Main consumer loop ────────────────────────────────────────────────────────
+
 
 def main() -> None:
     logger.info("update worker starting")
@@ -211,7 +215,9 @@ def main() -> None:
         except Exception as exc:
             logger.error(
                 "job failed: ticker=%s accession=%s error=%s",
-                job.get("ticker"), job.get("accession"), exc,
+                job.get("ticker"),
+                job.get("accession"),
+                exc,
                 exc_info=True,
             )
             try:

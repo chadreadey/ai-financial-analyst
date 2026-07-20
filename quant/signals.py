@@ -25,6 +25,7 @@ class SignalResult:
 @dataclass
 class SignalVector:
     """Complete scored signal vector from price/volume data."""
+
     sma_trend: SignalResult
     mean_reversion_z: SignalResult
     bollinger_pctb: SignalResult
@@ -35,7 +36,7 @@ class SignalVector:
     composite_score: float = 0.0
     composite_direction: str = "HOLD"
     actionable: bool = False
-    earnings_rank_score: float = 0.0   # Set by earnings signals for ranking (Path A)
+    earnings_rank_score: float = 0.0  # Set by earnings signals for ranking (Path A)
     institutional_flow_score: float = 0.0  # Set by institutional flow signal
     sentiment_score: float = 0.0  # Set by sentiment blend for cross-sectional normalization
     sector_momentum_score: float = 0.0  # Set by sector ETF momentum signal
@@ -43,12 +44,12 @@ class SignalVector:
     price_momentum_score: float = 0.0  # Set by 12-1M price momentum
     insider_score: float = 0.0  # Set by standalone insider MSPR signal
     event_timing_score: float = 0.0  # Set by event timing (PEAD + catalyst proximity)
-    copper_regime_score: float = 0.0   # Set by copper macro signal (-1 to +1)
-    kalshi_macro_score: float = 0.0   # Macro regime from Kalshi Fed/CPI/JOBS markets
-    kalshi_event_score: float = 0.0   # Pre-earnings divergence vs Kalshi-implied prob
+    copper_regime_score: float = 0.0  # Set by copper macro signal (-1 to +1)
+    kalshi_macro_score: float = 0.0  # Macro regime from Kalshi Fed/CPI/JOBS markets
+    kalshi_event_score: float = 0.0  # Pre-earnings divergence vs Kalshi-implied prob
     kalshi_macro_momentum: float = 0.0  # Rate-of-change of macro modifier (velocity)
     price_regression_score: float = 0.0  # R²-filtered OLS trend signal [-1, +1]
-    arima_forecast_score: float = 0.0    # ARIMA(1,1,1) forecast signal, stable regimes only [-1, +1]
+    arima_forecast_score: float = 0.0  # ARIMA(1,1,1) forecast signal, stable regimes only [-1, +1]
     qmj_score: float = 0.0  # Quality-Minus-Junk composite (Asness/Frazzini/Pedersen 2019) — opt-in via cfg.enable_qmj_signal
     earnings_blocked: bool = False  # True if earnings within 3 days — block new entries
     flags: list = field(default_factory=list)
@@ -74,12 +75,11 @@ class SignalVector:
             "obv_trend": self.obv_trend.score,
             "high_52w": self.high_52w.score,
         }
-        self.composite_score = sum(
-            signals[k] * self.WEIGHTS[k] for k in signals
-        )
+        self.composite_score = sum(signals[k] * self.WEIGHTS[k] for k in signals)
         self.composite_score = np.clip(self.composite_score, -1.0, 1.0)
 
         from quant.scoring import reclassify
+
         reclassify(self)
 
         # Gate: suppress long entries if SMA is bearish (disabled — SMA weight=0)
@@ -98,8 +98,11 @@ class SignalVector:
         return val
 
     def _signal_dict(self, sr: SignalResult) -> dict:
-        return {"score": round(float(sr.score), 3), "detail": sr.detail,
-                **{k: self._clean(v) for k, v in sr.metadata.items()}}
+        return {
+            "score": round(float(sr.score), 3),
+            "detail": sr.detail,
+            **{k: self._clean(v) for k, v in sr.metadata.items()},
+        }
 
     def to_dict(self) -> dict:
         return {
@@ -125,7 +128,9 @@ class SignalVector:
         sv = d["signal_vector"]
         for name, data in sv.items():
             lines.append(f"  {name}: score={data['score']:.3f} — {data.get('detail', '')}")
-        lines.append(f"  COMPOSITE: {d['composite_score']:.4f} → {d['composite_direction']} (actionable={d['actionable']})")
+        lines.append(
+            f"  COMPOSITE: {d['composite_score']:.4f} → {d['composite_direction']} (actionable={d['actionable']})"
+        )
         if d["flags"]:
             lines.append(f"  FLAGS: {', '.join(d['flags'])}")
         return "\n".join(lines)
@@ -135,6 +140,7 @@ class SignalVector:
 # Individual signal computations
 # ---------------------------------------------------------------------------
 
+
 def compute_sma_trend(close: pd.Series) -> SignalResult:
     """SMA trend: 50d/200d crossover scoring."""
     if len(close) < 200:
@@ -143,8 +149,11 @@ def compute_sma_trend(close: pd.Series) -> SignalResult:
         sma50 = float(close.tail(50).mean())
         price = float(close.iloc[-1])
         score = 0.5 if price > sma50 else -0.5
-        return SignalResult(score, f"price {'above' if price > sma50 else 'below'} 50d SMA (no 200d data)",
-                           {"sma50": round(sma50, 2), "price": round(price, 2)})
+        return SignalResult(
+            score,
+            f"price {'above' if price > sma50 else 'below'} 50d SMA (no 200d data)",
+            {"sma50": round(sma50, 2), "price": round(price, 2)},
+        )
 
     price = float(close.iloc[-1])
     sma50 = float(close.tail(50).mean())
@@ -164,8 +173,16 @@ def compute_sma_trend(close: pd.Series) -> SignalResult:
         detail = "strong downtrend — price < 50d < 200d"
 
     cross = "golden_cross" if sma50 > sma200 else "death_cross"
-    return SignalResult(score, detail, {"sma50": round(sma50, 2), "sma200": round(sma200, 2),
-                                        "price": round(price, 2), "cross": cross})
+    return SignalResult(
+        score,
+        detail,
+        {
+            "sma50": round(sma50, 2),
+            "sma200": round(sma200, 2),
+            "price": round(price, 2),
+            "cross": cross,
+        },
+    )
 
 
 def compute_mean_reversion(close: pd.Series) -> SignalResult:
@@ -186,8 +203,11 @@ def compute_mean_reversion(close: pd.Series) -> SignalResult:
     # Suppress on trending stocks (>30% drift over 60d)
     drift = abs(price / float(window.iloc[0]) - 1)
     if drift > 0.30:
-        return SignalResult(0.0, f"suppressed — {drift*100:.0f}% drift over 60d (trending)",
-                           {"z_score": round(z, 3), "drift_pct": round(drift * 100, 1), "suppressed": True})
+        return SignalResult(
+            0.0,
+            f"suppressed — {drift * 100:.0f}% drift over 60d (trending)",
+            {"z_score": round(z, 3), "drift_pct": round(drift * 100, 1), "suppressed": True},
+        )
 
     score = float(np.clip(-z / 2, -1.0, 1.0))
     if z < -1.5:
@@ -201,8 +221,11 @@ def compute_mean_reversion(close: pd.Series) -> SignalResult:
     else:
         detail = "near mean"
 
-    return SignalResult(score, detail, {"z_score": round(z, 3), "mean_60": round(mean_60, 2),
-                                        "std_60": round(std_60, 2)})
+    return SignalResult(
+        score,
+        detail,
+        {"z_score": round(z, 3), "mean_60": round(mean_60, 2), "std_60": round(std_60, 2)},
+    )
 
 
 def compute_bollinger(close: pd.Series) -> SignalResult:
@@ -237,8 +260,17 @@ def compute_bollinger(close: pd.Series) -> SignalResult:
     if squeeze:
         detail += " — SQUEEZE detected (low bandwidth)"
 
-    return SignalResult(score, detail, {"pct_b": round(pct_b, 3), "bandwidth": round(bandwidth, 4),
-                                        "squeeze": bool(squeeze), "upper": round(upper, 2), "lower": round(lower, 2)})
+    return SignalResult(
+        score,
+        detail,
+        {
+            "pct_b": round(pct_b, 3),
+            "bandwidth": round(bandwidth, 4),
+            "squeeze": bool(squeeze),
+            "upper": round(upper, 2),
+            "lower": round(lower, 2),
+        },
+    )
 
 
 def compute_rsi(close: pd.Series, period: int = 14) -> SignalResult:
@@ -319,13 +351,23 @@ def compute_obv_trend(close: pd.Series, volume: pd.Series) -> SignalResult:
         detail = "bearish divergence — OBV falling, price rising"
 
     divergence = bool(obv_up != price_up)
-    return SignalResult(score, detail, {"obv_slope": round(obv_slope, 2),
-                                        "price_slope": round(price_slope, 4),
-                                        "divergence": divergence})
+    return SignalResult(
+        score,
+        detail,
+        {
+            "obv_slope": round(obv_slope, 2),
+            "price_slope": round(price_slope, 4),
+            "divergence": divergence,
+        },
+    )
 
 
-def compute_atr_regime(close: pd.Series, high: Optional[pd.Series] = None,
-                       low: Optional[pd.Series] = None, period: int = 14) -> SignalResult:
+def compute_atr_regime(
+    close: pd.Series,
+    high: Optional[pd.Series] = None,
+    low: Optional[pd.Series] = None,
+    period: int = 14,
+) -> SignalResult:
     """ATR regime classification for position sizing (non-directional)."""
     if len(close) < period + 1:
         return SignalResult(0.0, "insufficient data")
@@ -361,10 +403,16 @@ def compute_atr_regime(close: pd.Series, high: Optional[pd.Series] = None,
     detail = f"ATR%={atr_pct:.2f}%, regime={regime}"
     stop_2x = round(price - 2 * atr, 2) if price > 0 else 0.0
 
-    return SignalResult(0.0, detail, {"atr_pct": round(atr_pct, 3),
-                                      "atr_value": round(atr, 3),
-                                      "volatility_regime": regime,
-                                      "stop_loss_atr2x": stop_2x})
+    return SignalResult(
+        0.0,
+        detail,
+        {
+            "atr_pct": round(atr_pct, 3),
+            "atr_value": round(atr, 3),
+            "volatility_regime": regime,
+            "stop_loss_atr2x": stop_2x,
+        },
+    )
 
 
 def compute_52w_high(close: pd.Series) -> SignalResult:
@@ -420,9 +468,13 @@ def compute_52w_high(close: pd.Series) -> SignalResult:
 # Main entry point
 # ---------------------------------------------------------------------------
 
-def compute_signal_vector(close: pd.Series, volume: Optional[pd.Series] = None,
-                          high: Optional[pd.Series] = None,
-                          low: Optional[pd.Series] = None) -> SignalVector:
+
+def compute_signal_vector(
+    close: pd.Series,
+    volume: Optional[pd.Series] = None,
+    high: Optional[pd.Series] = None,
+    low: Optional[pd.Series] = None,
+) -> SignalVector:
     """Compute the full technical signal vector from price/volume data.
 
     Args:
@@ -460,15 +512,19 @@ def compute_signal_vector(close: pd.Series, volume: Optional[pd.Series] = None,
     return sv
 
 
-def compute_signal_vector_from_provider(ticker: str, tiingo_api_key: str = "") -> Optional[SignalVector]:
+def compute_signal_vector_from_provider(
+    ticker: str, tiingo_api_key: str = ""
+) -> Optional[SignalVector]:
     """Convenience: fetch 2-year data via price provider and compute signals.
 
     Args:
         tiingo_api_key: Deprecated — kept for backward compat. Uses PRICE_PROVIDER env var.
     """
     from datetime import datetime, timedelta
+
     try:
         from price_provider import get_price_provider
+
         provider = get_price_provider()
         start = (datetime.now() - timedelta(days=730)).strftime("%Y-%m-%d")
         data = provider.get_eod_history(ticker, start)
@@ -477,7 +533,9 @@ def compute_signal_vector_from_provider(ticker: str, tiingo_api_key: str = "") -
 
         df = pd.DataFrame(data)
         if df["date"].dtype == "object":
-            df["date"] = pd.to_datetime(df["date"]).dt.tz_localize(None, ambiguous="NaT", nonexistent="NaT")
+            df["date"] = pd.to_datetime(df["date"]).dt.tz_localize(
+                None, ambiguous="NaT", nonexistent="NaT"
+            )
         else:
             df["date"] = pd.to_datetime(df["date"]).dt.tz_convert(None)
         df = df.sort_values("date").set_index("date")

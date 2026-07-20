@@ -76,8 +76,10 @@ from quant.signals import compute_obv_trend  # noqa: E402
 from quant.institutional_flow import (  # noqa: E402
     fetch_and_score_institutional_flow,
 )
+
 try:
     from finnhub_client import SentimentDiskCache  # noqa: E402
+
     _SENTIMENT_CACHE = SentimentDiskCache()
 except Exception:
     _SENTIMENT_CACHE = None
@@ -114,10 +116,7 @@ FLOW_SIGNAL_NAMES = ["institutional_flow"]
 
 BASELINE_NAMES = ["piotroski", "qmj", "hml_bm"]
 ALL_SIGNAL_NAMES = (
-    FUNDAMENTAL_SIGNAL_NAMES
-    + PRICE_SIGNAL_NAMES
-    + FLOW_SIGNAL_NAMES
-    + BASELINE_NAMES
+    FUNDAMENTAL_SIGNAL_NAMES + PRICE_SIGNAL_NAMES + FLOW_SIGNAL_NAMES + BASELINE_NAMES
 )
 
 SPY_TICKER = "SPY"
@@ -132,6 +131,7 @@ HORIZONS = {
 
 
 # ── Data loading ────────────────────────────────────────────────────────
+
 
 def load_universe_prices(tickers: list[str]) -> dict[str, pd.DataFrame]:
     """Load OHLCV from the local price cache for tickers we have on disk."""
@@ -160,6 +160,7 @@ def get_wrds_universe() -> list[str]:
 
 
 # ── Forward returns ─────────────────────────────────────────────────────
+
 
 def compute_forward_returns_panel(
     universe_data: dict[str, pd.DataFrame],
@@ -222,6 +223,7 @@ def compute_excess_forward_returns_panel(
 
 # ── Signal scoring panel ────────────────────────────────────────────────
 
+
 def compute_signal_panel(
     universe_data: dict[str, pd.DataFrame],
     as_of: pd.Timestamp,
@@ -242,7 +244,10 @@ def compute_signal_panel(
     quality_scores = compute_quality_scores(tickers, provider, as_of_d)
     # insider MSPR — disk cache only, no API calls (prefetched 2026-04-27)
     insider_scores = compute_insider_scores(
-        tickers, as_of, finnhub_client=None, sentiment_cache=_SENTIMENT_CACHE,
+        tickers,
+        as_of,
+        finnhub_client=None,
+        sentiment_cache=_SENTIMENT_CACHE,
     )
 
     rows = {}
@@ -342,6 +347,7 @@ def compute_signal_panel(
 
 # ── IC computation ──────────────────────────────────────────────────────
 
+
 @dataclass
 class SignalIcStats:
     signal: str
@@ -349,13 +355,13 @@ class SignalIcStats:
     n_dates: int
     mean_ic: float
     std_ic: float
-    ic_ir: float                # mean_ic / std_ic (single-period IR)
+    ic_ir: float  # mean_ic / std_ic (single-period IR)
     t_stat: float
-    p_value: float              # two-sided p-value on t_stat with n-1 df
-    pct_positive: float         # aka hit_rate (%)
-    n_tickers_avg: float        # avg # tickers used per period
-    first_period: str           # ISO date of first IC observation
-    last_period: str            # ISO date of last IC observation
+    p_value: float  # two-sided p-value on t_stat with n-1 df
+    pct_positive: float  # aka hit_rate (%)
+    n_tickers_avg: float  # avg # tickers used per period
+    first_period: str  # ISO date of first IC observation
+    last_period: str  # ISO date of last IC observation
 
     # Long-short decile spread (annualized return)
     ls_ann_return: float
@@ -389,7 +395,7 @@ class SignalIcStats:
             "signal": self.signal,
             "horizon": self.horizon,
             "n_dates": self.n_dates,
-            "n_periods": self.n_dates,      # spec-friendly alias
+            "n_periods": self.n_dates,  # spec-friendly alias
             "n_tickers_avg": round(self.n_tickers_avg, 1),
             "first_period": self.first_period,
             "last_period": self.last_period,
@@ -435,23 +441,24 @@ def compute_ic_walkforward(
     # How many monthly rebalances make up one horizon-non-overlap window
     months_per_horizon = max(1, round(horizon_days / 21))
 
-    stats_per_signal = {sig: {
-        "ics": [],            # IC computed at every rebalance (overlap is fine for IC)
-        "dates": [],          # dates corresponding to each ic observation
-        "n_tickers": [],      # cross-section size at each ic observation
-        "ls_returns": [],     # LS return at non-overlapping samples
-        "ls_dates": [],       # corresponding dates
-    } for sig in ALL_SIGNAL_NAMES}
+    stats_per_signal = {
+        sig: {
+            "ics": [],  # IC computed at every rebalance (overlap is fine for IC)
+            "dates": [],  # dates corresponding to each ic observation
+            "n_tickers": [],  # cross-section size at each ic observation
+            "ls_returns": [],  # LS return at non-overlapping samples
+            "ls_dates": [],  # corresponding dates
+        }
+        for sig in ALL_SIGNAL_NAMES
+    }
 
-    for i, ((date_p, panel), (date_r, fwd)) in enumerate(
-        zip(panel_per_date, fwd_returns_per_date)
-    ):
+    for i, ((date_p, panel), (date_r, fwd)) in enumerate(zip(panel_per_date, fwd_returns_per_date)):
         assert date_p == date_r
         common = panel.index.intersection(fwd.index)
         if len(common) < 10:
             continue
         # Non-overlapping flag for LS sampling
-        is_ls_sample = (i % months_per_horizon == 0)
+        is_ls_sample = i % months_per_horizon == 0
 
         for sig in ALL_SIGNAL_NAMES:
             if sig not in panel.columns:
@@ -489,20 +496,25 @@ def compute_ic_walkforward(
         n = int(len(ics))
 
         if n < 1:
-            results.append(SignalIcStats(
-                signal=sig, horizon=horizon_label,
-                n_dates=0, mean_ic=float("nan"), std_ic=float("nan"),
-                ic_ir=float("nan"),
-                t_stat=0.0,
-                p_value=float("nan"),
-                pct_positive=0.0,
-                n_tickers_avg=float("nan"),
-                first_period="",
-                last_period="",
-                ls_ann_return=float("nan"),
-                ls_yearly_hit_rate=float("nan"),
-                ls_max_drawdown=float("nan"),
-            ))
+            results.append(
+                SignalIcStats(
+                    signal=sig,
+                    horizon=horizon_label,
+                    n_dates=0,
+                    mean_ic=float("nan"),
+                    std_ic=float("nan"),
+                    ic_ir=float("nan"),
+                    t_stat=0.0,
+                    p_value=float("nan"),
+                    pct_positive=0.0,
+                    n_tickers_avg=float("nan"),
+                    first_period="",
+                    last_period="",
+                    ls_ann_return=float("nan"),
+                    ls_yearly_hit_rate=float("nan"),
+                    ls_max_drawdown=float("nan"),
+                )
+            )
             continue
 
         mean_ic = float(np.mean(ics))
@@ -534,34 +546,47 @@ def compute_ic_walkforward(
             mdd = float("nan")
 
         ic_ir = mean_ic / std_ic if std_ic > 1e-8 else float("nan")
-        p_value = float(stats.t.sf(abs(t_stat), df=n - 1) * 2) if n > 1 and std_ic > 1e-8 else float("nan")
+        p_value = (
+            float(stats.t.sf(abs(t_stat), df=n - 1) * 2)
+            if n > 1 and std_ic > 1e-8
+            else float("nan")
+        )
         n_tickers_arr = d["n_tickers"]
         n_tickers_avg = float(np.mean(n_tickers_arr)) if n_tickers_arr else float("nan")
         dates_arr = d["dates"]
         first_period = str(min(dates_arr).date()) if dates_arr else ""
         last_period = str(max(dates_arr).date()) if dates_arr else ""
 
-        results.append(SignalIcStats(
-            signal=sig, horizon=horizon_label,
-            n_dates=n, mean_ic=mean_ic, std_ic=std_ic,
-            ic_ir=float(ic_ir),
-            t_stat=float(t_stat),
-            p_value=p_value,
-            pct_positive=pct_pos,
-            n_tickers_avg=n_tickers_avg,
-            first_period=first_period,
-            last_period=last_period,
-            ls_ann_return=ls_ann, ls_yearly_hit_rate=hit_rate,
-            ls_max_drawdown=mdd,
-        ))
+        results.append(
+            SignalIcStats(
+                signal=sig,
+                horizon=horizon_label,
+                n_dates=n,
+                mean_ic=mean_ic,
+                std_ic=std_ic,
+                ic_ir=float(ic_ir),
+                t_stat=float(t_stat),
+                p_value=p_value,
+                pct_positive=pct_pos,
+                n_tickers_avg=n_tickers_avg,
+                first_period=first_period,
+                last_period=last_period,
+                ls_ann_return=ls_ann,
+                ls_yearly_hit_rate=hit_rate,
+                ls_max_drawdown=mdd,
+            )
+        )
 
     return results
 
 
 # ── Top-level runner ────────────────────────────────────────────────────
 
+
 def generate_monthly_rebalance_dates(
-    start: pd.Timestamp, end: pd.Timestamp, trading_dates: pd.DatetimeIndex,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    trading_dates: pd.DatetimeIndex,
 ) -> list[pd.Timestamp]:
     """Last trading day of each month between start and end."""
     candidates = pd.date_range(start, end, freq="BME")
@@ -587,11 +612,14 @@ def run(
 
     # ── Universe ───────────────────────────────────────────────────
     wrds_tickers = set(get_wrds_universe())
-    price_tickers = {f.replace(".csv", "")
-                     for f in os.listdir(PRICE_CACHE_DIR) if f.endswith(".csv")}
+    price_tickers = {
+        f.replace(".csv", "") for f in os.listdir(PRICE_CACHE_DIR) if f.endswith(".csv")
+    }
     universe = sorted(wrds_tickers & price_tickers)
-    print(f"[universe] WRDS={len(wrds_tickers)}  price-cache={len(price_tickers)}  "
-          f"intersection={len(universe)}")
+    print(
+        f"[universe] WRDS={len(wrds_tickers)}  price-cache={len(price_tickers)}  "
+        f"intersection={len(universe)}"
+    )
 
     if limit_tickers is not None:
         universe = universe[:limit_tickers]
@@ -607,20 +635,26 @@ def run(
     if spy_df is None:
         print(f"[warn] SPY not found in price cache — falling back to raw returns")
     else:
-        print(f"[load] SPY series: {len(spy_df)} rows, {spy_df.index[0].date()} → {spy_df.index[-1].date()}")
+        print(
+            f"[load] SPY series: {len(spy_df)} rows, {spy_df.index[0].date()} → {spy_df.index[-1].date()}"
+        )
 
     # ── Trading date axis from union of all loaded series ──────────
     all_idx = pd.DatetimeIndex(sorted(set().union(*[df.index for df in universe_data.values()])))
     rebalance_dates = generate_monthly_rebalance_dates(
-        pd.Timestamp(start), pd.Timestamp(end), all_idx,
+        pd.Timestamp(start),
+        pd.Timestamp(end),
+        all_idx,
     )
     # Keep ample buffer from the right edge so the longest horizon has
     # sufficient forward data (12M = 252 trading days).
     cutoff = all_idx[-1] - pd.tseries.offsets.BDay(max(HORIZONS.values()))
     rebalance_dates = [d for d in rebalance_dates if d <= cutoff]
-    print(f"[dates] {len(rebalance_dates)} monthly rebalance dates "
-          f"({rebalance_dates[0].date() if rebalance_dates else 'n/a'} -> "
-          f"{rebalance_dates[-1].date() if rebalance_dates else 'n/a'})")
+    print(
+        f"[dates] {len(rebalance_dates)} monthly rebalance dates "
+        f"({rebalance_dates[0].date() if rebalance_dates else 'n/a'} -> "
+        f"{rebalance_dates[-1].date() if rebalance_dates else 'n/a'})"
+    )
 
     # ── Stores ─────────────────────────────────────────────────────
     store = WRDSPointInTimeStore()
@@ -628,13 +662,11 @@ def run(
 
     # ── Score panels and forward returns at every rebalance ────────
     panel_per_date: list[tuple[pd.Timestamp, pd.DataFrame]] = []
-    fwd_per_horizon: dict[str, list[tuple[pd.Timestamp, pd.Series]]] = {
-        h: [] for h in HORIZONS
-    }
+    fwd_per_horizon: dict[str, list[tuple[pd.Timestamp, pd.Series]]] = {h: [] for h in HORIZONS}
 
     for i, d in enumerate(rebalance_dates):
         if i % 12 == 0:
-            print(f"[rebalance] {i+1}/{len(rebalance_dates)} {d.date()}")
+            print(f"[rebalance] {i + 1}/{len(rebalance_dates)} {d.date()}")
         panel = compute_signal_panel(universe_data, d, store, provider)
         if panel is None or panel.empty:
             continue
@@ -659,7 +691,10 @@ def run(
         fwd_list = fwd_per_horizon[label]
         # Some rebalance dates may have produced empty fwd series — that's OK
         stats_list = compute_ic_walkforward(
-            panel_per_date, fwd_list, label, hd,
+            panel_per_date,
+            fwd_list,
+            label,
+            hd,
         )
         full_results[label] = [s.to_dict() for s in stats_list]
         print(f"[ic-{label}] computed for {len(stats_list)} signals")
@@ -679,9 +714,7 @@ def run(
                 per_date_counts.append(0)
         coverage[sig] = {
             "avg_tickers_per_date": round(float(np.mean(per_date_counts)), 1),
-            "pct_dates_with_data": round(
-                float(np.mean(np.array(per_date_counts) > 0)) * 100, 1
-            ),
+            "pct_dates_with_data": round(float(np.mean(np.array(per_date_counts) > 0)) * 100, 1),
             "max_tickers": int(max(per_date_counts)) if per_date_counts else 0,
         }
 
@@ -721,6 +754,7 @@ def run(
 
 # ── Markdown renderer ───────────────────────────────────────────────────
 
+
 def render_summary_md(results: dict) -> str:
     meta = results["meta"]
     cov = results["coverage"]
@@ -729,9 +763,7 @@ def render_summary_md(results: dict) -> str:
     lines = []
     lines.append("# Audit Session 2 — Per-Signal IC Summary")
     lines.append("")
-    lines.append(
-        f"**Generated**: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}  "
-    )
+    lines.append(f"**Generated**: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}  ")
     lines.append(
         f"**Window**: {meta['start']} → {meta['end']}  "
         f"**Universe**: {meta['universe_size']} tickers (WRDS ∩ price-cache)  "
@@ -745,19 +777,11 @@ def render_summary_md(results: dict) -> str:
 
     # Universe note
     lines.append("## Universe Coverage")
-    lines.append(
-        f"- WRDS PIT cache: {meta['wrds_tickers_total']} tickers"
-    )
-    lines.append(
-        f"- Local price cache: {meta['price_cache_tickers_total']} tickers"
-    )
-    lines.append(
-        f"- Intersection (used for IC): {meta['intersection_universe_total']} tickers"
-    )
+    lines.append(f"- WRDS PIT cache: {meta['wrds_tickers_total']} tickers")
+    lines.append(f"- Local price cache: {meta['price_cache_tickers_total']} tickers")
+    lines.append(f"- Intersection (used for IC): {meta['intersection_universe_total']} tickers")
     if meta.get("limit_tickers"):
-        lines.append(
-            f"- `--limit-tickers={meta['limit_tickers']}` applied for this run"
-        )
+        lines.append(f"- `--limit-tickers={meta['limit_tickers']}` applied for this run")
     lines.append("")
     lines.append(
         "Tickers in WRDS but missing from the local price cache are "
@@ -791,12 +815,14 @@ def render_summary_md(results: dict) -> str:
         lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---|")
 
         rows = ic.get(h, [])
+
         # Sort by mean_ic descending (NaN last)
         def _key(r):
             v = r.get("mean_ic")
             if v is None or (isinstance(v, float) and math.isnan(v)):
                 return -1e9
             return v
+
         rows_sorted = sorted(rows, key=_key, reverse=True)
         for r in rows_sorted:
             mic = r.get("mean_ic")
@@ -811,7 +837,7 @@ def render_summary_md(results: dict) -> str:
                 if v is None or (isinstance(v, float) and math.isnan(v)):
                     return "n/a"
                 if pct:
-                    return f"{v:.1f}%" if not isinstance(v, float) else f"{v*100:.1f}%"
+                    return f"{v:.1f}%" if not isinstance(v, float) else f"{v * 100:.1f}%"
                 return f"{v:+.4f}" if isinstance(v, float) else str(v)
 
             verdict = r.get("verdict", "")
@@ -821,9 +847,9 @@ def render_summary_md(results: dict) -> str:
                 f"{(f'{sic:.4f}' if isinstance(sic, (int, float)) and not math.isnan(sic) else 'n/a')} | "
                 f"{(f'{ts:+.2f}' if isinstance(ts, (int, float)) and not math.isnan(ts) else 'n/a')} | "
                 f"{(f'{pp:.0f}%' if isinstance(pp, (int, float)) and not math.isnan(pp) else 'n/a')} | "
-                f"{(f'{ls*100:+.1f}%' if isinstance(ls, (int, float)) and not math.isnan(ls) else 'n/a')} | "
-                f"{(f'{hr*100:.0f}%' if isinstance(hr, (int, float)) and not math.isnan(hr) else 'n/a')} | "
-                f"{(f'{mdd*100:.1f}%' if isinstance(mdd, (int, float)) and not math.isnan(mdd) else 'n/a')} | "
+                f"{(f'{ls * 100:+.1f}%' if isinstance(ls, (int, float)) and not math.isnan(ls) else 'n/a')} | "
+                f"{(f'{hr * 100:.0f}%' if isinstance(hr, (int, float)) and not math.isnan(hr) else 'n/a')} | "
+                f"{(f'{mdd * 100:.1f}%' if isinstance(mdd, (int, float)) and not math.isnan(mdd) else 'n/a')} | "
                 f"{verdict} |"
             )
         lines.append("")
@@ -840,9 +866,13 @@ def render_summary_md(results: dict) -> str:
         lines.append("| Signal | 3M Mean IC | Beats Piotroski? |")
         lines.append("|---|---:|---|")
         sorted_h3 = sorted(
-            [r for r in h3 if not (isinstance(r.get("mean_ic"), float)
-                                   and math.isnan(r["mean_ic"]))],
-            key=lambda r: r["mean_ic"], reverse=True,
+            [
+                r
+                for r in h3
+                if not (isinstance(r.get("mean_ic"), float) and math.isnan(r["mean_ic"]))
+            ],
+            key=lambda r: r["mean_ic"],
+            reverse=True,
         )
         for r in sorted_h3:
             sig = r["signal"]
@@ -864,10 +894,14 @@ def render_summary_md(results: dict) -> str:
     lines.append("- IC is computed at every monthly rebalance (overlap is fine for IC averaging).")
     lines.append("- Long-short = top-decile mean minus bottom-decile mean.")
     lines.append("- LS sampled on **non-overlapping** windows (every horizon-many months).")
-    lines.append("- Annualized LS = `(1 + mean_ls) ** (12/horizon_months) - 1` (no overlap-compounding).")
+    lines.append(
+        "- Annualized LS = `(1 + mean_ls) ** (12/horizon_months) - 1` (no overlap-compounding)."
+    )
     lines.append("- Yearly hit rate = fraction of calendar years with positive mean LS.")
     lines.append("- t-stat = `mean_ic / (std_ic / sqrt(N))` over rebalance-period ICs.")
-    lines.append("- Verdict thresholds: |t|≥2 SIGNIFICANT; |t|≥1.5 marginal; else NO_SIGNAL; N<10 INSUFFICIENT.")
+    lines.append(
+        "- Verdict thresholds: |t|≥2 SIGNIFICANT; |t|≥1.5 marginal; else NO_SIGNAL; N<10 INSUFFICIENT."
+    )
     lines.append("")
     lines.append("## Audit Notes")
     lines.append("")
@@ -897,12 +931,14 @@ def render_summary_md(results: dict) -> str:
 
 # ── CLI entry ───────────────────────────────────────────────────────────
 
+
 def main():
     p = argparse.ArgumentParser(description=__doc__.split("\n")[1])
     p.add_argument("--start", default="2015-01-01")
     p.add_argument("--end", default="2024-12-31")
-    p.add_argument("--limit-tickers", type=int, default=None,
-                   help="Limit universe size for testing")
+    p.add_argument(
+        "--limit-tickers", type=int, default=None, help="Limit universe size for testing"
+    )
     p.add_argument("--out-dir", default=OUT_DIR)
     p.add_argument("--quiet", action="store_true")
     args = p.parse_args()

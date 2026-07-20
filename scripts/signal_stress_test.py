@@ -16,6 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 import numpy as np
@@ -23,11 +24,17 @@ import pandas as pd
 from scipy import stats
 
 from quant.backtest import (
-    BacktestConfig, run_walk_forward, load_universe_data,
-    generate_rebalance_dates, compute_signals_at_date, load_vix_data,
+    BacktestConfig,
+    run_walk_forward,
+    load_universe_data,
+    generate_rebalance_dates,
+    compute_signals_at_date,
+    load_vix_data,
 )
 from quant.redundancy import (
-    SIGNAL_NAMES, compute_signal_scores_at_date, compute_forward_returns,
+    SIGNAL_NAMES,
+    compute_signal_scores_at_date,
+    compute_forward_returns,
 )
 from quant.signals import compute_signal_vector, compute_rsi, compute_bollinger
 from quant.universe import get_universe, BENCHMARK
@@ -36,8 +43,12 @@ logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(levelname)s: %(
 logger = logging.getLogger(__name__)
 
 SHORT_NAMES = {
-    "sma_trend": "SMA", "mean_reversion_z": "MR", "bollinger_pctb": "BB",
-    "rsi": "RSI", "obv_trend": "OBV", "high_52w": "52W",
+    "sma_trend": "SMA",
+    "mean_reversion_z": "MR",
+    "bollinger_pctb": "BB",
+    "rsi": "RSI",
+    "obv_trend": "OBV",
+    "high_52w": "52W",
 }
 
 
@@ -68,6 +79,7 @@ def load_data_and_dates(universe_name="liquid_50", start="2020-01-01", end="2026
 # =======================================================================
 # PHASE 1: Signal Orthogonalization
 # =======================================================================
+
 
 def phase1_orthogonalization(universe_data, rebalance_dates):
     """For each signal, regress on all others, keep residual, compute residual IC."""
@@ -124,7 +136,9 @@ def phase1_orthogonalization(universe_data, rebalance_dates):
 
     # Compute stats
     print(f"\n  Dates used: {n_dates_used}")
-    print(f"\n  {'Signal':<8s} {'Raw IC':>10s} {'Raw t':>8s} {'Resid IC':>10s} {'Resid t':>8s} {'Verdict':>12s}")
+    print(
+        f"\n  {'Signal':<8s} {'Raw IC':>10s} {'Raw t':>8s} {'Resid IC':>10s} {'Resid t':>8s} {'Verdict':>12s}"
+    )
     print(f"  {'-' * 60}")
 
     results = {}
@@ -133,9 +147,13 @@ def phase1_orthogonalization(universe_data, rebalance_dates):
         res = np.array(all_resid_ics[sig])
 
         raw_mean = np.mean(raw)
-        raw_t = raw_mean / (np.std(raw) / np.sqrt(len(raw))) if np.std(raw) > 0 and len(raw) > 1 else 0
+        raw_t = (
+            raw_mean / (np.std(raw) / np.sqrt(len(raw))) if np.std(raw) > 0 and len(raw) > 1 else 0
+        )
         res_mean = np.mean(res)
-        res_t = res_mean / (np.std(res) / np.sqrt(len(res))) if np.std(res) > 0 and len(res) > 1 else 0
+        res_t = (
+            res_mean / (np.std(res) / np.sqrt(len(res))) if np.std(res) > 0 and len(res) > 1 else 0
+        )
 
         if abs(res_t) >= 1.5:
             verdict = "KEEP"
@@ -144,9 +162,17 @@ def phase1_orthogonalization(universe_data, rebalance_dates):
         else:
             verdict = "DROP"
 
-        results[sig] = {"raw_ic": raw_mean, "raw_t": raw_t, "resid_ic": res_mean, "resid_t": res_t, "verdict": verdict}
+        results[sig] = {
+            "raw_ic": raw_mean,
+            "raw_t": raw_t,
+            "resid_ic": res_mean,
+            "resid_t": res_t,
+            "verdict": verdict,
+        }
         sn = SHORT_NAMES[sig]
-        print(f"  {sn:<8s} {raw_mean:>+10.4f} {raw_t:>8.2f} {res_mean:>+10.4f} {res_t:>8.2f} {verdict:>12s}")
+        print(
+            f"  {sn:<8s} {raw_mean:>+10.4f} {raw_t:>8.2f} {res_mean:>+10.4f} {res_t:>8.2f} {verdict:>12s}"
+        )
 
     return results
 
@@ -154,6 +180,7 @@ def phase1_orthogonalization(universe_data, rebalance_dates):
 # =======================================================================
 # PHASE 2: 12-1 Month Momentum
 # =======================================================================
+
 
 def phase2_momentum(universe_data, rebalance_dates):
     """Test 12-1 month momentum as a new signal candidate."""
@@ -223,7 +250,11 @@ def phase2_momentum(universe_data, rebalance_dates):
     ic_t = ic_mean / (np.std(mom_ics) / np.sqrt(len(mom_ics))) if np.std(mom_ics) > 0 else 0
     corr_mean = np.mean(mom_sma_corrs)
     resid_mean = np.mean(mom_resid_ics)
-    resid_t = resid_mean / (np.std(mom_resid_ics) / np.sqrt(len(mom_resid_ics))) if np.std(mom_resid_ics) > 0 else 0
+    resid_t = (
+        resid_mean / (np.std(mom_resid_ics) / np.sqrt(len(mom_resid_ics)))
+        if np.std(mom_resid_ics) > 0
+        else 0
+    )
 
     print(f"\n  Dates used: {n_used}")
     print(f"  12-1 Mom IC:            {ic_mean:+.4f}  (t = {ic_t:.2f})")
@@ -239,9 +270,11 @@ def phase2_momentum(universe_data, rebalance_dates):
     print(f"  Verdict: {verdict}")
 
     return {
-        "ic": ic_mean, "ic_t": ic_t,
+        "ic": ic_mean,
+        "ic_t": ic_t,
         "corr_sma": corr_mean,
-        "resid_ic": resid_mean, "resid_t": resid_t,
+        "resid_ic": resid_mean,
+        "resid_t": resid_t,
         "verdict": verdict,
     }
 
@@ -249,6 +282,7 @@ def phase2_momentum(universe_data, rebalance_dates):
 # =======================================================================
 # PHASE 3: RSI Divergence vs BB Squeeze
 # =======================================================================
+
 
 def phase3_conditional_signals(universe_data, rebalance_dates):
     """Compare RSI divergence IC vs BB squeeze IC on conditional dates."""
@@ -311,12 +345,24 @@ def phase3_conditional_signals(universe_data, rebalance_dates):
     bb_arr = np.array(bb_squeeze_ics) if bb_squeeze_ics else np.array([0.0])
 
     rsi_mean = np.mean(rsi_arr)
-    rsi_t = rsi_mean / (np.std(rsi_arr) / np.sqrt(len(rsi_arr))) if np.std(rsi_arr) > 0 and len(rsi_arr) > 1 else 0
+    rsi_t = (
+        rsi_mean / (np.std(rsi_arr) / np.sqrt(len(rsi_arr)))
+        if np.std(rsi_arr) > 0 and len(rsi_arr) > 1
+        else 0
+    )
     bb_mean = np.mean(bb_arr)
-    bb_t = bb_mean / (np.std(bb_arr) / np.sqrt(len(bb_arr))) if np.std(bb_arr) > 0 and len(bb_arr) > 1 else 0
+    bb_t = (
+        bb_mean / (np.std(bb_arr) / np.sqrt(len(bb_arr)))
+        if np.std(bb_arr) > 0 and len(bb_arr) > 1
+        else 0
+    )
 
-    print(f"\n  RSI divergence dates with >= 5 tickers: {len(rsi_div_ics)}, total observations: {rsi_div_count}")
-    print(f"  BB squeeze dates with >= 5 tickers:     {len(bb_squeeze_ics)}, total observations: {bb_squeeze_count}")
+    print(
+        f"\n  RSI divergence dates with >= 5 tickers: {len(rsi_div_ics)}, total observations: {rsi_div_count}"
+    )
+    print(
+        f"  BB squeeze dates with >= 5 tickers:     {len(bb_squeeze_ics)}, total observations: {bb_squeeze_count}"
+    )
     print(f"\n  RSI divergence IC:  {rsi_mean:+.4f}  (t = {rsi_t:.2f})")
     print(f"  BB squeeze IC:      {bb_mean:+.4f}  (t = {bb_t:.2f})")
 
@@ -329,8 +375,12 @@ def phase3_conditional_signals(universe_data, rebalance_dates):
     print(f"  Winner: {winner}")
 
     return {
-        "rsi_div_ic": rsi_mean, "rsi_div_t": rsi_t, "rsi_div_dates": len(rsi_div_ics),
-        "bb_squeeze_ic": bb_mean, "bb_squeeze_t": bb_t, "bb_squeeze_dates": len(bb_squeeze_ics),
+        "rsi_div_ic": rsi_mean,
+        "rsi_div_t": rsi_t,
+        "rsi_div_dates": len(rsi_div_ics),
+        "bb_squeeze_ic": bb_mean,
+        "bb_squeeze_t": bb_t,
+        "bb_squeeze_dates": len(bb_squeeze_ics),
         "winner": winner,
     }
 
@@ -338,6 +388,7 @@ def phase3_conditional_signals(universe_data, rebalance_dates):
 # =======================================================================
 # PHASE 4: 52W High vs SMA
 # =======================================================================
+
 
 def phase4_52w_vs_sma(universe_data, rebalance_dates):
     """Test whether 52W high subsumes SMA or vice versa."""
@@ -431,17 +482,23 @@ def phase4_52w_vs_sma(universe_data, rebalance_dates):
     print(f"\n  Verdict: {verdict}")
 
     return {
-        "sma_ic": sma_m, "sma_t": sma_t,
-        "h52_ic": h52_m, "h52_t": h52_t,
-        "sma_resid_ic": sma_r_m, "sma_resid_t": sma_r_t,
-        "h52_resid_ic": h52_r_m, "h52_resid_t": h52_r_t,
-        "corr": corr_mean, "verdict": verdict,
+        "sma_ic": sma_m,
+        "sma_t": sma_t,
+        "h52_ic": h52_m,
+        "h52_t": h52_t,
+        "sma_resid_ic": sma_r_m,
+        "sma_resid_t": sma_r_t,
+        "h52_resid_ic": h52_r_m,
+        "h52_resid_t": h52_r_t,
+        "corr": corr_mean,
+        "verdict": verdict,
     }
 
 
 # =======================================================================
 # PHASE 5: Cost Sensitivity
 # =======================================================================
+
 
 def phase5_cost_sensitivity():
     """Run walk-forward at different transaction cost levels."""
@@ -500,7 +557,11 @@ def phase5_cost_sensitivity():
     elif breakeven is None:
         breakeven = "< 0 bps (strategy unprofitable)"
 
-    print(f"\n  Break-even cost: {breakeven} bps" if isinstance(breakeven, str) else f"\n  Break-even cost: {breakeven:.0f} bps")
+    print(
+        f"\n  Break-even cost: {breakeven} bps"
+        if isinstance(breakeven, str)
+        else f"\n  Break-even cost: {breakeven:.0f} bps"
+    )
 
     return results, breakeven
 
@@ -549,23 +610,35 @@ if __name__ == "__main__":
     for sig in SIGNAL_NAMES:
         r = ortho_results[sig]
         sn = SHORT_NAMES[sig]
-        print(f"  {sn:<8s} {r['raw_ic']:+.4f}({r['raw_t']:+.1f}) {r['resid_ic']:+.4f}({r['resid_t']:+.1f}) {r['verdict']:>12s}")
+        print(
+            f"  {sn:<8s} {r['raw_ic']:+.4f}({r['raw_t']:+.1f}) {r['resid_ic']:+.4f}({r['resid_t']:+.1f}) {r['verdict']:>12s}"
+        )
 
     print(f"\n  NEW SIGNAL CANDIDATES")
-    print(f"  12-1 Mom | IC(t)={mom_results['ic']:+.4f}({mom_results['ic_t']:+.1f}) | "
-          f"Corr SMA={mom_results['corr_sma']:+.3f} | "
-          f"Resid IC(t)={mom_results['resid_ic']:+.4f}({mom_results['resid_t']:+.1f}) | "
-          f"{mom_results['verdict']}")
+    print(
+        f"  12-1 Mom | IC(t)={mom_results['ic']:+.4f}({mom_results['ic_t']:+.1f}) | "
+        f"Corr SMA={mom_results['corr_sma']:+.3f} | "
+        f"Resid IC(t)={mom_results['resid_ic']:+.4f}({mom_results['resid_t']:+.1f}) | "
+        f"{mom_results['verdict']}"
+    )
 
     print(f"\n  CONDITIONAL SIGNAL TESTS")
-    print(f"  RSI divergence IC={cond_results['rsi_div_ic']:+.4f} (t={cond_results['rsi_div_t']:.2f}, N={cond_results['rsi_div_dates']})")
-    print(f"  BB squeeze IC=    {cond_results['bb_squeeze_ic']:+.4f} (t={cond_results['bb_squeeze_t']:.2f}, N={cond_results['bb_squeeze_dates']})")
+    print(
+        f"  RSI divergence IC={cond_results['rsi_div_ic']:+.4f} (t={cond_results['rsi_div_t']:.2f}, N={cond_results['rsi_div_dates']})"
+    )
+    print(
+        f"  BB squeeze IC=    {cond_results['bb_squeeze_ic']:+.4f} (t={cond_results['bb_squeeze_t']:.2f}, N={cond_results['bb_squeeze_dates']})"
+    )
     print(f"  Winner: {cond_results['winner']}")
 
     print(f"\n  52W vs SMA")
     print(f"  Correlation: {sma_52w_results['corr']:+.3f}")
-    print(f"  SMA resid IC(t) after 52W: {sma_52w_results['sma_resid_ic']:+.4f}({sma_52w_results['sma_resid_t']:+.1f})")
-    print(f"  52W resid IC(t) after SMA: {sma_52w_results['h52_resid_ic']:+.4f}({sma_52w_results['h52_resid_t']:+.1f})")
+    print(
+        f"  SMA resid IC(t) after 52W: {sma_52w_results['sma_resid_ic']:+.4f}({sma_52w_results['sma_resid_t']:+.1f})"
+    )
+    print(
+        f"  52W resid IC(t) after SMA: {sma_52w_results['h52_resid_ic']:+.4f}({sma_52w_results['h52_resid_t']:+.1f})"
+    )
     print(f"  {sma_52w_results['verdict']}")
 
     print(f"\n  COST SENSITIVITY")

@@ -80,11 +80,21 @@ but also acknowledge genuine strengths in the risk profile."""
             parts.append("\n── Risk-Relevant Metrics ──")
             m = data.metrics
             for key in [
-                "total_assets", "total_liabilities", "stockholders_equity",
-                "cash", "long_term_debt", "debt_to_equity",
-                "operating_cash_flow", "free_cash_flow",
-                "net_income", "operating_income", "revenue",
-                "roe", "roa", "net_margin", "operating_margin",
+                "total_assets",
+                "total_liabilities",
+                "stockholders_equity",
+                "cash",
+                "long_term_debt",
+                "debt_to_equity",
+                "operating_cash_flow",
+                "free_cash_flow",
+                "net_income",
+                "operating_income",
+                "revenue",
+                "roe",
+                "roa",
+                "net_margin",
+                "operating_margin",
             ]:
                 if key in m and m[key] is not None:
                     parts.append(f"  {key}: {m[key]}")

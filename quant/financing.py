@@ -75,12 +75,12 @@ def load_sofr_series(
     """
     if fred_client is None:
         from fred_client import get_fred_client
+
         fred_client = get_fred_client()
 
     if fred_client is None:
         logger.warning(
-            "FRED client unavailable — falling back to hardcoded "
-            "broker-call proxy of %.2f%%",
+            "FRED client unavailable — falling back to hardcoded broker-call proxy of %.2f%%",
             HARDCODED_BROKER_CALL_ANN_RATE * 100,
         )
         idx = pd.date_range(start_date, end_date, freq="B")
@@ -94,7 +94,9 @@ def load_sofr_series(
     for series_id in (SOFR_FRED_SERIES, SOFR_FALLBACK_SERIES, TBILL_FALLBACK_SERIES):
         try:
             s = fred_client.get_series(
-                series_id, observation_start=fetch_start, observation_end=end_date,
+                series_id,
+                observation_start=fetch_start,
+                observation_end=end_date,
             )
         except Exception as exc:  # pragma: no cover - network path
             logger.debug("FRED %s failed: %s", series_id, exc)
@@ -201,6 +203,7 @@ class LeverageGuardrails:
 
     Any field left as None disables the corresponding gate.
     """
+
     # Max acceptable peak-to-trough drawdown on the equity curve, as a
     # positive decimal fraction (0.25 = 25%).
     max_drawdown_pct: Optional[float] = None
@@ -252,14 +255,12 @@ def evaluate_guardrails(
     # Max drawdown
     if guardrails.max_drawdown_pct is not None and not equity_curve.empty:
         running_max = equity_curve.cummax()
-        dd = (equity_curve / running_max - 1.0)
+        dd = equity_curve / running_max - 1.0
         max_dd = float(-dd.min()) if len(dd) else 0.0
         ev.stats["observed_max_drawdown"] = max_dd
         if max_dd > guardrails.max_drawdown_pct:
             ev.passed = False
-            ev.breaches.append(
-                f"max_drawdown {max_dd:.2%} > cap {guardrails.max_drawdown_pct:.2%}"
-            )
+            ev.breaches.append(f"max_drawdown {max_dd:.2%} > cap {guardrails.max_drawdown_pct:.2%}")
 
     # Stressed single-day loss (analytical, not observed): a -shock% market
     # day at this gross would produce a NAV loss of gross * shock. If that

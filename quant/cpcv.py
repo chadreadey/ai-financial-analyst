@@ -143,8 +143,7 @@ def apply_purge_embargo(
     test_set = set(test_indices)
     for i in range(len(groups) - 1):
         # A boundary exists where group i and group i+1 are in different sets
-        if (i in train_set and (i + 1) in test_set) or \
-           (i in test_set and (i + 1) in train_set):
+        if (i in train_set and (i + 1) in test_set) or (i in test_set and (i + 1) in train_set):
             boundary_dates.add(groups[i][1])  # end of group i = start of group i+1
 
     # Build purge zones: +/- purge_months around each boundary
@@ -225,7 +224,7 @@ def compute_pbo(
         # Simplified: use the logit approach from Lopez de Prado
         # For practical purposes, compute the rank correlation:
         n = len(pairs)
-        n_overfit = sum(1 for is_s, oos_s in pairs[:n // 2] if oos_s <= 0)
+        n_overfit = sum(1 for is_s, oos_s in pairs[: n // 2] if oos_s <= 0)
         pbo = n_overfit / max(n // 2, 1)
         return pbo, "is_optimal"
     else:
@@ -288,9 +287,7 @@ def compute_deflated_sharpe(
     # Standard error of the Sharpe ratio (Lo, 2002) with
     # non-normality correction (Bailey & Lopez de Prado)
     se_sr = math.sqrt(
-        (1.0
-         - skewness * observed_sharpe
-         + ((kurtosis - 1.0) / 4.0) * observed_sharpe ** 2)
+        (1.0 - skewness * observed_sharpe + ((kurtosis - 1.0) / 4.0) * observed_sharpe**2)
         / (n_obs - 1.0)
     )
 
@@ -310,6 +307,7 @@ def compute_sharpe_from_returns(
     Delegates to quant.metrics.compute_sharpe (canonical implementation).
     """
     from quant.metrics import compute_sharpe
+
     return compute_sharpe(daily_returns, annual_factor, min_observations=2)
 
 
@@ -422,10 +420,24 @@ class CPCVResult:
             lines.append("")
             lines.append("  OOS Sharpe Distribution:")
             arr = np.array(self.oos_sharpes)
-            bins = [(-999, -0.5), (-0.5, 0.0), (0.0, 0.5), (0.5, 1.0),
-                    (1.0, 1.5), (1.5, 2.0), (2.0, 999)]
-            labels = ["< -0.5", "-0.5–0.0", " 0.0–0.5", " 0.5–1.0",
-                      " 1.0–1.5", " 1.5–2.0", "  2.0+  "]
+            bins = [
+                (-999, -0.5),
+                (-0.5, 0.0),
+                (0.0, 0.5),
+                (0.5, 1.0),
+                (1.0, 1.5),
+                (1.5, 2.0),
+                (2.0, 999),
+            ]
+            labels = [
+                "< -0.5",
+                "-0.5–0.0",
+                " 0.0–0.5",
+                " 0.5–1.0",
+                " 1.0–1.5",
+                " 1.5–2.0",
+                "  2.0+  ",
+            ]
             max_bar = 40
             counts = [int(np.sum((arr > lo) & (arr <= hi))) for lo, hi in bins]
             max_count = max(counts) if max(counts) > 0 else 1

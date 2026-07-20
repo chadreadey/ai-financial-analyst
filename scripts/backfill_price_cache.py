@@ -60,16 +60,18 @@ WRDS_DB = REPO / ".wrds_pit.db"
 COVERAGE_DIR = REPO / "docs" / "audit" / "coverage"
 
 START_DATE = "2015-01-01"
-FRESH_THRESHOLD_DAYS = 7          # CSV covers 2015 if first_date within 7 days
-RECENT_MOD_SECONDS = 3600         # skip if modified in last hour
-SLEEP_BETWEEN_CALLS = 0.3         # ~3.3 req/sec sustained
+FRESH_THRESHOLD_DAYS = 7  # CSV covers 2015 if first_date within 7 days
+RECENT_MOD_SECONDS = 3600  # skip if modified in last hour
+SLEEP_BETWEEN_CALLS = 0.3  # ~3.3 req/sec sustained
 BACKOFF_SECONDS = [30, 60, 120, 240, 300]
 MAX_RETRIES = len(BACKOFF_SECONDS)
 
 
 def _load_universe() -> list[str]:
     conn = sqlite3.connect(str(WRDS_DB))
-    wrds = {r[0] for r in conn.execute("SELECT DISTINCT ticker FROM compustat_quarterly").fetchall()}
+    wrds = {
+        r[0] for r in conn.execute("SELECT DISTINCT ticker FROM compustat_quarterly").fetchall()
+    }
     conn.close()
     cache = {p.stem for p in CACHE_DIR.iterdir() if p.suffix == ".csv"}
     return sorted(wrds & cache)
@@ -117,10 +119,14 @@ def _fetch_from_tiingo(session: requests.Session, ticker: str) -> tuple[str, lis
             resp = session.get(url, params=params, timeout=(5, 30))
             if resp.status_code == 429:
                 if attempt >= MAX_RETRIES:
-                    logger.error("[%s] 429 rate-limited after %d retries; aborting", ticker, attempt)
+                    logger.error(
+                        "[%s] 429 rate-limited after %d retries; aborting", ticker, attempt
+                    )
                     return "error", []
                 wait = BACKOFF_SECONDS[attempt]
-                logger.warning("[%s] 429 rate-limited (attempt %d); sleeping %ds", ticker, attempt + 1, wait)
+                logger.warning(
+                    "[%s] 429 rate-limited (attempt %d); sleeping %ds", ticker, attempt + 1, wait
+                )
                 time.sleep(wait)
                 attempt += 1
                 continue
@@ -140,7 +146,9 @@ def _fetch_from_tiingo(session: requests.Session, ticker: str) -> tuple[str, lis
                 logger.error("[%s] network error after %d retries: %s", ticker, attempt, exc)
                 return "error", []
             wait = BACKOFF_SECONDS[attempt]
-            logger.warning("[%s] network error (attempt %d): %s; sleeping %ds", ticker, attempt + 1, exc, wait)
+            logger.warning(
+                "[%s] network error (attempt %d): %s; sleeping %ds", ticker, attempt + 1, exc, wait
+            )
             time.sleep(wait)
             attempt += 1
 
@@ -185,11 +193,15 @@ def main() -> int:
 
         if _is_recently_fresh(ticker):
             counts["SKIPPED"] += 1
-            per_ticker.append({
-                "ticker": ticker, "status": "SKIPPED",
-                "old_first": old_first_str, "new_first": old_first_str,
-                "rows": None,
-            })
+            per_ticker.append(
+                {
+                    "ticker": ticker,
+                    "status": "SKIPPED",
+                    "old_first": old_first_str,
+                    "new_first": old_first_str,
+                    "rows": None,
+                }
+            )
             logger.info("[SKIPPED] %s  already fresh (first=%s, mtime<1h)", ticker, old_first_str)
             continue
 
@@ -197,17 +209,27 @@ def main() -> int:
 
         if status == "error":
             counts["ERROR"] += 1
-            per_ticker.append({
-                "ticker": ticker, "status": "ERROR",
-                "old_first": old_first_str, "new_first": old_first_str, "rows": None,
-            })
+            per_ticker.append(
+                {
+                    "ticker": ticker,
+                    "status": "ERROR",
+                    "old_first": old_first_str,
+                    "new_first": old_first_str,
+                    "rows": None,
+                }
+            )
             logger.info("[ERROR   ] %s  old_first=%s (kept existing)", ticker, old_first_str)
         elif status == "no_data" or not bars:
             counts["NO_DATA"] += 1
-            per_ticker.append({
-                "ticker": ticker, "status": "NO_DATA",
-                "old_first": old_first_str, "new_first": old_first_str, "rows": 0,
-            })
+            per_ticker.append(
+                {
+                    "ticker": ticker,
+                    "status": "NO_DATA",
+                    "old_first": old_first_str,
+                    "new_first": old_first_str,
+                    "rows": 0,
+                }
+            )
             logger.info("[NO_DATA ] %s  provider returned empty", ticker)
         else:
             try:
@@ -222,21 +244,35 @@ def main() -> int:
                 else:
                     status_label = "POST_IPO"
                 counts[status_label] += 1
-                per_ticker.append({
-                    "ticker": ticker, "status": status_label,
-                    "old_first": old_first_str, "new_first": new_first_str, "rows": len(df),
-                })
+                per_ticker.append(
+                    {
+                        "ticker": ticker,
+                        "status": status_label,
+                        "old_first": old_first_str,
+                        "new_first": new_first_str,
+                        "rows": len(df),
+                    }
+                )
                 logger.info(
                     "[%-8s] %s  old_first=%s → new_first=%s  rows=%d",
-                    status_label, ticker, old_first_str, new_first_str, len(df),
+                    status_label,
+                    ticker,
+                    old_first_str,
+                    new_first_str,
+                    len(df),
                 )
             except Exception as exc:
                 counts["ERROR"] += 1
-                per_ticker.append({
-                    "ticker": ticker, "status": "ERROR",
-                    "old_first": old_first_str, "new_first": old_first_str,
-                    "rows": None, "exception": str(exc),
-                })
+                per_ticker.append(
+                    {
+                        "ticker": ticker,
+                        "status": "ERROR",
+                        "old_first": old_first_str,
+                        "new_first": old_first_str,
+                        "rows": None,
+                        "exception": str(exc),
+                    }
+                )
                 logger.error("[ERROR   ] %s  serialization failed: %s", ticker, exc)
 
         # Progress ping every 25
@@ -244,8 +280,14 @@ def main() -> int:
             elapsed = time.time() - started
             rate = i / elapsed if elapsed > 0 else 0
             eta = (len(universe) - i) / rate if rate > 0 else 0
-            logger.info("── progress %d/%d  elapsed=%.1fs  rate=%.2f/s  eta=%.0fs",
-                        i, len(universe), elapsed, rate, eta)
+            logger.info(
+                "── progress %d/%d  elapsed=%.1fs  rate=%.2f/s  eta=%.0fs",
+                i,
+                len(universe),
+                elapsed,
+                rate,
+                eta,
+            )
 
         time.sleep(SLEEP_BETWEEN_CALLS)
 

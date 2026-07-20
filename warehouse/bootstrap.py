@@ -28,11 +28,7 @@ logger = logging.getLogger(__name__)
 EPS_CONCEPTS = {"EarningsPerShareBasic", "EarningsPerShareDiluted"}
 SHARES_CONCEPTS = {"CommonStockSharesOutstanding"}
 
-ALL_CONCEPTS = (
-    INCOME_STATEMENT_CONCEPTS
-    + BALANCE_SHEET_CONCEPTS
-    + CASH_FLOW_CONCEPTS
-)
+ALL_CONCEPTS = INCOME_STATEMENT_CONCEPTS + BALANCE_SHEET_CONCEPTS + CASH_FLOW_CONCEPTS
 
 
 def _unit_for_concept(concept: str) -> str:
@@ -73,20 +69,24 @@ def bootstrap_ticker(
     logger.info("bootstrap %s  CIK=%s  name=%s", ticker, cik, company_name)
 
     filings = sec_client.get_recent_filings(
-        ticker, form_types=form_types, limit=filing_limit,
+        ticker,
+        form_types=form_types,
+        limit=filing_limit,
     )
     filing_count = len(filings)
 
-    db.upsert_filings_bulk([
-        {
-            "ticker": ticker,
-            "accession": f["accessionNumber"],
-            "form": f["form"],
-            "filing_date": f["filingDate"],
-            "primary_doc": f.get("primaryDocument", ""),
-        }
-        for f in filings
-    ])
+    db.upsert_filings_bulk(
+        [
+            {
+                "ticker": ticker,
+                "accession": f["accessionNumber"],
+                "form": f["form"],
+                "filing_date": f["filingDate"],
+                "primary_doc": f.get("primaryDocument", ""),
+            }
+            for f in filings
+        ]
+    )
 
     company_facts = sec_client.get_company_facts(ticker)
     parser = XBRLParser(company_facts)
@@ -108,7 +108,11 @@ def bootstrap_ticker(
     elapsed = round(time.monotonic() - t0, 2)
     logger.info(
         "bootstrap %s complete: %d filings, %d facts, %d sections in %.1fs",
-        ticker, filing_count, fact_count, sections_extracted, elapsed,
+        ticker,
+        filing_count,
+        fact_count,
+        sections_extracted,
+        elapsed,
     )
     return BootstrapResult(
         ticker=ticker,
@@ -120,7 +124,9 @@ def bootstrap_ticker(
 
 
 def _ingest_xbrl_facts(
-    ticker: str, parser: XBRLParser, db: WarehouseDB,
+    ticker: str,
+    parser: XBRLParser,
+    db: WarehouseDB,
 ) -> int:
     """Extract all tracked XBRL concepts and bulk-write to warehouse. Returns row count."""
     rows = []
@@ -131,20 +137,20 @@ def _ingest_xbrl_facts(
         unit = _unit_for_concept(concept)
         for _, row in df.iterrows():
             period_end = (
-                str(row["end"].date())
-                if isinstance(row["end"], pd.Timestamp)
-                else str(row["end"])
+                str(row["end"].date()) if isinstance(row["end"], pd.Timestamp) else str(row["end"])
             )
-            rows.append({
-                "ticker": ticker,
-                "concept": concept,
-                "unit": unit,
-                "period_end": period_end,
-                "value": float(row["val"]),
-                "form": row.get("form", ""),
-                "fiscal_year": _safe_int(row.get("fiscal_year")),
-                "fiscal_period": row.get("fiscal_period"),
-            })
+            rows.append(
+                {
+                    "ticker": ticker,
+                    "concept": concept,
+                    "unit": unit,
+                    "period_end": period_end,
+                    "value": float(row["val"]),
+                    "form": row.get("form", ""),
+                    "fiscal_year": _safe_int(row.get("fiscal_year")),
+                    "fiscal_period": row.get("fiscal_period"),
+                }
+            )
     db.upsert_xbrl_facts_bulk(rows)
     return len(rows)
 
@@ -196,7 +202,10 @@ def _ingest_10k_sections(
 
         logger.info(
             "%s  %s (%s)  %d sections extracted",
-            ticker, accession, filing.get("filingDate", ""), written,
+            ticker,
+            accession,
+            filing.get("filingDate", ""),
+            written,
         )
         total += written
 
@@ -245,7 +254,10 @@ def _ingest_10q_sections(
 
         logger.info(
             "%s  10-Q %s (%s)  %d sections extracted",
-            ticker, accession, filing.get("filingDate", ""), written,
+            ticker,
+            accession,
+            filing.get("filingDate", ""),
+            written,
         )
         total += written
 

@@ -120,14 +120,19 @@ def _with_ephemeral_env(env_overrides: dict[str, str], fn):
                 os.environ[key] = old
 
 
-def _run_analysis_sync(ticker: str, user_agent: str, provider: str, model: str, progress) -> AnalysisResult:
+def _run_analysis_sync(
+    ticker: str, user_agent: str, provider: str, model: str, progress
+) -> AnalysisResult:
     if os.getenv("ENABLE_WAREHOUSE", "").lower() == "true":
         try:
             from warehouse.db import WarehouseDB
             from warehouse.bootstrap import bootstrap_ticker
+
             db = WarehouseDB()
             if db.get_company(ticker.upper()) is None:
-                progress.write(f"First time analyzing {ticker.upper()} — bootstrapping warehouse (~10s)...")
+                progress.write(
+                    f"First time analyzing {ticker.upper()} — bootstrapping warehouse (~10s)..."
+                )
                 bootstrap_ticker(ticker.upper(), db, SECClient(user_agent=user_agent))
                 progress.write("Bootstrap complete. Running analysis...")
         except Exception as exc:
@@ -147,10 +152,9 @@ def _run_analysis_sync(ticker: str, user_agent: str, provider: str, model: str, 
         progress.write("Running analyst agents in parallel...")
         agent_reports = await orchestrator.run_phase1(data)
         progress.write("Synthesizing final investment brief...")
-        raw_synthesis = await orchestrator.run_phase2(
-            data.ticker, data.company_name, agent_reports
-        )
+        raw_synthesis = await orchestrator.run_phase2(data.ticker, data.company_name, agent_reports)
         from orchestrator import _extract_structured_block
+
         structured, synthesis = _extract_structured_block(raw_synthesis)
         return AnalysisResult(
             ticker=data.ticker,
@@ -212,12 +216,15 @@ def _render_history_sidebar(ticker: str) -> None:
     ]
     if len(scores) >= 2:
         import pandas as pd
+
         df = pd.DataFrame(scores, columns=["date", "score"])
         df["date"] = pd.to_datetime(df["date"], unit="s")
         st.sidebar.line_chart(df.set_index("date")["score"], height=120)
 
 
-def _render_result(result: AnalysisResult, txt_path: str | None = None, pdf_path: str | None = None) -> None:
+def _render_result(
+    result: AnalysisResult, txt_path: str | None = None, pdf_path: str | None = None
+) -> None:
     st.subheader(f"{result.company_name} ({result.ticker})")
 
     sv = result.structured_verdict
@@ -235,9 +242,7 @@ def _render_result(result: AnalysisResult, txt_path: str | None = None, pdf_path
     st.markdown(streamlit_markdown_text(result.synthesis))
 
     result_dict = result.model_dump()
-    result_dict["agent_reports"] = [
-        (r.agent_name, r.analysis) for r in result.agent_reports
-    ]
+    result_dict["agent_reports"] = [(r.agent_name, r.analysis) for r in result.agent_reports]
     pdf_bytes = build_pdf_report(result_dict)
 
     st.download_button(
@@ -347,23 +352,38 @@ def main() -> None:
 
         with st.expander("Budget Guardrails", expanded=False):
             max_agent_context_chars = st.number_input(
-                "MAX_AGENT_CONTEXT_CHARS", min_value=1000, max_value=20000, step=500,
+                "MAX_AGENT_CONTEXT_CHARS",
+                min_value=1000,
+                max_value=20000,
+                step=500,
                 value=settings.max_agent_context_chars,
             )
             max_agent_output_tokens = st.number_input(
-                "MAX_AGENT_OUTPUT_TOKENS", min_value=100, max_value=4000, step=100,
+                "MAX_AGENT_OUTPUT_TOKENS",
+                min_value=100,
+                max_value=4000,
+                step=100,
                 value=settings.max_agent_output_tokens,
             )
             synthesis_report_max_chars = st.number_input(
-                "SYNTHESIS_REPORT_MAX_CHARS", min_value=500, max_value=10000, step=250,
+                "SYNTHESIS_REPORT_MAX_CHARS",
+                min_value=500,
+                max_value=10000,
+                step=250,
                 value=settings.synthesis_report_max_chars,
             )
             synthesis_input_max_chars = st.number_input(
-                "SYNTHESIS_INPUT_MAX_CHARS", min_value=1000, max_value=30000, step=500,
+                "SYNTHESIS_INPUT_MAX_CHARS",
+                min_value=1000,
+                max_value=30000,
+                step=500,
                 value=settings.synthesis_input_max_chars,
             )
             max_synthesis_output_tokens = st.number_input(
-                "MAX_SYNTHESIS_OUTPUT_TOKENS", min_value=100, max_value=5000, step=100,
+                "MAX_SYNTHESIS_OUTPUT_TOKENS",
+                min_value=100,
+                max_value=5000,
+                step=100,
                 value=settings.max_synthesis_output_tokens,
             )
 
@@ -384,6 +404,7 @@ def main() -> None:
         try:
             from warehouse.db import WarehouseDB
             from warehouse.change_detector import incremental_update
+
             wh_db = WarehouseDB()
             tracked = wh_db.list_tracked_tickers()
             with st.sidebar:
@@ -394,18 +415,28 @@ def main() -> None:
                         company = wh_db.get_company(ticker.upper())
                         if company:
                             from datetime import datetime as _dt
+
                             if company.get("bootstrapped_at"):
-                                bs_time = _dt.fromtimestamp(company["bootstrapped_at"]).strftime("%Y-%m-%d %H:%M")
+                                bs_time = _dt.fromtimestamp(company["bootstrapped_at"]).strftime(
+                                    "%Y-%m-%d %H:%M"
+                                )
                                 st.text(f"Bootstrapped: {bs_time}")
                             if company.get("last_checked_at"):
-                                lc_time = _dt.fromtimestamp(company["last_checked_at"]).strftime("%Y-%m-%d %H:%M")
+                                lc_time = _dt.fromtimestamp(company["last_checked_at"]).strftime(
+                                    "%Y-%m-%d %H:%M"
+                                )
                                 st.text(f"Last checked: {lc_time}")
                     if st.button("Force Refresh", key="wh_refresh"):
                         try:
                             from sec.client import SECClient as SECCli
-                            result = incremental_update(ticker.upper(), wh_db, SECCli(user_agent=user_agent))
+
+                            result = incremental_update(
+                                ticker.upper(), wh_db, SECCli(user_agent=user_agent)
+                            )
                             if result.had_changes:
-                                st.success(f"Updated {ticker.upper()}: {result.new_filing_count} new filings")
+                                st.success(
+                                    f"Updated {ticker.upper()}: {result.new_filing_count} new filings"
+                                )
                             else:
                                 st.info(f"{ticker.upper()} is up to date")
                         except Exception as exc:
@@ -471,7 +502,9 @@ def main() -> None:
                 if provider == "anthropic":
                     st.info("Check ANTHROPIC_API_KEY in deployment secrets, or switch to OpenAI.")
                 else:
-                    st.info("Check OPENAI_CBS_API_KEY / OPENAI_API_KEY and OPENAI_BASE_URL in deployment secrets.")
+                    st.info(
+                        "Check OPENAI_CBS_API_KEY / OPENAI_API_KEY and OPENAI_BASE_URL in deployment secrets."
+                    )
             progress.update(label=f"Failed: {exc}", state="error", expanded=True)
             st.exception(exc)
             return

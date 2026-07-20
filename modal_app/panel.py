@@ -13,6 +13,7 @@ This avoids the two failure modes a naive approach would hit:
   b) Having each container re-fetch prices from Tiingo/FMP → rate-limit death
      when `max_containers=200`.
 """
+
 from __future__ import annotations
 
 import logging
@@ -30,6 +31,7 @@ PANELS_MOUNT_PATH = "/panels"
 @dataclass
 class CPCVPanel:
     """Serialized, pickleable bundle of data CPCV combos need."""
+
     run_id: str
     universe_data: dict[str, pd.DataFrame]
     benchmark_df: Optional[pd.DataFrame]
@@ -77,8 +79,7 @@ def build_panel_locally(
     provider = get_price_provider()
 
     fetch_start = (
-        datetime.strptime(config.start_date, "%Y-%m-%d")
-        - timedelta(days=config.lookback_days + 30)
+        datetime.strptime(config.start_date, "%Y-%m-%d") - timedelta(days=config.lookback_days + 30)
     ).strftime("%Y-%m-%d")
 
     all_tickers = list(set(list(config.tickers) + [BENCHMARK]))
@@ -100,6 +101,7 @@ def build_panel_locally(
         _load_sector_etf_data(fetch_start, provider)
         try:
             from quant.macro_signals import load_fred_macro_data
+
             hy_oas_series, t10y3m_series, copper_series = load_fred_macro_data(fetch_start)
         except Exception as exc:
             logger.warning("FRED macro load failed (continuing without): %s", exc)
@@ -127,18 +129,26 @@ def build_panel_locally(
     xgb_feature_matrix = None
     if getattr(config, "enable_xgb_ranker", False):
         from pathlib import Path
-        for candidate in [f".xgb_features_liquid_{len(config.tickers)}.csv",
-                          ".xgb_features.csv"]:
+
+        for candidate in [f".xgb_features_liquid_{len(config.tickers)}.csv", ".xgb_features.csv"]:
             path = Path(candidate)
             if path.exists():
                 try:
                     from quant.xgb_features import load_feature_matrix
+
                     xgb_feature_matrix = load_feature_matrix(str(path))
                     xgb_feature_matrix["date"] = pd.to_datetime(xgb_feature_matrix["date"])
-                    logger.info("XGB feature matrix loaded into panel: %d rows from %s",
-                                len(xgb_feature_matrix), path)
+                    logger.info(
+                        "XGB feature matrix loaded into panel: %d rows from %s",
+                        len(xgb_feature_matrix),
+                        path,
+                    )
                 except Exception as exc:
-                    logger.warning("XGB feature matrix load failed (%s): %s — XGB will be disabled for this run", path, exc)
+                    logger.warning(
+                        "XGB feature matrix load failed (%s): %s — XGB will be disabled for this run",
+                        path,
+                        exc,
+                    )
                 break
         if xgb_feature_matrix is None:
             logger.warning(
@@ -180,6 +190,7 @@ def unpickle_panel(blob: bytes) -> CPCVPanel:
 def panel_to_cpcv_state(panel: CPCVPanel):
     """Adapt a `CPCVPanel` into a `quant.backtest.CPCVState` for the combo runner."""
     from quant.backtest import CPCVState
+
     return CPCVState(
         universe_data=panel.universe_data,
         benchmark_df=panel.benchmark_df,
@@ -200,6 +211,7 @@ def panel_to_cpcv_state(panel: CPCVPanel):
 def upload_panel_to_volume(panel: CPCVPanel, panels_volume) -> str:
     """Write `panel` to the Modal Volume. Returns the object key."""
     import io
+
     blob = pickle_panel(panel)
     key = f"{panel.run_id}.pkl"
     size_mb = len(blob) / (1024 * 1024)

@@ -11,4 +11,3 @@ def trim_text(text: str, max_chars: int, marker: str = "\n...[trimmed]...") -> s
         return text
     keep = max(0, max_chars - len(marker))
     return text[:keep] + marker
-

@@ -1,6 +1,7 @@
 """Per-combo CPCV worker. Class-based so the heavy panel load amortizes
 across every combo routed to a given container (see architect's §4 + §5).
 """
+
 from __future__ import annotations
 
 import logging
@@ -75,6 +76,7 @@ class CPCVWorker:
         if sig == self._providers_signature:
             return
         from quant.backtest import init_providers_for_config
+
         initialized = init_providers_for_config(config)
         self._providers_signature = sig
         if initialized:
@@ -88,6 +90,7 @@ class CPCVWorker:
             return self._state_cache[panel_key]
 
         import pickle
+
         panel_path = f"{PANELS_MOUNT_PATH}/{panel_key}.pkl"
         t0 = time.time()
         with open(panel_path, "rb") as f:
@@ -96,6 +99,7 @@ class CPCVWorker:
         self._panels_cache[panel_key] = panel
 
         from modal_app.panel import panel_to_cpcv_state
+
         state = panel_to_cpcv_state(panel)
         self._state_cache[panel_key] = state
         return state
@@ -142,6 +146,7 @@ class CPCVWorker:
             return result
         except Exception as exc:
             import traceback
+
             return {
                 "combo_idx": combo_idx,
                 "status": "error",
@@ -157,6 +162,7 @@ def _rebuild_config(config_json: dict):
     keys so old payloads remain compatible when fields are added."""
     from dataclasses import fields
     from quant.backtest import BacktestConfig
+
     allowed = {f.name for f in fields(BacktestConfig)}
     filtered = {k: v for k, v in config_json.items() if k in allowed}
     return BacktestConfig(**filtered)

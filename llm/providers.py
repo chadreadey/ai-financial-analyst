@@ -43,6 +43,7 @@ class AnthropicProvider(LLMProvider):
 
     def __init__(self, api_key: Optional[str] = None):
         import os
+
         key = api_key or os.getenv("ANTHROPIC_API_KEY") or settings.anthropic_api_key or None
         self._client = AsyncAnthropic(api_key=key)
         self._prompt_caching = settings.enable_prompt_caching
@@ -81,6 +82,7 @@ class OpenAIProvider(LLMProvider):
         base_url: Optional[str] = None,
     ):
         import os
+
         # Read live env vars so per-request overrides from jobs.py take effect.
         # settings.* is a frozen Pydantic singleton and won't see runtime changes.
         key = api_key or os.getenv("OPENAI_API_KEY") or settings.openai_api_key or None

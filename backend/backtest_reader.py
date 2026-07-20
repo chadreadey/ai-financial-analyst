@@ -17,6 +17,7 @@ Row shape normalisation:
 - Array columns (`train_indices`, `test_indices`) arrive as Python lists
   from Supabase and from `_row_to_dict` in SQLite.
 """
+
 from __future__ import annotations
 
 import logging
@@ -80,17 +81,21 @@ def list_runs(
 ) -> list[dict]:
     if supabase_backtest.is_enabled():
         try:
-            r = supabase_backtest.list_runs(status=status, config_hash=config_hash,
-                                             limit=limit, offset=offset)
+            r = supabase_backtest.list_runs(
+                status=status, config_hash=config_hash, limit=limit, offset=offset
+            )
             if r is not None:
                 return r
         except Exception:
-            logger.warning(
-                "supabase list_runs failed, falling back to SQLite", exc_info=True
-            )
-    return _normalize_sqlite_rows(cpcv_sqlite.list_runs(
-        status=status, config_hash=config_hash, limit=limit, offset=offset,
-    ))
+            logger.warning("supabase list_runs failed, falling back to SQLite", exc_info=True)
+    return _normalize_sqlite_rows(
+        cpcv_sqlite.list_runs(
+            status=status,
+            config_hash=config_hash,
+            limit=limit,
+            offset=offset,
+        )
+    )
 
 
 def get_run(run_id: str) -> Optional[dict]:
@@ -100,9 +105,7 @@ def get_run(run_id: str) -> Optional[dict]:
             if r is not None:
                 return r
         except Exception:
-            logger.warning(
-                "supabase get_run failed, falling back to SQLite", exc_info=True
-            )
+            logger.warning("supabase get_run failed, falling back to SQLite", exc_info=True)
     row = cpcv_sqlite.get_run(run_id)
     return _normalize_sqlite_run(row) if row else None
 
@@ -130,9 +133,9 @@ def get_combinations(
 ) -> list[dict]:
     if supabase_backtest.is_enabled():
         try:
-            r = supabase_backtest.get_combinations(run_id, order_by=order_by,
-                                                   descending=descending,
-                                                   limit=limit, offset=offset)
+            r = supabase_backtest.get_combinations(
+                run_id, order_by=order_by, descending=descending, limit=limit, offset=offset
+            )
             if r is not None:
                 return r
         except Exception:
@@ -140,10 +143,15 @@ def get_combinations(
                 "supabase get_combinations failed, falling back to SQLite",
                 exc_info=True,
             )
-    return _normalize_sqlite_rows(cpcv_sqlite.get_combinations(
-        run_id, order_by=order_by, descending=descending,
-        limit=limit, offset=offset,
-    ))
+    return _normalize_sqlite_rows(
+        cpcv_sqlite.get_combinations(
+            run_id,
+            order_by=order_by,
+            descending=descending,
+            limit=limit,
+            offset=offset,
+        )
+    )
 
 
 def get_trades(
@@ -155,17 +163,22 @@ def get_trades(
 ) -> list[dict]:
     if supabase_backtest.is_enabled():
         try:
-            r = supabase_backtest.get_trades(run_id, combo_idx=combo_idx,
-                                             ticker=ticker, limit=limit, offset=offset)
+            r = supabase_backtest.get_trades(
+                run_id, combo_idx=combo_idx, ticker=ticker, limit=limit, offset=offset
+            )
             if r is not None:
                 return r
         except Exception:
-            logger.warning(
-                "supabase get_trades failed, falling back to SQLite", exc_info=True
-            )
-    return _normalize_sqlite_rows(cpcv_sqlite.get_trades(
-        run_id, combo_idx=combo_idx, ticker=ticker, limit=limit, offset=offset,
-    ))
+            logger.warning("supabase get_trades failed, falling back to SQLite", exc_info=True)
+    return _normalize_sqlite_rows(
+        cpcv_sqlite.get_trades(
+            run_id,
+            combo_idx=combo_idx,
+            ticker=ticker,
+            limit=limit,
+            offset=offset,
+        )
+    )
 
 
 def get_events(
@@ -184,12 +197,8 @@ def get_events(
             if r is not None:
                 return {"source": "supabase", "events": r}
         except Exception:
-            logger.warning(
-                "supabase get_events failed, falling back to SQLite", exc_info=True
-            )
-    rows = _normalize_sqlite_rows(
-        cpcv_sqlite.get_events(run_id, after_id=after_id, limit=limit)
-    )
+            logger.warning("supabase get_events failed, falling back to SQLite", exc_info=True)
+    rows = _normalize_sqlite_rows(cpcv_sqlite.get_events(run_id, after_id=after_id, limit=limit))
     return {"source": "sqlite", "events": rows}
 
 

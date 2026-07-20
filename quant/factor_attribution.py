@@ -29,7 +29,9 @@ logger = logging.getLogger(__name__)
 # ── Download factor data from Kenneth French Data Library ──────────────
 
 FF5_URL = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Research_Data_5_Factors_2x3_daily_CSV.zip"
-MOM_URL = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Momentum_Factor_daily_CSV.zip"
+MOM_URL = (
+    "https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/F-F_Momentum_Factor_daily_CSV.zip"
+)
 
 
 def _download_french_zip(url: str) -> str:
@@ -197,34 +199,46 @@ def run_ff5_momentum_regression(
         label = "alpha" if var == "const" else var
         lines.append(f"  {label:>12} {coef:>10.4f} {se:>10.4f} {t:>10.2f} {p:>10.4f} {sig}")
 
-    lines.extend([
-        "",
-        f"  R-squared:     {nw_model.rsquared:.4f}",
-        f"  Adj R-squared: {nw_model.rsquared_adj:.4f}",
-        "",
-        "  ── Alpha Significance Test (95% CI) ──",
-        "",
-        f"  Daily alpha:      {alpha_daily:.4f}% (SE: {alpha_se:.4f}%)",
-        f"  Annualized alpha: {alpha_annual:.2f}%",
-        f"  Newey-West t-stat: {alpha_t:.4f}",
-        f"  p-value: {alpha_p:.6f}",
-        f"  95% CI (annual):  [{alpha_ci[0] * 252:.2f}%, {alpha_ci[1] * 252:.2f}%]",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            f"  R-squared:     {nw_model.rsquared:.4f}",
+            f"  Adj R-squared: {nw_model.rsquared_adj:.4f}",
+            "",
+            "  ── Alpha Significance Test (95% CI) ──",
+            "",
+            f"  Daily alpha:      {alpha_daily:.4f}% (SE: {alpha_se:.4f}%)",
+            f"  Annualized alpha: {alpha_annual:.2f}%",
+            f"  Newey-West t-stat: {alpha_t:.4f}",
+            f"  p-value: {alpha_p:.6f}",
+            f"  95% CI (annual):  [{alpha_ci[0] * 252:.2f}%, {alpha_ci[1] * 252:.2f}%]",
+            "",
+        ]
+    )
 
     if significant:
         direction = "positive" if alpha_daily > 0 else "negative"
-        lines.append(f"  >>> RESULT: Alpha IS significant at 95%. {direction.title()} {alpha_annual:.2f}%/yr")
-        lines.append(f"      after controlling for market, size, value, profitability, investment, momentum.")
+        lines.append(
+            f"  >>> RESULT: Alpha IS significant at 95%. {direction.title()} {alpha_annual:.2f}%/yr"
+        )
+        lines.append(
+            f"      after controlling for market, size, value, profitability, investment, momentum."
+        )
     else:
-        lines.append(f"  >>> RESULT: Alpha is NOT significant at 95% (t={alpha_t:.2f}, p={alpha_p:.4f})")
+        lines.append(
+            f"  >>> RESULT: Alpha is NOT significant at 95% (t={alpha_t:.2f}, p={alpha_p:.4f})"
+        )
         lines.append(f"      Returns are explained by the six factor exposures.")
 
     # Harvey-Liu-Zhu check
     if abs(alpha_t) < 3.0:
-        lines.append(f"  >>> HLZ threshold: t={alpha_t:.2f} < 3.0 — fails multiple-testing adjustment.")
+        lines.append(
+            f"  >>> HLZ threshold: t={alpha_t:.2f} < 3.0 — fails multiple-testing adjustment."
+        )
     else:
-        lines.append(f"  >>> HLZ threshold: t={alpha_t:.2f} >= 3.0 — survives multiple-testing adjustment.")
+        lines.append(
+            f"  >>> HLZ threshold: t={alpha_t:.2f} >= 3.0 — survives multiple-testing adjustment."
+        )
 
     lines.extend(["", "=" * 70])
 
@@ -249,6 +263,7 @@ def run_ff5_momentum_regression(
 
 
 # ── Rolling regression ─────────────────────────────────────────────────
+
 
 def rolling_factor_regression(
     portfolio_daily_returns: pd.Series,
@@ -308,6 +323,7 @@ def rolling_factor_regression(
 
 # ── Convenience: extract daily returns from backtest equity curve ──────
 
+
 def equity_curve_to_daily_returns(equity_curve: list[dict]) -> pd.Series:
     """
     Convert backtest equity_curve list to daily return series in percentage
@@ -328,6 +344,7 @@ def equity_curve_to_daily_returns(equity_curve: list[dict]) -> pd.Series:
 
 
 # ── Print rolling summary ──────────────────────────────────────────────
+
 
 def print_rolling_summary(rolling_df: pd.DataFrame) -> str:
     """Format rolling regression summary."""

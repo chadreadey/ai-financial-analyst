@@ -27,7 +27,8 @@ class UpdateResult:
 
 
 def get_latest_accession_from_sec(
-    ticker: str, sec_client: SECClient,
+    ticker: str,
+    sec_client: SECClient,
 ) -> Optional[str]:
     """
     Fetch the most recent accessionNumber directly from SEC EDGAR,
@@ -44,18 +45,20 @@ def get_latest_accession_from_sec(
         data = resp.json()
     except Exception:
         logger.warning(
-            "failed to fetch fresh submissions for %s", ticker, exc_info=True,
+            "failed to fetch fresh submissions for %s",
+            ticker,
+            exc_info=True,
         )
         return None
 
-    accessions = (
-        data.get("filings", {}).get("recent", {}).get("accessionNumber", [])
-    )
+    accessions = data.get("filings", {}).get("recent", {}).get("accessionNumber", [])
     return accessions[0] if accessions else None
 
 
 def needs_update(
-    ticker: str, db: WarehouseDB, sec_client: SECClient,
+    ticker: str,
+    db: WarehouseDB,
+    sec_client: SECClient,
 ) -> bool:
     """
     Return True when the warehouse data for *ticker* is stale:
@@ -113,13 +116,12 @@ def incremental_update(
         )
 
     filings = sec_client.get_recent_filings(
-        ticker, form_types=form_types, limit=settings.warehouse_filing_limit,
+        ticker,
+        form_types=form_types,
+        limit=settings.warehouse_filing_limit,
     )
 
-    stored = {
-        f["accession"]
-        for f in db.get_filings(ticker, limit=1000)
-    }
+    stored = {f["accession"] for f in db.get_filings(ticker, limit=1000)}
     new_filings = [f for f in filings if f["accessionNumber"] not in stored]
 
     for f in new_filings:
@@ -153,7 +155,9 @@ def incremental_update(
     elapsed = round(time.monotonic() - t0, 2)
     logger.info(
         "incremental update %s: %d new filings in %.1fs",
-        ticker, len(new_filings), elapsed,
+        ticker,
+        len(new_filings),
+        elapsed,
     )
     return UpdateResult(
         ticker=ticker,

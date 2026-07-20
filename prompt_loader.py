@@ -27,4 +27,3 @@ def render_prompt(template: str, data: Dict[str, str]) -> str:
         .replace("[STOCK NAME]", company_name)
         .replace("[TICKER]", ticker)
     )
-

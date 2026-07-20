@@ -38,6 +38,7 @@ class WarehouseDB:
     def _connect(self):
         if self._pg:
             import psycopg2
+
             return psycopg2.connect(self._dsn)
         conn = sqlite3.connect(self._db_path)
         conn.execute("PRAGMA journal_mode=WAL")
@@ -47,6 +48,7 @@ class WarehouseDB:
     def _cursor(self, conn):
         if self._pg:
             from psycopg2.extras import RealDictCursor
+
             return conn.cursor(cursor_factory=RealDictCursor)
         return conn.cursor()
 
@@ -101,6 +103,7 @@ class WarehouseDB:
         """
         if self._pg:
             from psycopg2.extras import execute_batch
+
             cur = conn.cursor()
             execute_batch(cur, sql, params_seq, page_size=500)
         else:
@@ -272,8 +275,15 @@ class WarehouseDB:
                     ingested_at   = EXCLUDED.ingested_at
                 """,
                 (
-                    ticker.upper(), concept, unit, period_end, value,
-                    form, fiscal_year, fiscal_period, self._now(),
+                    ticker.upper(),
+                    concept,
+                    unit,
+                    period_end,
+                    value,
+                    form,
+                    fiscal_year,
+                    fiscal_period,
+                    self._now(),
                 ),
             )
             conn.commit()
@@ -400,9 +410,20 @@ class WarehouseDB:
                     ingested_at    = EXCLUDED.ingested_at
                 """,
                 (
-                    ticker.upper(), as_of_date, price, market_cap, pe_ttm,
-                    forward_pe, ps_ttm, ev_ebitda, beta, week52_high,
-                    week52_low, target_mean, recommendation, self._now(),
+                    ticker.upper(),
+                    as_of_date,
+                    price,
+                    market_cap,
+                    pe_ttm,
+                    forward_pe,
+                    ps_ttm,
+                    ev_ebitda,
+                    beta,
+                    week52_high,
+                    week52_low,
+                    target_mean,
+                    recommendation,
+                    self._now(),
                 ),
             )
             conn.commit()

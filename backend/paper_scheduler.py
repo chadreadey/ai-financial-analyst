@@ -1,6 +1,7 @@
 """
 Monthly paper trading rebalance scheduler.
 """
+
 from __future__ import annotations
 
 import logging
@@ -75,7 +76,9 @@ def run_rebalance(target_tickers: Optional[list[str]] = None) -> dict[str, Any]:
             else:
                 continue
 
-            order = client.submit_market_order(symbol=ticker, qty=settings.paper_default_qty, side=side)
+            order = client.submit_market_order(
+                symbol=ticker, qty=settings.paper_default_qty, side=side
+            )
             opened.append(ticker)
             logger.info("Rebalance: opened %s %s order=%s", side, ticker, order["order_id"])
         except Exception as exc:
@@ -107,7 +110,9 @@ def create_scheduler(start: bool = True) -> BackgroundScheduler:
     scheduler = BackgroundScheduler(timezone="US/Eastern")
     parts = settings.paper_rebalance_cron.split()
     if len(parts) == 5:
-        trigger = CronTrigger(minute=parts[0], hour=parts[1], day=parts[2], month=parts[3], day_of_week=parts[4])
+        trigger = CronTrigger(
+            minute=parts[0], hour=parts[1], day=parts[2], month=parts[3], day_of_week=parts[4]
+        )
     else:
         trigger = CronTrigger(minute=30, hour=9, day=1)
     scheduler.add_job(

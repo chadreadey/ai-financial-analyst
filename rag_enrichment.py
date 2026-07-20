@@ -25,6 +25,7 @@ def _get_lock():
     global _pinecone_lock
     if _pinecone_lock is None:
         import threading
+
         _pinecone_lock = threading.Lock()
     return _pinecone_lock
 
@@ -75,9 +76,7 @@ def query_rag(
         return []
 
     try:
-        q = query or (
-            f"{ticker} financial analysis revenue earnings outlook risks business"
-        )
+        q = query or (f"{ticker} financial analysis revenue earnings outlook risks business")
         namespace = settings.pinecone_namespace or "__default__"
         results = index.search(
             namespace=namespace,
@@ -92,13 +91,15 @@ def query_rag(
         chunks = []
         for hit in results.result.hits:
             fields = hit.fields or {}
-            chunks.append({
-                "text": fields.get("text", ""),
-                "score": float(hit._score),
-                "source": f"{fields.get('form_type', '10-K')} {fields.get('section_key', '')}",
-                "date": fields.get("filing_date", ""),
-                "section_key": fields.get("section_key", ""),
-            })
+            chunks.append(
+                {
+                    "text": fields.get("text", ""),
+                    "score": float(hit._score),
+                    "source": f"{fields.get('form_type', '10-K')} {fields.get('section_key', '')}",
+                    "date": fields.get("filing_date", ""),
+                    "section_key": fields.get("section_key", ""),
+                }
+            )
         return chunks
 
     except Exception:
@@ -146,6 +147,7 @@ def fetch_rag_section(ticker: str) -> str:
 
 # ── time-series RAG ────────────────────────────────────────────────────────
 
+
 def query_financial_history(
     ticker: str,
     query: str = "",
@@ -169,9 +171,7 @@ def query_financial_history(
         return []
 
     try:
-        q = query or (
-            f"{ticker} quarterly revenue earnings margins cash flow growth"
-        )
+        q = query or (f"{ticker} quarterly revenue earnings margins cash flow growth")
         namespace = settings.pinecone_financial_ts_namespace
         results = index.search(
             namespace=namespace,
@@ -180,20 +180,30 @@ def query_financial_history(
                 "top_k": top_k,
                 "filter": {"ticker": {"$eq": ticker.upper()}},
             },
-            fields=["text", "ticker", "period", "quarter_label",
-                    "revenue", "net_income", "operating_margin", "free_cash_flow"],
+            fields=[
+                "text",
+                "ticker",
+                "period",
+                "quarter_label",
+                "revenue",
+                "net_income",
+                "operating_margin",
+                "free_cash_flow",
+            ],
         )
 
         chunks = []
         for hit in results.result.hits:
             fields = hit.fields or {}
-            chunks.append({
-                "text": fields.get("text", ""),
-                "score": float(hit._score),
-                "source": f"Financial History {fields.get('quarter_label', '')}",
-                "date": fields.get("period", ""),
-                "quarter_label": fields.get("quarter_label", ""),
-            })
+            chunks.append(
+                {
+                    "text": fields.get("text", ""),
+                    "score": float(hit._score),
+                    "source": f"Financial History {fields.get('quarter_label', '')}",
+                    "date": fields.get("period", ""),
+                    "quarter_label": fields.get("quarter_label", ""),
+                }
+            )
         return chunks
 
     except Exception:
@@ -232,20 +242,29 @@ def query_macro_history(
                 "inputs": {"text": q},
                 "top_k": top_k,
             },
-            fields=["text", "period", "quarter_label", "fed_funds",
-                    "cpi_yoy", "real_gdp_growth", "hy_spread"],
+            fields=[
+                "text",
+                "period",
+                "quarter_label",
+                "fed_funds",
+                "cpi_yoy",
+                "real_gdp_growth",
+                "hy_spread",
+            ],
         )
 
         chunks = []
         for hit in results.result.hits:
             fields = hit.fields or {}
-            chunks.append({
-                "text": fields.get("text", ""),
-                "score": float(hit._score),
-                "source": f"Macro Snapshot {fields.get('quarter_label', '')}",
-                "date": fields.get("period", ""),
-                "quarter_label": fields.get("quarter_label", ""),
-            })
+            chunks.append(
+                {
+                    "text": fields.get("text", ""),
+                    "score": float(hit._score),
+                    "source": f"Macro Snapshot {fields.get('quarter_label', '')}",
+                    "date": fields.get("period", ""),
+                    "quarter_label": fields.get("quarter_label", ""),
+                }
+            )
         return chunks
 
     except Exception:
@@ -317,6 +336,7 @@ def fetch_timeseries_rag_section(ticker: str) -> str:
 
 # ── research RAG (Perplexity research library) ──────────────────────────────
 
+
 def query_research_rag(
     query: str,
     top_k: int = 0,
@@ -358,20 +378,29 @@ def query_research_rag(
         results = index.search(
             namespace=namespace,
             query=search_params,
-            fields=["text", "source_file", "section_header",
-                    "document_category", "token_count", "tickers", "data_as_of"],
+            fields=[
+                "text",
+                "source_file",
+                "section_header",
+                "document_category",
+                "token_count",
+                "tickers",
+                "data_as_of",
+            ],
         )
 
         chunks = []
         for hit in results.result.hits:
             fields = hit.fields or {}
-            chunks.append({
-                "text": fields.get("text", ""),
-                "score": float(hit._score),
-                "source": fields.get("source_file", ""),
-                "section": fields.get("section_header", ""),
-                "category": fields.get("document_category", ""),
-            })
+            chunks.append(
+                {
+                    "text": fields.get("text", ""),
+                    "score": float(hit._score),
+                    "source": fields.get("source_file", ""),
+                    "section": fields.get("section_header", ""),
+                    "category": fields.get("document_category", ""),
+                }
+            )
         return chunks
 
     except Exception:

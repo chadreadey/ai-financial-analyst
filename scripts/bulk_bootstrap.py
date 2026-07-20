@@ -19,6 +19,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
 logging.basicConfig(
@@ -30,21 +31,39 @@ logger = logging.getLogger("bulk_bootstrap")
 
 DEFAULT_TICKERS = [
     # Mega-cap tech
-    "AAPL", "MSFT", "GOOGL", "META", "NVDA", "AMZN", "TSLA",
+    "AAPL",
+    "MSFT",
+    "GOOGL",
+    "META",
+    "NVDA",
+    "AMZN",
+    "TSLA",
     # Financials
-    "JPM", "GS", "BAC",
+    "JPM",
+    "GS",
+    "BAC",
     # Healthcare
-    "JNJ", "LLY", "UNH",
+    "JNJ",
+    "LLY",
+    "UNH",
     # Energy
-    "XOM", "CVX",
+    "XOM",
+    "CVX",
     # Consumer
-    "WMT", "HD", "MCD", "NKE", "COST",
+    "WMT",
+    "HD",
+    "MCD",
+    "NKE",
+    "COST",
     # Industrials
-    "CAT", "HON",
+    "CAT",
+    "HON",
     # Semiconductors
-    "AMD", "AVGO",
+    "AMD",
+    "AVGO",
     # Media / Comm
-    "NFLX", "DIS",
+    "NFLX",
+    "DIS",
 ]
 
 
@@ -61,6 +80,7 @@ def _get_pinecone_index():
 
 def seed_ticker(ticker: str, index, db_path: str, namespace: str) -> int:
     from warehouse.embedder import upsert_ticker_sections
+
     count = upsert_ticker_sections(
         ticker=ticker,
         db_path=db_path,
@@ -76,7 +96,9 @@ def main():
     parser.add_argument("--tickers", nargs="+", metavar="TICKER")
     parser.add_argument("--no-seed", action="store_true", help="Skip Pinecone seeding")
     parser.add_argument("--no-text", action="store_true", help="Skip filing text (XBRL only, fast)")
-    parser.add_argument("--sections-limit", type=int, default=None, help="Override 10-K sections limit")
+    parser.add_argument(
+        "--sections-limit", type=int, default=None, help="Override 10-K sections limit"
+    )
     parser.add_argument("--tenq-limit", type=int, default=None, help="Override 10-Q sections limit")
     args = parser.parse_args()
 
@@ -113,8 +135,11 @@ def main():
             result = bootstrap_ticker(ticker, db, sec)
             logger.info(
                 "%s bootstrapped: %d filings, %d facts, %d sections (%.1fs)",
-                ticker, result.filing_count, result.fact_count,
-                result.sections_extracted, result.elapsed_s,
+                ticker,
+                result.filing_count,
+                result.fact_count,
+                result.sections_extracted,
+                result.elapsed_s,
             )
         except Exception as exc:
             logger.error("%s bootstrap FAILED: %s", ticker, exc)

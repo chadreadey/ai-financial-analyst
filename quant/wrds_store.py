@@ -183,12 +183,15 @@ class WRDSPointInTimeStore:
         Returns dicts with FMP-compatible field names for downstream compatibility.
         """
         conn = self._conn()
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT * FROM compustat_quarterly
             WHERE ticker = ? AND rdq <= ?
             ORDER BY datadate DESC
             LIMIT ?
-        """, (ticker.upper(), as_of_date, n_quarters)).fetchall()
+        """,
+            (ticker.upper(), as_of_date, n_quarters),
+        ).fetchall()
         conn.close()
 
         return [self._compustat_to_fmp_dict(dict(r)) for r in rows]
@@ -208,12 +211,15 @@ class WRDSPointInTimeStore:
             fpi: "1" = current fiscal year, "2" = next fiscal year
         """
         conn = self._conn()
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT * FROM ibes_consensus
             WHERE ticker = ? AND statpers <= ? AND fpi = ?
             ORDER BY statpers DESC
             LIMIT ?
-        """, (ticker.upper(), as_of_date, fpi, n_periods)).fetchall()
+        """,
+            (ticker.upper(), as_of_date, fpi, n_periods),
+        ).fetchall()
         conn.close()
 
         return [dict(r) for r in rows]
@@ -228,12 +234,15 @@ class WRDSPointInTimeStore:
         Return up to n_quarters of IBES actual EPS where anndats <= as_of_date.
         """
         conn = self._conn()
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT * FROM ibes_actuals
             WHERE ticker = ? AND anndats <= ?
             ORDER BY pends DESC
             LIMIT ?
-        """, (ticker.upper(), as_of_date, n_quarters)).fetchall()
+        """,
+            (ticker.upper(), as_of_date, n_quarters),
+        ).fetchall()
         conn.close()
 
         return [dict(r) for r in rows]
@@ -265,32 +274,44 @@ class WRDSPointInTimeStore:
                 rdq = str(rdq)[:10]
 
             try:
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT OR REPLACE INTO compustat_quarterly
                     (gvkey, ticker, datadate, rdq, fyearq, fqtr,
                      atq, ceqq, ltq, dlcq, dlttq, cheq, actq, lctq,
                      saleq, revtq, niq, ibq, oancfy, epsfxq, epspiq, capxy,
                      cogsq, xsgaq, cshoq, rdq_inferred)
                     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """, (
-                    str(row.get("gvkey", "")),
-                    str(row.get("tic", row.get("ticker", ""))).upper(),
-                    str(row["datadate"])[:10],
-                    rdq,
-                    int(row["fyearq"]) if pd.notna(row.get("fyearq")) else None,
-                    int(row["fqtr"]) if pd.notna(row.get("fqtr")) else None,
-                    self._float(row, "atq"), self._float(row, "ceqq"),
-                    self._float(row, "ltq"), self._float(row, "dlcq"),
-                    self._float(row, "dlttq"), self._float(row, "cheq"),
-                    self._float(row, "actq"), self._float(row, "lctq"),
-                    self._float(row, "saleq"), self._float(row, "revtq"),
-                    self._float(row, "niq"), self._float(row, "ibq"),
-                    self._float(row, "oancfy"), self._float(row, "epsfxq"),
-                    self._float(row, "epspiq"), self._float(row, "capxy"),
-                    self._float(row, "cogsq"), self._float(row, "xsgaq"),
-                    self._float(row, "cshoq"),
-                    rdq_inferred,
-                ))
+                """,
+                    (
+                        str(row.get("gvkey", "")),
+                        str(row.get("tic", row.get("ticker", ""))).upper(),
+                        str(row["datadate"])[:10],
+                        rdq,
+                        int(row["fyearq"]) if pd.notna(row.get("fyearq")) else None,
+                        int(row["fqtr"]) if pd.notna(row.get("fqtr")) else None,
+                        self._float(row, "atq"),
+                        self._float(row, "ceqq"),
+                        self._float(row, "ltq"),
+                        self._float(row, "dlcq"),
+                        self._float(row, "dlttq"),
+                        self._float(row, "cheq"),
+                        self._float(row, "actq"),
+                        self._float(row, "lctq"),
+                        self._float(row, "saleq"),
+                        self._float(row, "revtq"),
+                        self._float(row, "niq"),
+                        self._float(row, "ibq"),
+                        self._float(row, "oancfy"),
+                        self._float(row, "epsfxq"),
+                        self._float(row, "epspiq"),
+                        self._float(row, "capxy"),
+                        self._float(row, "cogsq"),
+                        self._float(row, "xsgaq"),
+                        self._float(row, "cshoq"),
+                        rdq_inferred,
+                    ),
+                )
                 n += 1
             except Exception as exc:
                 logger.debug("Compustat ingest error: %s", exc)
@@ -304,19 +325,25 @@ class WRDSPointInTimeStore:
         n = 0
         for _, row in df.iterrows():
             try:
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT OR REPLACE INTO ibes_consensus
                     (ticker, statpers, fpedats, fpi, meanest, medest, stdev, numest, numup, numdown)
                     VALUES (?,?,?,?,?,?,?,?,?,?)
-                """, (
-                    str(row["ticker"]).upper(),
-                    str(row["statpers"])[:10],
-                    str(row["fpedats"])[:10],
-                    str(row.get("fpi", "1")),
-                    self._float(row, "meanest"), self._float(row, "medest"),
-                    self._float(row, "stdev"), self._float(row, "numest"),
-                    self._float(row, "numup"), self._float(row, "numdown"),
-                ))
+                """,
+                    (
+                        str(row["ticker"]).upper(),
+                        str(row["statpers"])[:10],
+                        str(row["fpedats"])[:10],
+                        str(row.get("fpi", "1")),
+                        self._float(row, "meanest"),
+                        self._float(row, "medest"),
+                        self._float(row, "stdev"),
+                        self._float(row, "numest"),
+                        self._float(row, "numup"),
+                        self._float(row, "numdown"),
+                    ),
+                )
                 n += 1
             except Exception as exc:
                 logger.debug("IBES consensus ingest error: %s", exc)
@@ -330,17 +357,20 @@ class WRDSPointInTimeStore:
         n = 0
         for _, row in df.iterrows():
             try:
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT OR REPLACE INTO ibes_actuals
                     (ticker, pends, anndats, value, pdicity)
                     VALUES (?,?,?,?,?)
-                """, (
-                    str(row["ticker"]).upper(),
-                    str(row["pends"])[:10],
-                    str(row["anndats"])[:10],
-                    self._float(row, "value"),
-                    str(row.get("pdicity", "QTR")),
-                ))
+                """,
+                    (
+                        str(row["ticker"]).upper(),
+                        str(row["pends"])[:10],
+                        str(row["anndats"])[:10],
+                        self._float(row, "value"),
+                        str(row.get("pdicity", "QTR")),
+                    ),
+                )
                 n += 1
             except Exception as exc:
                 logger.debug("IBES actuals ingest error: %s", exc)
@@ -354,19 +384,26 @@ class WRDSPointInTimeStore:
         n = 0
         for _, row in df.iterrows():
             try:
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT OR REPLACE INTO ticker_link
                     (ticker, gvkey, permno, ibes_ticker, cusip8, link_start, link_end)
                     VALUES (?,?,?,?,?,?,?)
-                """, (
-                    str(row.get("ticker", "")).upper(),
-                    str(row.get("gvkey", "")),
-                    int(row["permno"]) if pd.notna(row.get("permno")) else None,
-                    str(row.get("ibes_ticker", "")).upper() if pd.notna(row.get("ibes_ticker")) else None,
-                    str(row.get("cusip8", "")) if pd.notna(row.get("cusip8")) else None,
-                    str(row.get("link_start", ""))[:10],
-                    str(row.get("link_end", ""))[:10] if pd.notna(row.get("link_end")) else "2099-12-31",
-                ))
+                """,
+                    (
+                        str(row.get("ticker", "")).upper(),
+                        str(row.get("gvkey", "")),
+                        int(row["permno"]) if pd.notna(row.get("permno")) else None,
+                        str(row.get("ibes_ticker", "")).upper()
+                        if pd.notna(row.get("ibes_ticker"))
+                        else None,
+                        str(row.get("cusip8", "")) if pd.notna(row.get("cusip8")) else None,
+                        str(row.get("link_start", ""))[:10],
+                        str(row.get("link_end", ""))[:10]
+                        if pd.notna(row.get("link_end"))
+                        else "2099-12-31",
+                    ),
+                )
                 n += 1
             except Exception as exc:
                 logger.debug("Ticker link ingest error: %s", exc)
@@ -385,19 +422,22 @@ class WRDSPointInTimeStore:
         n = 0
         for _, row in df.iterrows():
             try:
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT OR REPLACE INTO inst_holdings_13f
                     (ticker, rdate, n_holders, total_shares, n_buying, n_selling, n_unchanged)
                     VALUES (?,?,?,?,?,?,?)
-                """, (
-                    str(row["ticker"]).upper(),
-                    str(row["rdate"])[:10],
-                    int(row["n_holders"]) if pd.notna(row.get("n_holders")) else 0,
-                    float(row["total_shares"]) if pd.notna(row.get("total_shares")) else 0,
-                    int(row["n_buying"]) if pd.notna(row.get("n_buying")) else 0,
-                    int(row["n_selling"]) if pd.notna(row.get("n_selling")) else 0,
-                    int(row["n_unchanged"]) if pd.notna(row.get("n_unchanged")) else 0,
-                ))
+                """,
+                    (
+                        str(row["ticker"]).upper(),
+                        str(row["rdate"])[:10],
+                        int(row["n_holders"]) if pd.notna(row.get("n_holders")) else 0,
+                        float(row["total_shares"]) if pd.notna(row.get("total_shares")) else 0,
+                        int(row["n_buying"]) if pd.notna(row.get("n_buying")) else 0,
+                        int(row["n_selling"]) if pd.notna(row.get("n_selling")) else 0,
+                        int(row["n_unchanged"]) if pd.notna(row.get("n_unchanged")) else 0,
+                    ),
+                )
                 n += 1
             except Exception as exc:
                 logger.debug("13F ingest error: %s", exc)
@@ -420,12 +460,15 @@ class WRDSPointInTimeStore:
         Returns list of dicts ordered by rdate DESC (most recent first).
         """
         conn = self._conn()
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT * FROM inst_holdings_13f
             WHERE ticker = ? AND rdate <= ?
             ORDER BY rdate DESC
             LIMIT ?
-        """, (ticker.upper(), as_of_date, n_quarters)).fetchall()
+        """,
+            (ticker.upper(), as_of_date, n_quarters),
+        ).fetchall()
         conn.close()
         return [dict(r) for r in rows]
 
@@ -433,10 +476,13 @@ class WRDSPointInTimeStore:
         """Write all commercial migration tags to the database."""
         conn = self._conn()
         for table_name, tag in COMMERCIAL_TAGS.items():
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO commercial_tags (table_name, tag_json, etl_timestamp)
                 VALUES (?, ?, ?)
-            """, (table_name, json.dumps(tag), time.strftime("%Y-%m-%d %H:%M:%S")))
+            """,
+                (table_name, json.dumps(tag), time.strftime("%Y-%m-%d %H:%M:%S")),
+            )
         conn.commit()
         conn.close()
 
@@ -445,7 +491,13 @@ class WRDSPointInTimeStore:
     def summary(self) -> dict:
         conn = self._conn()
         result = {}
-        for table in ["compustat_quarterly", "ibes_consensus", "ibes_actuals", "ticker_link", "inst_holdings_13f"]:
+        for table in [
+            "compustat_quarterly",
+            "ibes_consensus",
+            "ibes_actuals",
+            "ticker_link",
+            "inst_holdings_13f",
+        ]:
             row = conn.execute(f"SELECT COUNT(*) as cnt FROM {table}").fetchone()
             result[table] = row["cnt"]
         # Ticker counts
@@ -492,7 +544,9 @@ class WRDSPointInTimeStore:
             "totalLiabilities": row.get("ltq"),
             "shortTermDebt": row.get("dlcq"),
             "longTermDebt": row.get("dlttq"),
-            "totalDebt": (row.get("dlcq") or 0) + (row.get("dlttq") or 0) if row.get("dlcq") is not None or row.get("dlttq") is not None else None,
+            "totalDebt": (row.get("dlcq") or 0) + (row.get("dlttq") or 0)
+            if row.get("dlcq") is not None or row.get("dlttq") is not None
+            else None,
             "cashAndCashEquivalents": row.get("cheq"),
             "totalCurrentAssets": row.get("actq"),
             "totalCurrentLiabilities": row.get("lctq"),

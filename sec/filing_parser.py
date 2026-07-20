@@ -154,7 +154,7 @@ def _parse_filing_sections_legacy(html: str) -> Dict[str, str]:
     for key, budget in budgets.items():
         bounds = _find_section_boundaries(text, key)
         if bounds:
-            raw = text[bounds[0]:bounds[1]].strip()
+            raw = text[bounds[0] : bounds[1]].strip()
             result[key] = trim_text(raw, budget, marker="\n...[section trimmed]...")
         else:
             result[key] = ""
@@ -176,7 +176,7 @@ def _parse_tenq_sections_legacy(html: str) -> Dict[str, str]:
     for key, budget in budgets.items():
         bounds = _find_section_boundaries_generic(text, key, TENQ_ITEM_PATTERNS)
         if bounds:
-            raw = text[bounds[0]:bounds[1]].strip()
+            raw = text[bounds[0] : bounds[1]].strip()
             result[key] = trim_text(raw, budget, marker="\n...[section trimmed]...")
         else:
             result[key] = ""
@@ -244,12 +244,12 @@ def _parse_filing_sections_edgartools(ticker: str) -> Optional[Dict[str, str]]:
             return trim_text(text, budget, marker="\n...[section trimmed]...") if text else ""
 
         sections: Dict[str, str] = {
-            "mda":                  _trim(mda, settings.max_mda_chars),
-            "risk_factors":         _trim(risk, settings.max_risk_factors_chars),
+            "mda": _trim(mda, settings.max_mda_chars),
+            "risk_factors": _trim(risk, settings.max_risk_factors_chars),
             "business_description": _trim(biz, settings.max_biz_desc_chars),
-            "market_risk":          _trim(market_risk, settings.max_market_risk_chars),
-            "legal_proceedings":    _trim(legal, settings.max_legal_proceedings_chars),
-            "properties":           _trim(properties, settings.max_properties_chars),
+            "market_risk": _trim(market_risk, settings.max_market_risk_chars),
+            "legal_proceedings": _trim(legal, settings.max_legal_proceedings_chars),
+            "properties": _trim(properties, settings.max_properties_chars),
         }
 
         extracted_count = sum(1 for v in sections.values() if v)
@@ -324,8 +324,12 @@ def parse_filing_sections(html: str, ticker: str = "") -> Dict[str, str]:
       'market_risk', 'legal_proceedings', 'properties'
     """
     result: Dict[str, str] = {
-        "mda": "", "risk_factors": "", "business_description": "",
-        "market_risk": "", "legal_proceedings": "", "properties": "",
+        "mda": "",
+        "risk_factors": "",
+        "business_description": "",
+        "market_risk": "",
+        "legal_proceedings": "",
+        "properties": "",
     }
 
     if ticker and settings.enable_edgartools:
@@ -354,7 +358,9 @@ def parse_tenq_sections(html: str, ticker: str = "") -> Dict[str, str]:
     Returns dict with keys: 'tenq_mda', 'tenq_risk_update', 'tenq_market_risk'
     """
     result: Dict[str, str] = {
-        "tenq_mda": "", "tenq_risk_update": "", "tenq_market_risk": "",
+        "tenq_mda": "",
+        "tenq_risk_update": "",
+        "tenq_market_risk": "",
     }
 
     if ticker and settings.enable_edgartools:

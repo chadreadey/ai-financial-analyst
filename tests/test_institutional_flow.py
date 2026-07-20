@@ -142,16 +142,22 @@ class TestComputeInstitutionalFlowScore:
         from quant.institutional_flow import compute_institutional_flow_score
 
         current_snapshot = [
-            {"investorName": f"Fund{i}", "sharesNumber": 1_000_000 + i * 100_000,
-             "sharesNumberChange": 100_000}
+            {
+                "investorName": f"Fund{i}",
+                "sharesNumber": 1_000_000 + i * 100_000,
+                "sharesNumberChange": 100_000,
+            }
             for i in range(8)
         ] + [
             {"investorName": "Seller1", "sharesNumber": 500_000, "sharesNumberChange": -50_000},
             {"investorName": "Flat1", "sharesNumber": 300_000, "sharesNumberChange": 0},
         ]
         prior_snapshot = [
-            {"investorName": f"Fund{i}", "sharesNumber": 1_000_000 + i * 100_000 - 100_000,
-             "sharesNumberChange": 0}
+            {
+                "investorName": f"Fund{i}",
+                "sharesNumber": 1_000_000 + i * 100_000 - 100_000,
+                "sharesNumberChange": 0,
+            }
             for i in range(8)
         ] + [
             {"investorName": "Seller1", "sharesNumber": 550_000, "sharesNumberChange": 0},
@@ -172,8 +178,7 @@ class TestComputeInstitutionalFlowScore:
         from quant.institutional_flow import compute_institutional_flow_score
 
         current_snapshot = [
-            {"investorName": f"Fund{i}", "sharesNumber": 500_000,
-             "sharesNumberChange": -200_000}
+            {"investorName": f"Fund{i}", "sharesNumber": 500_000, "sharesNumberChange": -200_000}
             for i in range(8)
         ] + [
             {"investorName": "Buyer1", "sharesNumber": 600_000, "sharesNumberChange": 50_000},
@@ -200,7 +205,9 @@ class TestComputeInstitutionalFlowScore:
         from quant.institutional_flow import compute_institutional_flow_score
 
         score, meta = compute_institutional_flow_score(
-            current_snapshot=[{"investorName": "Solo", "sharesNumber": 100, "sharesNumberChange": 10}],
+            current_snapshot=[
+                {"investorName": "Solo", "sharesNumber": 100, "sharesNumberChange": 10}
+            ],
             prior_snapshot=[],
         )
 

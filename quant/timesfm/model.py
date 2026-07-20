@@ -61,6 +61,7 @@ class TimesFMModel:
             return None
 
         import os
+
         kwargs = {}
         checkpoint_dir = os.getenv("TIMESFM_CHECKPOINT_DIR", "").strip()
         if checkpoint_dir:
@@ -74,8 +75,11 @@ class TimesFMModel:
             for loader_name in ["TimesFM_2p5_200M_torch", "TimesFM_2_200M_torch"]:
                 loader = getattr(timesfm, loader_name, None)
                 if loader is not None:
-                    repo = ("google/timesfm-2.5-200m-pytorch" if "2p5" in loader_name
-                            else "google/timesfm-2.0-200m-pytorch")
+                    repo = (
+                        "google/timesfm-2.5-200m-pytorch"
+                        if "2p5" in loader_name
+                        else "google/timesfm-2.0-200m-pytorch"
+                    )
                     logger.info("Trying %s from %s", loader_name, repo)
                     model = loader.from_pretrained(repo, **kwargs)
                     break
@@ -96,9 +100,7 @@ class TimesFMModel:
                         )
                     )
                 except TypeError:
-                    model.compile(
-                        timesfm.ForecastConfig(max_horizon=256)
-                    )
+                    model.compile(timesfm.ForecastConfig(max_horizon=256))
 
             inst = cls(model, backend="timesfm")
             # Pre-warm
@@ -120,6 +122,7 @@ class TimesFMModel:
 
         try:
             import torch as _torch
+
             logger.info("Loading Chronos-T5-Small model (fallback)...")
             pipeline = ChronosPipeline.from_pretrained(
                 "amazon/chronos-t5-small",
@@ -194,6 +197,7 @@ class TimesFMModel:
 
     def _forecast_chronos(self, series, horizon):
         import torch
+
         context = torch.tensor(series, dtype=torch.float32)
         samples = self._model.predict(context, horizon, num_samples=50)
         samples_np = samples[0].numpy()

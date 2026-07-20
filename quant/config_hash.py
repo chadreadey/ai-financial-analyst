@@ -13,6 +13,7 @@ Design choices (documented in `.cursor/plans/modal-backtesting.md`):
     serialization scheme or blocklist changes so old hashes don't silently
     become non-dedup'd.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -24,16 +25,20 @@ from typing import Any, Iterable
 
 CONFIG_HASH_VERSION = 1
 
-_EXCLUDED_FIELDS: frozenset[str] = frozenset({
-    "verbose",
-    "output_dir",
-    "progress_cb",
-    "end_date_is_today",
-})
+_EXCLUDED_FIELDS: frozenset[str] = frozenset(
+    {
+        "verbose",
+        "output_dir",
+        "progress_cb",
+        "end_date_is_today",
+    }
+)
 
-_ORDER_INSENSITIVE_LIST_FIELDS: frozenset[str] = frozenset({
-    "tickers",
-})
+_ORDER_INSENSITIVE_LIST_FIELDS: frozenset[str] = frozenset(
+    {
+        "tickers",
+    }
+)
 
 _FLOAT_PRECISION = 10
 
@@ -58,6 +63,7 @@ def _coerce(value: Any) -> Any:
         return value
     try:
         import numpy as np
+
         if isinstance(value, np.integer):
             return int(value)
         if isinstance(value, np.floating):

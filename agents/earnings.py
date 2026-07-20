@@ -80,13 +80,24 @@ Lead with conclusions, then support with data."""
             parts.append("\n── Earnings Metrics ──")
             m = data.metrics
             for key in [
-                "revenue", "gross_profit", "operating_income", "net_income",
-                "eps_basic", "eps_diluted",
-                "gross_margin", "operating_margin", "net_margin",
-                "revenue_growth_yoy", "operating_cash_flow", "free_cash_flow",
-                "roe", "roa",
-                "revenue_cagr_3y", "revenue_cagr_5y",
-                "net_income_cagr_3y", "net_income_cagr_5y",
+                "revenue",
+                "gross_profit",
+                "operating_income",
+                "net_income",
+                "eps_basic",
+                "eps_diluted",
+                "gross_margin",
+                "operating_margin",
+                "net_margin",
+                "revenue_growth_yoy",
+                "operating_cash_flow",
+                "free_cash_flow",
+                "roe",
+                "roa",
+                "revenue_cagr_3y",
+                "revenue_cagr_5y",
+                "net_income_cagr_3y",
+                "net_income_cagr_5y",
                 "operating_leverage_5y",
             ]:
                 if key in m and m[key] is not None:
@@ -105,19 +116,31 @@ Lead with conclusions, then support with data."""
             rev = cf.get("earnings_revision")
             if rev:
                 if rev.get("is_analyst_consensus"):
-                    parts.append("\n── Analyst Consensus EPS Revision (more recent than SEC filing) ──")
+                    parts.append(
+                        "\n── Analyst Consensus EPS Revision (more recent than SEC filing) ──"
+                    )
                     parts.append(f"  Direction: {rev['direction']}")
-                    parts.append(f"  Current consensus EPS: ${rev['current_eps']:.3f} ({rev['current_date']}, {rev.get('num_analysts', '?')} analysts)")
-                    parts.append(f"  Prior consensus EPS: ${rev['prior_eps']:.3f} ({rev['prior_date']})")
+                    parts.append(
+                        f"  Current consensus EPS: ${rev['current_eps']:.3f} ({rev['current_date']}, {rev.get('num_analysts', '?')} analysts)"
+                    )
+                    parts.append(
+                        f"  Prior consensus EPS: ${rev['prior_eps']:.3f} ({rev['prior_date']})"
+                    )
                     parts.append(f"  Revision: {rev['revision_pct']:+.1f}%")
                     if rev["direction"] == "UP":
-                        parts.append("  NOTE: Positive analyst revisions are a leading bullish indicator (IC 0.04-0.10)")
+                        parts.append(
+                            "  NOTE: Positive analyst revisions are a leading bullish indicator (IC 0.04-0.10)"
+                        )
                     elif rev["direction"] == "DOWN":
-                        parts.append("  NOTE: Negative analyst revisions often precede earnings misses")
+                        parts.append(
+                            "  NOTE: Negative analyst revisions often precede earnings misses"
+                        )
                 else:
                     parts.append("\n── Sequential Quarterly EPS Trend ──")
                     parts.append(f"  Latest EPS: ${rev['current_eps']:.3f} ({rev['current_date']})")
-                    parts.append(f"  Prior quarter EPS: ${rev['prior_eps']:.3f} ({rev['prior_date']})")
+                    parts.append(
+                        f"  Prior quarter EPS: ${rev['prior_eps']:.3f} ({rev['prior_date']})"
+                    )
                     parts.append(f"  Change: {rev['revision_pct']:+.1f}%")
                     parts.append(f"  Direction: {rev['direction']}")
 

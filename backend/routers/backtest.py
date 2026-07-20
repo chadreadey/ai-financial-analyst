@@ -49,7 +49,9 @@ def _ensure_backtest_runs_table(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def _persist_run(config: BacktestConfigSchema, result: dict, nl_query: str = "", parser_model: str = "") -> None:
+def _persist_run(
+    config: BacktestConfigSchema, result: dict, nl_query: str = "", parser_model: str = ""
+) -> None:
     conn = sqlite3.connect(settings.warehouse_db_path)
     try:
         _ensure_backtest_runs_table(conn)
@@ -72,7 +74,9 @@ def _persist_run(config: BacktestConfigSchema, result: dict, nl_query: str = "",
         conn.close()
 
 
-def _run_backtest(job_id: str, config: BacktestConfigSchema, nl_query: str = "", parser_model: str = ""):
+def _run_backtest(
+    job_id: str, config: BacktestConfigSchema, nl_query: str = "", parser_model: str = ""
+):
     from backend.backtest_engine import BacktestConfig, BacktestEngine
 
     _jobs[job_id]["status"] = "running"
@@ -139,7 +143,9 @@ Rules:
     user_prompt = f"User query:\n{query}"
 
     try:
-        raw = await provider.generate(system=schema_prompt, user=user_prompt, model=parser_model, max_tokens=500)
+        raw = await provider.generate(
+            system=schema_prompt, user=user_prompt, model=parser_model, max_tokens=500
+        )
         parsed = _extract_json_block(raw)
         config = BacktestConfigSchema(
             tickers=[str(t).upper().strip() for t in parsed.get("tickers", []) if str(t).strip()],
@@ -195,7 +201,11 @@ _quant_jobs: dict[str, dict] = {}
 
 
 def _run_quant_backtest(job_id: str, payload: dict):
-    from quant.backtest import BacktestConfig as QBacktestConfig, run_backtest as qbt_run, run_walk_forward as qbt_wf
+    from quant.backtest import (
+        BacktestConfig as QBacktestConfig,
+        run_backtest as qbt_run,
+        run_walk_forward as qbt_wf,
+    )
 
     _quant_jobs[job_id]["status"] = "running"
     try:
@@ -249,6 +259,7 @@ async def get_quant_backtest_result(job_id: str):
 async def list_quant_universes():
     """List available stock universes for quant backtest."""
     from quant.universe import LIQUID_10, LIQUID_20, LIQUID_50
+
     return {
         "universes": {
             "liquid_10": {"tickers": LIQUID_10, "count": len(LIQUID_10)},

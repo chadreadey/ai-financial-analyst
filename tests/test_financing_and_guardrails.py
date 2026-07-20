@@ -6,6 +6,7 @@ Deliberately isolated from _compute_daily_portfolio_returns; those tests
 would require a full price universe. The pieces here are the math the
 engine relies on.
 """
+
 from __future__ import annotations
 
 import math
@@ -27,6 +28,7 @@ from quant.financing import (
 
 # ── config plumbing ─────────────────────────────────────────────────────
 
+
 def test_backtest_config_has_financing_fields():
     c = BacktestConfig()
     assert c.gross_exposure == 1.0
@@ -38,6 +40,7 @@ def test_backtest_config_has_financing_fields():
 
 
 # ── per-day accrual math ────────────────────────────────────────────────
+
 
 def test_daily_financing_zero_when_no_borrow():
     assert compute_daily_financing_charge(0.0, 0.04, 150.0) == 0.0
@@ -60,6 +63,7 @@ def test_daily_financing_zero_spread():
 
 # ── series-level accrual over a synthetic period ────────────────────────
 
+
 def _flat_sofr(dates, ann_rate: float = 0.04) -> pd.Series:
     return pd.Series(ann_rate, index=dates)
 
@@ -68,8 +72,10 @@ def test_financing_series_returns_empty_at_gross_1():
     dates = pd.date_range("2024-01-02", periods=5, freq="B")
     pnl = pd.Series([100.0, -50.0, 25.0, 0.0, 75.0], index=dates)
     out = compute_financing_series(
-        daily_pnl=pnl, initial_capital=100_000.0,
-        gross_exposure=1.0, sofr_series=_flat_sofr(dates),
+        daily_pnl=pnl,
+        initial_capital=100_000.0,
+        gross_exposure=1.0,
+        sofr_series=_flat_sofr(dates),
         spread_bps=150.0,
     )
     assert out.empty
@@ -84,8 +90,10 @@ def test_financing_series_matches_manual_calc_constant_rate():
     dates = pd.date_range("2024-01-02", periods=5, freq="B")
     pnl = pd.Series([100.0, -50.0, 25.0, 0.0, 75.0], index=dates)
     fin = compute_financing_series(
-        daily_pnl=pnl, initial_capital=100_000.0,
-        gross_exposure=1.5, sofr_series=_flat_sofr(dates, 0.04),
+        daily_pnl=pnl,
+        initial_capital=100_000.0,
+        gross_exposure=1.5,
+        sofr_series=_flat_sofr(dates, 0.04),
         spread_bps=150.0,
     )
     daily_rate = (0.04 + 0.015) / DEFAULT_TRADING_DAYS_PER_YEAR
@@ -100,13 +108,17 @@ def test_financing_series_scales_linearly_with_excess_gross():
     dates = pd.date_range("2024-01-02", periods=3, freq="B")
     pnl = pd.Series([0.0, 0.0, 0.0], index=dates)
     fin_15 = compute_financing_series(
-        daily_pnl=pnl, initial_capital=100_000.0,
-        gross_exposure=1.5, sofr_series=_flat_sofr(dates),
+        daily_pnl=pnl,
+        initial_capital=100_000.0,
+        gross_exposure=1.5,
+        sofr_series=_flat_sofr(dates),
         spread_bps=150.0,
     )
     fin_20 = compute_financing_series(
-        daily_pnl=pnl, initial_capital=100_000.0,
-        gross_exposure=2.0, sofr_series=_flat_sofr(dates),
+        daily_pnl=pnl,
+        initial_capital=100_000.0,
+        gross_exposure=2.0,
+        sofr_series=_flat_sofr(dates),
         spread_bps=150.0,
     )
     # 2.0x borrows 1.0*NAV, 1.5x borrows 0.5*NAV. Ratio should be 2:1.
@@ -118,8 +130,10 @@ def test_financing_series_uses_hardcoded_fallback_when_sofr_empty():
     dates = pd.date_range("2024-01-02", periods=3, freq="B")
     pnl = pd.Series([0.0, 0.0, 0.0], index=dates)
     fin = compute_financing_series(
-        daily_pnl=pnl, initial_capital=100_000.0,
-        gross_exposure=1.5, sofr_series=pd.Series(dtype=float),
+        daily_pnl=pnl,
+        initial_capital=100_000.0,
+        gross_exposure=1.5,
+        sofr_series=pd.Series(dtype=float),
         spread_bps=150.0,
     )
     daily_rate = (HARDCODED_BROKER_CALL_ANN_RATE + 0.015) / DEFAULT_TRADING_DAYS_PER_YEAR
@@ -128,6 +142,7 @@ def test_financing_series_uses_hardcoded_fallback_when_sofr_empty():
 
 
 # ── guardrail checker ───────────────────────────────────────────────────
+
 
 def _synthetic_curve(drawdown_frac: float) -> tuple[pd.Series, pd.Series]:
     """Build a NAV curve with a peak then a defined drawdown."""
@@ -144,9 +159,12 @@ def _synthetic_curve(drawdown_frac: float) -> tuple[pd.Series, pd.Series]:
 def test_guardrail_passes_when_no_gates_set():
     equity, rets = _synthetic_curve(0.10)
     ev = evaluate_guardrails(
-        equity_curve=equity, daily_returns=rets,
-        financing_dollars_paid=0.0, initial_capital=100_000.0,
-        gross_exposure=1.5, guardrails=LeverageGuardrails(),
+        equity_curve=equity,
+        daily_returns=rets,
+        financing_dollars_paid=0.0,
+        initial_capital=100_000.0,
+        gross_exposure=1.5,
+        guardrails=LeverageGuardrails(),
     )
     assert ev.passed
     assert ev.breaches == []
@@ -155,8 +173,10 @@ def test_guardrail_passes_when_no_gates_set():
 def test_guardrail_fails_on_max_drawdown_breach():
     equity, rets = _synthetic_curve(0.30)  # 30% drawdown
     ev = evaluate_guardrails(
-        equity_curve=equity, daily_returns=rets,
-        financing_dollars_paid=0.0, initial_capital=100_000.0,
+        equity_curve=equity,
+        daily_returns=rets,
+        financing_dollars_paid=0.0,
+        initial_capital=100_000.0,
         gross_exposure=1.5,
         guardrails=LeverageGuardrails(max_drawdown_pct=0.25),
     )
@@ -168,8 +188,10 @@ def test_guardrail_fails_on_max_drawdown_breach():
 def test_guardrail_passes_when_max_drawdown_under_cap():
     equity, rets = _synthetic_curve(0.10)
     ev = evaluate_guardrails(
-        equity_curve=equity, daily_returns=rets,
-        financing_dollars_paid=0.0, initial_capital=100_000.0,
+        equity_curve=equity,
+        daily_returns=rets,
+        financing_dollars_paid=0.0,
+        initial_capital=100_000.0,
         gross_exposure=1.5,
         guardrails=LeverageGuardrails(max_drawdown_pct=0.25),
     )
@@ -180,8 +202,10 @@ def test_guardrail_fails_stressed_day_at_2x_gross():
     # 2.0x gross × 8% shock = 16% NAV loss > 15% cap
     equity, rets = _synthetic_curve(0.05)
     ev = evaluate_guardrails(
-        equity_curve=equity, daily_returns=rets,
-        financing_dollars_paid=0.0, initial_capital=100_000.0,
+        equity_curve=equity,
+        daily_returns=rets,
+        financing_dollars_paid=0.0,
+        initial_capital=100_000.0,
         gross_exposure=2.0,
         guardrails=LeverageGuardrails(stressed_day_loss_pct=0.15),
     )
@@ -193,8 +217,10 @@ def test_guardrail_passes_stressed_day_at_15x_gross():
     # 1.5x × 8% = 12% < 15% cap
     equity, rets = _synthetic_curve(0.05)
     ev = evaluate_guardrails(
-        equity_curve=equity, daily_returns=rets,
-        financing_dollars_paid=0.0, initial_capital=100_000.0,
+        equity_curve=equity,
+        daily_returns=rets,
+        financing_dollars_paid=0.0,
+        initial_capital=100_000.0,
         gross_exposure=1.5,
         guardrails=LeverageGuardrails(stressed_day_loss_pct=0.15),
     )
@@ -208,8 +234,10 @@ def test_guardrail_financing_frac_of_excess_return_breach():
     equity = pd.Series(np.linspace(100_000, 110_000, 10), index=dates)
     rets = equity.pct_change().fillna(0.0)
     ev = evaluate_guardrails(
-        equity_curve=equity, daily_returns=rets,
-        financing_dollars_paid=2_000.0, initial_capital=100_000.0,
+        equity_curve=equity,
+        daily_returns=rets,
+        financing_dollars_paid=2_000.0,
+        initial_capital=100_000.0,
         gross_exposure=1.5,
         guardrails=LeverageGuardrails(financing_cost_cap_frac_of_excess_return=0.30),
         benchmark_return_pct=5.0,
@@ -230,8 +258,10 @@ def test_guardrail_strategy_return_pct_override_matches_reported_alpha():
     equity = pd.Series(np.linspace(100_000, 200_000, 10), index=dates)
     rets = equity.pct_change().fillna(0.0)
     ev = evaluate_guardrails(
-        equity_curve=equity, daily_returns=rets,
-        financing_dollars_paid=1_000.0, initial_capital=100_000.0,
+        equity_curve=equity,
+        daily_returns=rets,
+        financing_dollars_paid=1_000.0,
+        initial_capital=100_000.0,
         gross_exposure=1.5,
         guardrails=LeverageGuardrails(financing_cost_cap_frac_of_excess_return=0.30),
         benchmark_return_pct=200.0,
@@ -246,8 +276,10 @@ def test_guardrail_financing_frac_pass():
     equity = pd.Series(np.linspace(100_000, 110_000, 10), index=dates)
     rets = equity.pct_change().fillna(0.0)
     ev = evaluate_guardrails(
-        equity_curve=equity, daily_returns=rets,
-        financing_dollars_paid=500.0, initial_capital=100_000.0,
+        equity_curve=equity,
+        daily_returns=rets,
+        financing_dollars_paid=500.0,
+        initial_capital=100_000.0,
         gross_exposure=1.5,
         guardrails=LeverageGuardrails(financing_cost_cap_frac_of_excess_return=0.30),
         benchmark_return_pct=5.0,

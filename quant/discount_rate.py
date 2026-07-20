@@ -149,7 +149,7 @@ def format_wacc_context(
     lines = ["=== Discount Rate Data ==="]
 
     if risk_free_rate is not None:
-        lines.append(f"  Risk-Free Rate (10Y interpolated): {risk_free_rate*100:.2f}%")
+        lines.append(f"  Risk-Free Rate (10Y interpolated): {risk_free_rate * 100:.2f}%")
 
     if yield_curve:
         lines.append("  Treasury Yield Curve:")

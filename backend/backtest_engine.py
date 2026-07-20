@@ -81,6 +81,7 @@ def _fetch_prices(ticker: str, conn: sqlite3.Connection) -> dict[str, float]:
 
     try:
         from price_provider import get_price_provider
+
         client = get_price_provider()
         start = (datetime.now() - timedelta(days=1825)).strftime("%Y-%m-%d")
         data = client.get_eod_history(ticker, start)
@@ -109,13 +110,15 @@ def _get_recommendations(tickers: list[str], conn_warehouse: sqlite3.Connection)
                 (ticker,),
             ).fetchall()
             for r in rows:
-                recs.append({
-                    "ticker": r[0],
-                    "run_at": r[1],
-                    "verdict": r[2],
-                    "conviction": r[3] if len(r) > 3 else "",
-                    "composite_score": r[4] if len(r) > 4 else None,
-                })
+                recs.append(
+                    {
+                        "ticker": r[0],
+                        "run_at": r[1],
+                        "verdict": r[2],
+                        "conviction": r[3] if len(r) > 3 else "",
+                        "composite_score": r[4] if len(r) > 4 else None,
+                    }
+                )
     except sqlite3.OperationalError:
         pass
     return recs
@@ -168,7 +171,9 @@ class BacktestEngine:
                 exit_date = None
                 exit_price = None
                 exit_reason = "time_decay"
-                deadline = (datetime.strptime(entry_date, "%Y-%m-%d") + timedelta(days=self.TIME_DECAY_DAYS)).strftime("%Y-%m-%d")
+                deadline = (
+                    datetime.strptime(entry_date, "%Y-%m-%d") + timedelta(days=self.TIME_DECAY_DAYS)
+                ).strftime("%Y-%m-%d")
 
                 for d in sorted_dates:
                     if d <= entry_date:
@@ -209,16 +214,18 @@ class BacktestEngine:
                 else:
                     pnl_pct = (entry_price - exit_price) / entry_price - self.TRANSACTION_COST * 2
 
-                trades.append({
-                    "ticker": ticker,
-                    "entry_date": entry_date,
-                    "entry_price": round(entry_price, 2),
-                    "exit_date": exit_date,
-                    "exit_price": round(exit_price, 2),
-                    "pnl_pct": round(pnl_pct * 100, 2),
-                    "exit_reason": exit_reason,
-                    "verdict": verdict,
-                })
+                trades.append(
+                    {
+                        "ticker": ticker,
+                        "entry_date": entry_date,
+                        "entry_price": round(entry_price, 2),
+                        "exit_date": exit_date,
+                        "exit_price": round(exit_price, 2),
+                        "pnl_pct": round(pnl_pct * 100, 2),
+                        "exit_reason": exit_reason,
+                        "verdict": verdict,
+                    }
+                )
 
             if not trades:
                 result.status = "insufficient_data"
@@ -239,7 +246,7 @@ class BacktestEngine:
             for t in trades_sorted:
                 ret = t["pnl_pct"] / 100
                 returns.append(ret)
-                equity *= (1 + ret)
+                equity *= 1 + ret
                 curve.append({"date": t["exit_date"], "equity": round(equity, 2)})
                 if equity > peak:
                     peak = equity
@@ -253,10 +260,13 @@ class BacktestEngine:
             if len(returns) > 1:
                 import pandas as pd
                 from quant.metrics import compute_sharpe, compute_sortino, compute_calmar
+
                 returns_series = pd.Series(returns)
                 result.sharpe = compute_sharpe(returns_series, min_observations=2)
                 result.sortino = compute_sortino(returns_series, min_observations=2)
-                annual_return = (equity / 10000) ** (252 / (len(returns) * self.TIME_DECAY_DAYS)) - 1
+                annual_return = (equity / 10000) ** (
+                    252 / (len(returns) * self.TIME_DECAY_DAYS)
+                ) - 1
                 result.calmar = compute_calmar(annual_return * 100, result.max_drawdown_pct)
 
             result.status = "complete"

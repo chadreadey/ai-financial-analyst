@@ -7,7 +7,14 @@ from sec.client import SECClient
 
 def test_fetch_filings_and_facts_delegates_to_helpers():
     client = SECClient()
-    filings = [{"form": "10-K", "accessionNumber": "1", "filingDate": "2025-01-01", "primaryDocument": "x.htm"}]
+    filings = [
+        {
+            "form": "10-K",
+            "accessionNumber": "1",
+            "filingDate": "2025-01-01",
+            "primaryDocument": "x.htm",
+        }
+    ]
     facts = {"entityName": "Test"}
 
     client.get_recent_filings = MagicMock(return_value=filings)
