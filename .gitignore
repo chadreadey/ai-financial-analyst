@@ -10,6 +10,14 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Python venvs and tool caches
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
 # Runtime artifacts
 .sec_cache.db
 .warehouse.db
