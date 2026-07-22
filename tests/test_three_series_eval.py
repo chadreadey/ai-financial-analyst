@@ -160,6 +160,28 @@ class TestAttribution:
         assert attr["ai_vs_quant"]["sharpe_delta"] is None
 
 
+class TestSharedEndDate:
+    def test_end_date_caps_final_holding_period(self):
+        dates = pd.date_range("2024-01-01", periods=500, freq="B")
+        prices = {"AAA": _make_trend_price(dates, 100.0, 0.001)}
+        portfolios = {
+            pd.Timestamp("2024-01-01"): Portfolio(pd.Timestamp("2024-01-01"), {"AAA": 1.0}),
+        }
+        capped = build_series("capped", portfolios, prices, end_date=pd.Timestamp("2024-03-01"))
+        uncapped = build_series("uncapped", portfolios, prices)
+        assert len(capped.daily_returns) < len(uncapped.daily_returns)
+        assert capped.daily_returns.index[-1] <= pd.Timestamp("2024-03-01")
+
+    def test_no_end_date_runs_to_eod(self):
+        dates = pd.date_range("2024-01-01", periods=50, freq="B")
+        prices = {"AAA": _make_trend_price(dates, 100.0, 0.001)}
+        portfolios = {
+            pd.Timestamp("2024-01-01"): Portfolio(pd.Timestamp("2024-01-01"), {"AAA": 1.0}),
+        }
+        result = build_series("uncapped", portfolios, prices)
+        assert result.daily_returns.index[-1] == dates[-1]
+
+
 class TestMarkdownReport:
     def test_report_contains_verdict(self):
         dates = pd.date_range("2024-01-01", periods=100, freq="B")

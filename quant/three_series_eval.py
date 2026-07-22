@@ -125,18 +125,31 @@ def build_series(
     name: str,
     portfolios_by_date: dict[pd.Timestamp, Portfolio],
     prices: dict[str, pd.DataFrame],
+    end_date: Optional[pd.Timestamp] = None,
 ) -> SeriesResult:
+    """
+    Build daily return series for a schedule of portfolios.
+
+    Args:
+        end_date: cap the final holding period at this date. If None, the
+            final period runs to end-of-price-history, which mismatches SPY
+            unless you separately cap the benchmark. Callers building the
+            three-series comparison should pass a shared `end_date`.
+    """
     dates = sorted(portfolios_by_date.keys())
     parts: list[pd.Series] = []
     for i, d in enumerate(dates):
-        next_d = dates[i + 1] if i + 1 < len(dates) else None
+        next_d = dates[i + 1] if i + 1 < len(dates) else end_date
         rets = _daily_returns_for_holding(portfolios_by_date[d], next_d, prices)
         parts.append(rets)
     if not parts:
         empty = pd.Series(dtype=float)
         return SeriesResult(name=name, daily_returns=empty, equity_curve=empty, metrics={})
     daily = pd.concat(parts).sort_index()
-    daily = daily[~daily.index.duplicated(keep="first")]
+    # Same-day rebalance-boundary contributions get summed (a ticker held
+    # across a weight change contributes returns from both slices at the
+    # boundary date). keep="first" would silently drop the second slice.
+    daily = daily.groupby(level=0).sum()
     equity = (1 + daily).cumprod()
     metrics = _compute_metrics(daily)
     return SeriesResult(name=name, daily_returns=daily, equity_curve=equity, metrics=metrics)

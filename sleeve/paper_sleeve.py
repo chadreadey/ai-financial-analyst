@@ -99,7 +99,9 @@ class PaperSleeve:
         if self.peak_sleeve_equity == 0.0:
             self.peak_sleeve_equity = self.sleeve_cash
 
-    def _check_open(self, idea: IdeaCard, max_loss: float) -> None:
+    def _check_open(
+        self, idea: IdeaCard, max_loss: float, entry_debit: float, max_profit: float
+    ) -> None:
         if self.halted:
             raise SleeveHalted(f"Sleeve halted: {self.halt_reason}")
         if max_loss <= 0:
@@ -115,6 +117,17 @@ class PaperSleeve:
                 f"Instrument {idea.instrument.value} not in allowed set "
                 f"{[i.value for i in self.config.allowed_instruments]}"
             )
+        # entry_debit sign encodes debit (>0, cash paid) vs credit (<0, cash
+        # received). Both are valid; sanity-check |entry_debit| ≤ max_loss so
+        # a mis-signed entry can't quietly exceed the risk cap.
+        if abs(entry_debit) > max_loss + 1e-9:
+            raise ValueError(
+                f"|entry_debit| {abs(entry_debit):.2f} > max_loss {max_loss:.2f} — "
+                "this contradicts the defined-risk claim. Check the entry_debit sign "
+                "(positive = cash paid, negative = cash received)."
+            )
+        if max_profit < 0:
+            raise ValueError(f"max_profit must be non-negative (got {max_profit:.2f})")
 
     def register_idea(self, idea: IdeaCard) -> None:
         self.ideas[idea.id] = idea
@@ -127,7 +140,17 @@ class PaperSleeve:
         entry_debit: float,
         entry_at: Optional[datetime] = None,
     ) -> Position:
-        self._check_open(idea, max_loss)
+        """
+        Open a paper position linked to an IdeaCard.
+
+        Cash-flow convention (matters for credit spreads):
+            entry_debit > 0  → cash paid; sleeve_cash -= entry_debit at open
+            entry_debit < 0  → cash received; sleeve_cash += |entry_debit|
+            entry_debit == 0 → no cash flow at open
+
+        See close_position for the matching pnl_realized convention.
+        """
+        self._check_open(idea, max_loss, entry_debit, max_profit)
         self.register_idea(idea)
         pos = Position(
             id=f"pos_{self._next_position_id}",
@@ -157,6 +180,23 @@ class PaperSleeve:
         reason: str = "target",
         closed_at: Optional[datetime] = None,
     ) -> Position:
+        """
+        Close a paper position.
+
+        pnl_realized convention: TOTAL trade P&L (final cash − initial cash),
+        NOT the incremental cash received at close. Same convention for debits
+        and credits.
+
+        Examples:
+          Debit spread paid 500, closed for 1500 → pnl_realized = +1000
+          Debit spread paid 500, expired worthless → pnl_realized = -500
+          Credit spread received 200, expired worthless (kept premium) → +200
+          Credit spread received 200, closed for 100 loss (paid 300 back) → -100
+
+        Cash flow at close: sleeve_cash += entry_debit + pnl_realized. This
+        "refunds" the debit that was subtracted at open and then applies the
+        total P&L, so sleeve_cash net change over the trade equals pnl_realized.
+        """
         pos = self._get(position_id)
         if not pos.is_open:
             raise ValueError(f"Position {position_id} already closed")

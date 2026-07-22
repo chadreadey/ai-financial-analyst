@@ -151,6 +151,44 @@ class TestSleeveDrawdownHalt:
         assert not s.halted
 
 
+class TestCreditSpreadAccounting:
+    """
+    Credit-spread P&L convention lock-in (P0 fix from PR #15 review).
+
+    Convention: pnl_realized is TOTAL trade P&L (final cash − initial cash),
+    NOT incremental cash at close. Cash flow at open uses -entry_debit;
+    at close uses +entry_debit + pnl_realized.
+    """
+
+    def test_credit_spread_expires_worthless(self):
+        s = PaperSleeve(nav=100_000.0)
+        idea = _mk_idea(instrument=Instrument.PUT_SPREAD)
+        pos = s.open_position(idea, max_loss=800.0, max_profit=200.0, entry_debit=-200.0)
+        assert s.sleeve_cash == pytest.approx(5_200)
+        s.close_position(pos.id, pnl_realized=200.0, reason="expired_worthless")
+        assert s.sleeve_cash == pytest.approx(5_200)
+
+    def test_credit_spread_max_loss(self):
+        s = PaperSleeve(nav=100_000.0)
+        idea = _mk_idea(instrument=Instrument.PUT_SPREAD)
+        pos = s.open_position(idea, max_loss=800.0, max_profit=200.0, entry_debit=-200.0)
+        assert s.sleeve_cash == pytest.approx(5_200)
+        s.close_position(pos.id, pnl_realized=-800.0, reason="max_loss")
+        assert s.sleeve_cash == pytest.approx(4_200)
+
+    def test_debit_gt_max_loss_rejected(self):
+        s = PaperSleeve(nav=100_000.0)
+        idea = _mk_idea()
+        with pytest.raises(ValueError, match="contradicts the defined-risk claim"):
+            s.open_position(idea, max_loss=300.0, max_profit=700.0, entry_debit=500.0)
+
+    def test_negative_max_profit_rejected(self):
+        s = PaperSleeve(nav=100_000.0)
+        idea = _mk_idea()
+        with pytest.raises(ValueError, match="max_profit must be non-negative"):
+            s.open_position(idea, max_loss=500.0, max_profit=-100.0, entry_debit=500.0)
+
+
 class TestPersistence:
     def test_to_json_roundtrippable_shape(self):
         s = PaperSleeve(nav=100_000.0)

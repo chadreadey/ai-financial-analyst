@@ -115,18 +115,25 @@ def run(
     )
     ai_ports = portfolios_from_ai_picks(ai_pick_files)
 
-    quant = build_series("Quant-only", quant_ports, prices)
-    ai = build_series("AI-augmented", ai_ports, prices)
-
     all_dates = sorted(set(quant_ports.keys()) | set(ai_ports.keys()))
     if not all_dates:
         raise RuntimeError("No rebalance dates found in candidate/AI pick files")
     start = all_dates[0]
-    end = all_dates[-1] + pd.Timedelta(days=45)
 
+    # Shared end date so all three series cover the same window.
+    # Cap the final holding period at min(last_rebalance + monthly_horizon,
+    # SPY last date) — otherwise the portfolio series runs to end-of-price-
+    # cache (unbounded) while SPY is truncated, silently inflating one side.
     spy_df = prices.get("SPY")
     if spy_df is None:
         raise RuntimeError("SPY not in price cache — cannot build benchmark")
+
+    monthly_horizon_days = 30
+    natural_end = all_dates[-1] + pd.Timedelta(days=monthly_horizon_days)
+    end = min(natural_end, pd.Timestamp(spy_df.index[-1]))
+
+    quant = build_series("Quant-only", quant_ports, prices, end_date=end)
+    ai = build_series("AI-augmented", ai_ports, prices, end_date=end)
     spy = build_spy_series(spy_df, start, end)
 
     attr = attribution(ai, quant, spy)
