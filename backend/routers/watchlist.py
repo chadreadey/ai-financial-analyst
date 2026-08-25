@@ -57,13 +57,15 @@ async def list_watchlist():
     for r in rows:
         t = r["ticker"]
         hist = latest.get(t)
-        entries.append(WatchlistEntry(
-            ticker=t,
-            added_at=r["added_at"] or "",
-            latest_verdict=hist["verdict"] if hist else None,
-            latest_conviction=hist["conviction"] if hist else None,
-            latest_score=hist["composite_score"] if hist else None,
-        ))
+        entries.append(
+            WatchlistEntry(
+                ticker=t,
+                added_at=r["added_at"] or "",
+                latest_verdict=hist["verdict"] if hist else None,
+                latest_conviction=hist["conviction"] if hist else None,
+                latest_score=hist["composite_score"] if hist else None,
+            )
+        )
     return {"entries": entries}
 
 
@@ -90,7 +92,9 @@ async def remove_from_watchlist(ticker: str):
     return {"status": "ok", "ticker": ticker.upper()}
 
 
-def _compute_outcome(verdict: str, entry_price: float | None, current_price: float | None) -> str | None:
+def _compute_outcome(
+    verdict: str, entry_price: float | None, current_price: float | None
+) -> str | None:
     if entry_price is None or current_price is None or entry_price <= 0:
         return None
     v = (verdict or "").upper()
@@ -112,6 +116,7 @@ async def get_watchlist_summary(ticker: str):
     if tiingo_key:
         try:
             from tiingo_client import TiingoClient
+
             client = TiingoClient(tiingo_key)
             data = client.get_quote(ticker)
             if data:
@@ -130,8 +135,7 @@ async def get_watchlist_summary(ticker: str):
         ).fetchall()
         conn.close()
         outcomes = [
-            _compute_outcome(r["verdict"], r["entry_price_at_run"], current_price)
-            for r in rows
+            _compute_outcome(r["verdict"], r["entry_price_at_run"], current_price) for r in rows
         ]
         scored = [o for o in outcomes if o is not None]
         if scored:

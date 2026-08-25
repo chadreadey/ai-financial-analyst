@@ -21,10 +21,18 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 FEATURE_COLS = [
-    "obv_trend", "earnings", "inst_flow", "sentiment",
-    "quality", "price_mom", "insider", "event_timing",
-    "atr_pct", "vix_level",
-    "price_regression", "arima_forecast",
+    "obv_trend",
+    "earnings",
+    "inst_flow",
+    "sentiment",
+    "quality",
+    "price_mom",
+    "insider",
+    "event_timing",
+    "atr_pct",
+    "vix_level",
+    "price_regression",
+    "arima_forecast",
 ]
 
 
@@ -76,6 +84,7 @@ class XGBMetaModel:
 
     def load(self, path: str) -> None:
         from xgboost import XGBRanker
+
         self._model = XGBRanker()
         self._model.load_model(path)
 

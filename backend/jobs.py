@@ -118,7 +118,10 @@ def run_analysis_job(job: JobState, request, auto_paper_trade: Optional[bool] = 
         from report import save_report, save_pdf_report
 
         cache = SECCache()
-        sec_client = SECClient(user_agent=os.getenv("SEC_USER_AGENT", "AIFinancialAnalyst admin@example.com"), cache=cache)
+        sec_client = SECClient(
+            user_agent=os.getenv("SEC_USER_AGENT", "AIFinancialAnalyst admin@example.com"),
+            cache=cache,
+        )
         orchestrator = Orchestrator(
             sec_client=sec_client,
             llm_provider_name=request.provider,

@@ -60,12 +60,16 @@ class FakeProvider:
 # → revision_pct = +25% → ERM raw score = +1.0 → blended ~ +0.7+ (well > 0.20)
 def _strong_estimates() -> list[dict]:
     return [
-        {"epsAvg": 2.50, "date": "2024-06-01", "numAnalystsEps": 10,
-         "numUp": 8, "numDown": 1},
+        {"epsAvg": 2.50, "date": "2024-06-01", "numAnalystsEps": 10, "numUp": 8, "numDown": 1},
         {"epsAvg": 2.40, "date": "2024-05-01", "numAnalystsEps": 10},
         {"epsAvg": 2.20, "date": "2024-04-01", "numAnalystsEps": 10},
-        {"epsAvg": 2.00, "date": "2024-02-15", "numAnalystsEps": 10,
-         "numUp": 1, "numDown": 5},  # 3 months back
+        {
+            "epsAvg": 2.00,
+            "date": "2024-02-15",
+            "numAnalystsEps": 10,
+            "numUp": 1,
+            "numDown": 5,
+        },  # 3 months back
         {"epsAvg": 1.95, "date": "2024-01-15", "numAnalystsEps": 10},
     ]
 
@@ -74,12 +78,10 @@ def _strong_estimates() -> list[dict]:
 # → revision_pct = -25% → ERM raw score ≈ -1.0 (well < 0.20 threshold)
 def _weak_estimates() -> list[dict]:
     return [
-        {"epsAvg": 1.50, "date": "2024-06-01", "numAnalystsEps": 10,
-         "numUp": 1, "numDown": 8},
+        {"epsAvg": 1.50, "date": "2024-06-01", "numAnalystsEps": 10, "numUp": 1, "numDown": 8},
         {"epsAvg": 1.60, "date": "2024-05-01", "numAnalystsEps": 10},
         {"epsAvg": 1.80, "date": "2024-04-01", "numAnalystsEps": 10},
-        {"epsAvg": 2.00, "date": "2024-02-15", "numAnalystsEps": 10,
-         "numUp": 5, "numDown": 1},
+        {"epsAvg": 2.00, "date": "2024-02-15", "numAnalystsEps": 10, "numUp": 5, "numDown": 1},
         {"epsAvg": 2.10, "date": "2024-01-15", "numAnalystsEps": 10},
     ]
 
@@ -99,7 +101,6 @@ def _flat_balance_sheet() -> list[dict]:
 
 
 class TestComputeFundamentalStrengthVeto:
-
     def test_strong_fundamentals_trigger_veto(self):
         provider = FakeProvider(
             analyst_estimates=_strong_estimates(),
@@ -107,7 +108,10 @@ class TestComputeFundamentalStrengthVeto:
         )
         sv = _make_sv(quality=0.5)  # strong cross-sectional quality > 0.30
         is_strong, meta = compute_fundamental_strength_veto(
-            "STRONG", provider, sv, as_of_date=date(2024, 6, 30),
+            "STRONG",
+            provider,
+            sv,
+            as_of_date=date(2024, 6, 30),
         )
         assert is_strong is True
         # At minimum quality > threshold OR ERM > threshold should fire
@@ -124,7 +128,10 @@ class TestComputeFundamentalStrengthVeto:
         )
         sv = _make_sv(quality=-0.5)  # weak quality
         is_strong, meta = compute_fundamental_strength_veto(
-            "WEAK", provider, sv, as_of_date=date(2024, 6, 30),
+            "WEAK",
+            provider,
+            sv,
+            as_of_date=date(2024, 6, 30),
         )
         assert is_strong is False
         assert meta["n_flags"] == 0
@@ -139,7 +146,10 @@ class TestComputeFundamentalStrengthVeto:
         provider = FakeProvider(analyst_estimates=[], balance_sheet=[])
         sv = _make_sv(quality=0.0)
         is_strong, meta = compute_fundamental_strength_veto(
-            "MISSING", provider, sv, as_of_date=date(2024, 6, 30),
+            "MISSING",
+            provider,
+            sv,
+            as_of_date=date(2024, 6, 30),
         )
         assert is_strong is False
         assert meta["n_flags"] == 0
@@ -147,7 +157,6 @@ class TestComputeFundamentalStrengthVeto:
 
 
 class TestApplyShortFundamentalVeto:
-
     def test_strong_short_rejected(self):
         provider = FakeProvider(
             analyst_estimates=_strong_estimates(),
@@ -155,7 +164,9 @@ class TestApplyShortFundamentalVeto:
         )
         candidates = [("STRONG", -0.55, _make_sv(quality=0.6))]
         survivors, log = apply_short_fundamental_veto(
-            candidates, provider, as_of_date=date(2024, 6, 30),
+            candidates,
+            provider,
+            as_of_date=date(2024, 6, 30),
             min_strong_signals=1,
         )
         assert len(survivors) == 0
@@ -170,7 +181,9 @@ class TestApplyShortFundamentalVeto:
         )
         candidates = [("WEAK", -0.55, _make_sv(quality=-0.5))]
         survivors, log = apply_short_fundamental_veto(
-            candidates, provider, as_of_date=date(2024, 6, 30),
+            candidates,
+            provider,
+            as_of_date=date(2024, 6, 30),
             min_strong_signals=1,
         )
         assert len(survivors) == 1
@@ -181,7 +194,9 @@ class TestApplyShortFundamentalVeto:
         provider = FakeProvider(analyst_estimates=[], balance_sheet=[])
         candidates = [("UNKNOWN", -0.55, _make_sv(quality=0.0))]
         survivors, log = apply_short_fundamental_veto(
-            candidates, provider, as_of_date=date(2024, 6, 30),
+            candidates,
+            provider,
+            as_of_date=date(2024, 6, 30),
             min_strong_signals=1,
         )
         assert len(survivors) == 1
@@ -199,7 +214,9 @@ class TestApplyShortFundamentalVeto:
         # quality > 0.30 → 1 flag only
         candidates = [("ONEFLAG", -0.55, _make_sv(quality=0.6))]
         survivors, log = apply_short_fundamental_veto(
-            candidates, provider, as_of_date=date(2024, 6, 30),
+            candidates,
+            provider,
+            as_of_date=date(2024, 6, 30),
             min_strong_signals=2,
         )
         assert len(survivors) == 1
@@ -223,11 +240,13 @@ class TestApplyShortFundamentalVeto:
         # behavior consistent with the multi-ticker case.
         s1, l1 = apply_short_fundamental_veto(
             [("STRONG", -0.6, _make_sv(quality=0.6))],
-            provider_strong, as_of_date=date(2024, 6, 30),
+            provider_strong,
+            as_of_date=date(2024, 6, 30),
         )
         s2, l2 = apply_short_fundamental_veto(
             [("WEAK", -0.5, _make_sv(quality=-0.5))],
-            provider_weak, as_of_date=date(2024, 6, 30),
+            provider_weak,
+            as_of_date=date(2024, 6, 30),
         )
 
         assert len(s1) == 0 and len(l1) == 1

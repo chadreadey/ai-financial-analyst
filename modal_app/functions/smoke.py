@@ -6,6 +6,7 @@ Run via:
     modal run modal_app.functions.smoke::ping
     modal run modal_app.functions.smoke::run_tiny_cpcv
 """
+
 from __future__ import annotations
 
 import logging

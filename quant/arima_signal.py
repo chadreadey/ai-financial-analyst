@@ -46,7 +46,7 @@ def compute_arima_forecast_score(
     if len(prices) < lookback + horizon:
         return 0.0
 
-    recent = prices.iloc[-(lookback + horizon):-horizon]
+    recent = prices.iloc[-(lookback + horizon) : -horizon]
     raw = recent.values.astype(float)
     if np.any(np.isnan(raw)) or np.any(raw <= 0):
         return 0.0

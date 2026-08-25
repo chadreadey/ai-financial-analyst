@@ -12,6 +12,7 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(project_root) / ".env")
 
 from config import settings
@@ -28,6 +29,7 @@ if _dsn:
     try:
         import sentry_sdk
         from sentry_sdk.integrations.fastapi import FastApiIntegration
+
         sentry_sdk.init(
             dsn=_dsn,
             environment=os.getenv("SENTRY_ENVIRONMENT", "production"),
@@ -45,6 +47,7 @@ async def lifespan(app: FastAPI):
     if settings.alpaca_api_key and settings.alpaca_secret_key:
         try:
             from backend.paper_scheduler import create_scheduler
+
             _scheduler = create_scheduler(start=True)
             logger.info("Paper trading scheduler started")
         except Exception as exc:
@@ -57,6 +60,7 @@ async def lifespan(app: FastAPI):
         # — we do not block SIGTERM forever.
         try:
             from modal_app.dispatcher import snapshot_active_threads
+
             threads = snapshot_active_threads()
             if threads:
                 logger.info(
@@ -71,7 +75,8 @@ async def lifespan(app: FastAPI):
                     logger.warning(
                         "lifespan: CPCV dispatch thread %s still running after "
                         "%.1fs — proceeding with shutdown; stale sweeper will finalize",
-                        t.name, per_thread_budget,
+                        t.name,
+                        per_thread_budget,
                     )
         except Exception as exc:  # noqa: BLE001
             logger.warning("lifespan CPCV thread drain failed: %s", exc)

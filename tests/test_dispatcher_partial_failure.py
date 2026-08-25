@@ -8,6 +8,7 @@ This is a regression guard for the partial-failure contract; full recovery
 logic (retry queue, divergence alerting) belongs in the DB reviewer's DLQ
 plan and is intentionally out of scope here.
 """
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -20,6 +21,7 @@ def _make_minimal_config():
     `config.tickers` assertion. Avoids importing heavy providers.
     """
     from quant.backtest import BacktestConfig
+
     return BacktestConfig(
         tickers=["AAPL"],
         start_date="2022-01-01",
@@ -38,6 +40,7 @@ def test_sqlite_row_persists_when_supabase_upsert_fails(tmp_path, monkeypatch):
     db_file = tmp_path / "cpcv_test.db"
     # settings.warehouse_db_path is read inside _connect().
     from config import settings as cfg_settings
+
     monkeypatch.setattr(cfg_settings, "warehouse_db_path", str(db_file), raising=False)
     # Force the module to rebuild the schema against this fresh DB.
     monkeypatch.setattr(sqlite_mod, "_SCHEMA_READY", False, raising=False)
@@ -51,6 +54,7 @@ def test_sqlite_row_persists_when_supabase_upsert_fails(tmp_path, monkeypatch):
     monkeypatch.setattr(supa_mod, "upsert_run", supa_upsert)
 
     from modal_app.dispatcher import kickoff_cpcv_background
+
     config = _make_minimal_config()
 
     # kickoff_cpcv_background will call cpcv_sqlite.upsert_run synchronously
@@ -80,16 +84,16 @@ def test_supabase_failure_does_not_leak_state_across_runs(tmp_path, monkeypatch)
 
     db_file = tmp_path / "cpcv_test2.db"
     from config import settings as cfg_settings
+
     monkeypatch.setattr(cfg_settings, "warehouse_db_path", str(db_file), raising=False)
     monkeypatch.setattr(sqlite_mod, "_SCHEMA_READY", False, raising=False)
 
     monkeypatch.setattr(supa_mod, "is_enabled", lambda: True)
 
     # First call: Supabase raises.
-    monkeypatch.setattr(
-        supa_mod, "upsert_run", MagicMock(side_effect=RuntimeError("boom"))
-    )
+    monkeypatch.setattr(supa_mod, "upsert_run", MagicMock(side_effect=RuntimeError("boom")))
     from modal_app.dispatcher import kickoff_cpcv_background
+
     config = _make_minimal_config()
     with pytest.raises(RuntimeError):
         kickoff_cpcv_background(config, local=True, max_combos=1)

@@ -175,7 +175,7 @@ class Settings(BaseSettings):
         default="",
         description=(
             "Shared secret for internal API endpoints (backtest dispatch, etc). "
-            "Must be set in production. Generate with: python -c \"import secrets; print(secrets.token_hex(32))\""
+            'Must be set in production. Generate with: python -c "import secrets; print(secrets.token_hex(32))"'
         ),
     )
 

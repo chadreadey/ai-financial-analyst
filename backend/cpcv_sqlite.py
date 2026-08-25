@@ -10,6 +10,7 @@ don't clobber the legacy `backtest_runs` schema in backend/routers/backtest.py.
 Every public function is safe to call repeatedly — tables are created on
 first write.
 """
+
 from __future__ import annotations
 
 import json
@@ -157,6 +158,7 @@ def _json_default(v):
 
 # ── cpcv_runs ────────────────────────────────────────────────────────────
 
+
 def upsert_run(row: dict[str, Any]) -> bool:
     """Insert or update a cpcv_runs row (keyed by run_id)."""
     try:
@@ -213,15 +215,31 @@ def upsert_run(row: dict[str, Any]) -> bool:
 # Columns patch_run is allowed to touch. Excludes run_id (primary key)
 # and created_at (immutable). Derived from the schema at
 # `_ensure_schema` — update together when adding new columns.
-_PATCHABLE_RUN_COLS: frozenset[str] = frozenset({
-    "config_hash", "git_sha", "status", "universe",
-    "n_groups", "n_test_groups", "n_combinations",
-    "n_completed", "n_skipped", "n_failed",
-    "median_oos_sharpe", "oos_sharpe_min", "oos_sharpe_max",
-    "pbo", "deflated_sharpe",
-    "config_json", "metrics_json", "error", "modal_call_id",
-    "started_at", "finished_at",
-})
+_PATCHABLE_RUN_COLS: frozenset[str] = frozenset(
+    {
+        "config_hash",
+        "git_sha",
+        "status",
+        "universe",
+        "n_groups",
+        "n_test_groups",
+        "n_combinations",
+        "n_completed",
+        "n_skipped",
+        "n_failed",
+        "median_oos_sharpe",
+        "oos_sharpe_min",
+        "oos_sharpe_max",
+        "pbo",
+        "deflated_sharpe",
+        "config_json",
+        "metrics_json",
+        "error",
+        "modal_call_id",
+        "started_at",
+        "finished_at",
+    }
+)
 
 
 def patch_run(run_id: str, patch: dict[str, Any]) -> bool:
@@ -231,8 +249,7 @@ def patch_run(run_id: str, patch: dict[str, Any]) -> bool:
     unknown = set(patch.keys()) - _PATCHABLE_RUN_COLS
     if unknown:
         raise ValueError(
-            f"patch_run: unknown columns {sorted(unknown)} "
-            f"(allowed: {sorted(_PATCHABLE_RUN_COLS)})"
+            f"patch_run: unknown columns {sorted(unknown)} (allowed: {sorted(_PATCHABLE_RUN_COLS)})"
         )
     try:
         conn = _connect()
@@ -254,6 +271,7 @@ def patch_run(run_id: str, patch: dict[str, Any]) -> bool:
 
 
 # ── cpcv_combinations ────────────────────────────────────────────────────
+
 
 def insert_combinations_batch(rows: list[dict[str, Any]]) -> tuple[int, int]:
     if not rows:
@@ -302,6 +320,7 @@ def insert_combinations_batch(rows: list[dict[str, Any]]) -> tuple[int, int]:
 
 
 # ── cpcv_trades ──────────────────────────────────────────────────────────
+
 
 def insert_trades_batch(rows: list[dict[str, Any]]) -> tuple[int, int]:
     if not rows:
@@ -357,6 +376,7 @@ def insert_trades_batch(rows: list[dict[str, Any]]) -> tuple[int, int]:
 
 # ── cpcv_events ──────────────────────────────────────────────────────────
 
+
 def insert_event(row: dict[str, Any]) -> bool:
     try:
         conn = _connect()
@@ -393,27 +413,67 @@ def insert_event(row: dict[str, Any]) -> bool:
 # when Supabase is disabled, and are also used by the stale-run sweeper.
 
 _RUN_COLS = [
-    "run_id", "config_hash", "git_sha", "status", "universe",
-    "n_groups", "n_test_groups", "n_combinations",
-    "n_completed", "n_skipped", "n_failed",
-    "median_oos_sharpe", "oos_sharpe_min", "oos_sharpe_max",
-    "pbo", "deflated_sharpe",
-    "config_json", "metrics_json", "error", "modal_call_id",
-    "started_at", "finished_at", "updated_at",
+    "run_id",
+    "config_hash",
+    "git_sha",
+    "status",
+    "universe",
+    "n_groups",
+    "n_test_groups",
+    "n_combinations",
+    "n_completed",
+    "n_skipped",
+    "n_failed",
+    "median_oos_sharpe",
+    "oos_sharpe_min",
+    "oos_sharpe_max",
+    "pbo",
+    "deflated_sharpe",
+    "config_json",
+    "metrics_json",
+    "error",
+    "modal_call_id",
+    "started_at",
+    "finished_at",
+    "updated_at",
 ]
 
 _COMBO_COLS = [
-    "run_id", "combo_idx", "status", "train_indices_json", "test_indices_json",
-    "oos_sharpe", "return_pct", "n_trades", "n_test_dates",
-    "elapsed_seconds", "git_sha", "error", "gates_json", "created_at",
+    "run_id",
+    "combo_idx",
+    "status",
+    "train_indices_json",
+    "test_indices_json",
+    "oos_sharpe",
+    "return_pct",
+    "n_trades",
+    "n_test_dates",
+    "elapsed_seconds",
+    "git_sha",
+    "error",
+    "gates_json",
+    "created_at",
 ]
 
 _TRADE_COLS = [
-    "run_id", "combo_idx", "trade_idx", "ticker", "direction",
-    "entry_date", "exit_date", "entry_price", "exit_price",
-    "pnl_dollar", "pnl_pct", "holding_days", "exit_reason",
-    "composite_score", "regime_at_entry", "signals_at_entry_json",
-    "flags_json", "created_at",
+    "run_id",
+    "combo_idx",
+    "trade_idx",
+    "ticker",
+    "direction",
+    "entry_date",
+    "exit_date",
+    "entry_price",
+    "exit_price",
+    "pnl_dollar",
+    "pnl_pct",
+    "holding_days",
+    "exit_reason",
+    "composite_score",
+    "regime_at_entry",
+    "signals_at_entry_json",
+    "flags_json",
+    "created_at",
 ]
 
 _EVENT_COLS = ["id", "run_id", "kind", "combo_idx", "payload", "created_at"]

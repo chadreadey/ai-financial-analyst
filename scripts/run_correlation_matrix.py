@@ -119,7 +119,9 @@ def get_wrds_universe() -> list[str]:
 
 
 def generate_monthly_rebalance_dates(
-    start: pd.Timestamp, end: pd.Timestamp, trading_dates: pd.DatetimeIndex,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    trading_dates: pd.DatetimeIndex,
 ) -> list[pd.Timestamp]:
     candidates = pd.date_range(start, end, freq="BME")
     out = []
@@ -240,11 +242,14 @@ def run(
     os.makedirs(out_dir, exist_ok=True)
 
     wrds_tickers = set(get_wrds_universe())
-    price_tickers = {f.replace(".csv", "")
-                     for f in os.listdir(PRICE_CACHE_DIR) if f.endswith(".csv")}
+    price_tickers = {
+        f.replace(".csv", "") for f in os.listdir(PRICE_CACHE_DIR) if f.endswith(".csv")
+    }
     universe = sorted(wrds_tickers & price_tickers)
-    print(f"[universe] WRDS={len(wrds_tickers)}  price-cache={len(price_tickers)}  "
-          f"intersection={len(universe)}")
+    print(
+        f"[universe] WRDS={len(wrds_tickers)}  price-cache={len(price_tickers)}  "
+        f"intersection={len(universe)}"
+    )
 
     if limit_tickers is not None:
         universe = universe[:limit_tickers]
@@ -255,7 +260,9 @@ def run(
 
     all_idx = pd.DatetimeIndex(sorted(set().union(*[df.index for df in universe_data.values()])))
     rebalance_dates = generate_monthly_rebalance_dates(
-        pd.Timestamp(start), pd.Timestamp(end), all_idx,
+        pd.Timestamp(start),
+        pd.Timestamp(end),
+        all_idx,
     )
     # No forward-buffer needed for correlation (no forward returns), but we keep
     # the same date range as the IC run for direct comparability.
@@ -271,7 +278,7 @@ def run(
 
     for i, d in enumerate(rebalance_dates):
         if i % 12 == 0:
-            print(f"[rebalance] {i+1}/{len(rebalance_dates)} {d.date()}")
+            print(f"[rebalance] {i + 1}/{len(rebalance_dates)} {d.date()}")
         panel = compute_signal_panel(universe_data, d, store, provider)
         if panel is None or panel.empty:
             continue
@@ -287,7 +294,9 @@ def run(
 
     stacked = np.stack(matrices)  # shape (T, S, S)
     mean_corr = np.nanmean(stacked, axis=0)
-    std_corr = np.nanstd(stacked, axis=0, ddof=1) if stacked.shape[0] > 1 else np.zeros_like(mean_corr)
+    std_corr = (
+        np.nanstd(stacked, axis=0, ddof=1) if stacked.shape[0] > 1 else np.zeros_like(mean_corr)
+    )
 
     # Coverage diagnostics — for each signal, count how many dates had any
     # non-NaN value contributing to the correlation row.
@@ -306,14 +315,16 @@ def run(
             if math.isnan(mc):
                 continue
             ratio = (sc / abs(mc)) if abs(mc) > 1e-6 else float("nan")
-            pairs.append({
-                "a": SIGNAL_NAMES[i],
-                "b": SIGNAL_NAMES[j],
-                "mean": round(float(mc), 4),
-                "std": round(float(sc), 4),
-                "abs_mean": round(abs(float(mc)), 4),
-                "instability_ratio": round(float(ratio), 3) if not math.isnan(ratio) else None,
-            })
+            pairs.append(
+                {
+                    "a": SIGNAL_NAMES[i],
+                    "b": SIGNAL_NAMES[j],
+                    "mean": round(float(mc), 4),
+                    "std": round(float(sc), 4),
+                    "abs_mean": round(abs(float(mc)), 4),
+                    "instability_ratio": round(float(ratio), 3) if not math.isnan(ratio) else None,
+                }
+            )
 
     # Effective dimensionality (entropy of the eigenvalue spectrum)
     sym = np.nan_to_num(mean_corr, nan=0.0)
@@ -345,11 +356,19 @@ def run(
         },
         "signal_coverage_pct": sig_coverage,
         "mean_correlation": pd.DataFrame(
-            mean_corr, index=SIGNAL_NAMES, columns=SIGNAL_NAMES,
-        ).round(4).to_dict(),
+            mean_corr,
+            index=SIGNAL_NAMES,
+            columns=SIGNAL_NAMES,
+        )
+        .round(4)
+        .to_dict(),
         "std_correlation": pd.DataFrame(
-            std_corr, index=SIGNAL_NAMES, columns=SIGNAL_NAMES,
-        ).round(4).to_dict(),
+            std_corr,
+            index=SIGNAL_NAMES,
+            columns=SIGNAL_NAMES,
+        )
+        .round(4)
+        .to_dict(),
         "pairs": pairs,
         "effective_dimensionality": round(eff_dim, 2),
         "nominal_signals": n_sig,
@@ -370,7 +389,9 @@ def run(
 
 
 def render_markdown(
-    res: dict, mean_corr: np.ndarray, std_corr: np.ndarray,
+    res: dict,
+    mean_corr: np.ndarray,
+    std_corr: np.ndarray,
 ) -> str:
     meta = res["meta"]
     sigs = SIGNAL_NAMES
@@ -380,8 +401,9 @@ def render_markdown(
     # Sorted views
     sorted_by_abs = sorted(pairs, key=lambda p: -p["abs_mean"])
     high_corr = [p for p in sorted_by_abs if p["abs_mean"] > 0.5]
-    valid_inst = [p for p in pairs if p.get("instability_ratio") is not None
-                  and p["abs_mean"] >= 0.05]
+    valid_inst = [
+        p for p in pairs if p.get("instability_ratio") is not None and p["abs_mean"] >= 0.05
+    ]
     sorted_by_inst = sorted(valid_inst, key=lambda p: -p["instability_ratio"])
 
     L = []
@@ -466,8 +488,7 @@ def render_markdown(
         ratio = p.get("instability_ratio")
         ratio_str = f"{ratio:.2f}" if ratio is not None else "n/a"
         L.append(
-            f"| {k} | `{p['a']}` ↔ `{p['b']}` | {p['mean']:+.3f} | "
-            f"{p['std']:.3f} | {ratio_str} |"
+            f"| {k} | `{p['a']}` ↔ `{p['b']}` | {p['mean']:+.3f} | {p['std']:.3f} | {ratio_str} |"
         )
     L.append("")
 
@@ -488,10 +509,7 @@ def render_markdown(
         L.append("|---|---:|---:|---|")
         for p in high_corr:
             suggest = _suggest_treatment(p["a"], p["b"], p["mean"], p["std"])
-            L.append(
-                f"| `{p['a']}` ↔ `{p['b']}` | {p['mean']:+.3f} | "
-                f"{p['std']:.3f} | {suggest} |"
-            )
+            L.append(f"| `{p['a']}` ↔ `{p['b']}` | {p['mean']:+.3f} | {p['std']:.3f} | {suggest} |")
     L.append("")
 
     # Top 5 most UNSTABLE pairs (high std / |mean|)
@@ -510,8 +528,7 @@ def render_markdown(
     for k, p in enumerate(sorted_by_inst[:5], 1):
         ratio = p["instability_ratio"]
         L.append(
-            f"| {k} | `{p['a']}` ↔ `{p['b']}` | {p['mean']:+.3f} | "
-            f"{p['std']:.3f} | {ratio:.2f} |"
+            f"| {k} | `{p['a']}` ↔ `{p['b']}` | {p['mean']:+.3f} | {p['std']:.3f} | {ratio:.2f} |"
         )
     L.append("")
     L.append(
@@ -527,33 +544,55 @@ def render_markdown(
     def _pair_value(a: str, b: str) -> tuple[Optional[float], Optional[float]]:
         if a not in sigs or b not in sigs:
             return None, None
-        i = sigs.index(a); j = sigs.index(b)
-        m = mean_corr[i, j]; s = std_corr[i, j]
-        return (None if math.isnan(m) else float(m),
-                None if math.isnan(s) else float(s))
+        i = sigs.index(a)
+        j = sigs.index(b)
+        m = mean_corr[i, j]
+        s = std_corr[i, j]
+        return (None if math.isnan(m) else float(m), None if math.isnan(s) else float(s))
 
     targeted = [
-        ("qmj", "quality_score",
-         "Both quality factors. QMJ profitability pillar uses gross-profit/assets; "
-         "quality_score uses gross margin + ROIC. Likely to overlap meaningfully."),
-        ("erm", "sue",
-         "Both earnings-based but different mechanisms (consensus revisions vs "
-         "actual quarterly surprise). Should be moderately correlated, not "
-         "redundant."),
-        ("piotroski", "qmj",
-         "Both fundamental quality formulations. Piotroski is a 9-binary score "
-         "across profitability/leverage/efficiency; QMJ is z-scored across four "
-         "pillars. Cross-sectionally these often disagree."),
-        ("price_momentum", "erm",
-         "Price momentum vs earnings revisions — testing whether revisions "
-         "front-run price (or vice versa)."),
-        ("price_momentum", "qmj",
-         "Momentum vs quality — should be near-zero (orthogonal academic factors)."),
-        ("price_momentum", "obv_trend",
-         "Both technical, but OBV adds volume. Should be modestly correlated."),
-        ("hml_bm", "qmj",
-         "Value (HML) vs quality (QMJ) — academic factor stack should show "
-         "small or negative correlation."),
+        (
+            "qmj",
+            "quality_score",
+            "Both quality factors. QMJ profitability pillar uses gross-profit/assets; "
+            "quality_score uses gross margin + ROIC. Likely to overlap meaningfully.",
+        ),
+        (
+            "erm",
+            "sue",
+            "Both earnings-based but different mechanisms (consensus revisions vs "
+            "actual quarterly surprise). Should be moderately correlated, not "
+            "redundant.",
+        ),
+        (
+            "piotroski",
+            "qmj",
+            "Both fundamental quality formulations. Piotroski is a 9-binary score "
+            "across profitability/leverage/efficiency; QMJ is z-scored across four "
+            "pillars. Cross-sectionally these often disagree.",
+        ),
+        (
+            "price_momentum",
+            "erm",
+            "Price momentum vs earnings revisions — testing whether revisions "
+            "front-run price (or vice versa).",
+        ),
+        (
+            "price_momentum",
+            "qmj",
+            "Momentum vs quality — should be near-zero (orthogonal academic factors).",
+        ),
+        (
+            "price_momentum",
+            "obv_trend",
+            "Both technical, but OBV adds volume. Should be modestly correlated.",
+        ),
+        (
+            "hml_bm",
+            "qmj",
+            "Value (HML) vs quality (QMJ) — academic factor stack should show "
+            "small or negative correlation.",
+        ),
     ]
     L.append("| Pair | mean ρ | std ρ | Comment |")
     L.append("|---|---:|---:|---|")
@@ -571,8 +610,7 @@ def render_markdown(
                 verdict_seed = " Mildly related."
             else:
                 verdict_seed = " ~Orthogonal."
-            L.append(f"| `{a}` ↔ `{b}` | {m:+.3f} | {s:.3f} | "
-                     f"{comment}{verdict_seed} |")
+            L.append(f"| `{a}` ↔ `{b}` | {m:+.3f} | {s:.3f} | {comment}{verdict_seed} |")
     L.append("")
 
     # Methodology
@@ -592,9 +630,7 @@ def render_markdown(
         "- Pairwise Spearman rank correlation per date (pandas `.corr(method='spearman')` "
         "is NaN-aware: pairs with NaN on either side are dropped)."
     )
-    L.append(
-        "- Mean and std are taken across the rebalance dates."
-    )
+    L.append("- Mean and std are taken across the rebalance dates.")
     L.append(
         "- Effective dimensionality = `exp(-Σ pᵢ log pᵢ)` where `p` is "
         "the normalized eigenvalue spectrum of the mean-correlation matrix. "
@@ -610,13 +646,15 @@ def _suggest_treatment(a: str, b: str, mean_rho: float, std_rho: float) -> str:
     """Heuristic suggestion: keep+IC-weight, residualize, or divergence-signal."""
     instability = std_rho / abs(mean_rho) if abs(mean_rho) > 1e-6 else float("inf")
     if instability > 1.5:
-        return ("(c) Unstable — divergence between the two could become a "
-                "separate signal in Session 3.")
+        return (
+            "(c) Unstable — divergence between the two could become a separate signal in Session 3."
+        )
     if abs(mean_rho) > 0.7:
-        return ("(b) Strongly redundant — replace one with the residual of "
-                "the other, or drop the lower-IC member.")
-    return ("(a) Keep both, IC-weight the composite — overlap is real but "
-            "not crippling.")
+        return (
+            "(b) Strongly redundant — replace one with the residual of "
+            "the other, or drop the lower-IC member."
+        )
+    return "(a) Keep both, IC-weight the composite — overlap is real but not crippling."
 
 
 def main():

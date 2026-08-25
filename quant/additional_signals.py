@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 
 # ── Signal 1: Quality / Profitability ─────────────────────────────────
 
+
 def compute_quality_scores(
     tickers: list[str],
     wrds_provider,
@@ -43,7 +44,9 @@ def compute_quality_scores(
     for ticker in tickers:
         try:
             fundamentals = wrds_provider.get_balance_sheet_quarterly(
-                ticker, limit=4, as_of_date=as_of_date,
+                ticker,
+                limit=4,
+                as_of_date=as_of_date,
             )
             if not fundamentals or len(fundamentals) < 1:
                 continue
@@ -92,6 +95,7 @@ def compute_quality_scores(
 
 
 # ── Signal 2: Price Momentum (12-1 Month) ────────────────────────────
+
 
 def compute_price_momentum_scores(
     universe_data: dict[str, pd.DataFrame],
@@ -160,6 +164,7 @@ def compute_price_momentum_scores(
 
 # ── Signal 3: Insider Activity (standalone) ───────────────────────────
 
+
 def compute_insider_scores(
     tickers: list[str],
     as_of_date: pd.Timestamp,
@@ -184,7 +189,8 @@ def compute_insider_scores(
     for ticker in tickers:
         try:
             result = compute_insider_sentiment_score(
-                ticker, as_of_date,
+                ticker,
+                as_of_date,
                 lookback_months=lookback_months,
                 client=finnhub_client,
                 disk_cache=sentiment_cache,

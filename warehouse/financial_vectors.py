@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 
 # ── helpers ────────────────────────────────────────────────────────────────
 
+
 def _safe(value: Any, default: float = 0.0) -> float:
     try:
         return float(value) if value is not None else default
@@ -52,6 +53,7 @@ def _quarter_label(date_str: str) -> str:
     """Convert '2024-03-31' → '2024Q1' (calendar quarter from end date)."""
     try:
         from datetime import date
+
         d = date.fromisoformat(date_str[:10])
         q = (d.month - 1) // 3 + 1
         return f"{d.year}Q{q}"
@@ -134,6 +136,7 @@ def _build_financial_text(row: Dict, yoy: Dict, qoq: Dict) -> str:
 
 # ── public API ─────────────────────────────────────────────────────────────
 
+
 def build_financial_records(
     ticker: str,
     income: list,
@@ -179,7 +182,13 @@ def build_financial_records(
             "rev": _yoy_growth("revenue"),
             "ni": _yoy_growth("netIncome"),
             "ocf": _yoy_growth("operatingCashFlow"),
-            "fcf": _growth_str(fcf, _safe(prior_yoy.get("operatingCashFlow", 0)) + _safe(prior_yoy.get("capitalExpenditure", 0))) if prior_yoy else "n/a",
+            "fcf": _growth_str(
+                fcf,
+                _safe(prior_yoy.get("operatingCashFlow", 0))
+                + _safe(prior_yoy.get("capitalExpenditure", 0)),
+            )
+            if prior_yoy
+            else "n/a",
         }
         qoq = {
             "rev": _qoq_growth("revenue"),
@@ -197,20 +206,22 @@ def build_financial_records(
         op_margin = op_income / rev if rev else 0.0
         net_margin = net_income / rev if rev else 0.0
 
-        records.append({
-            "_id": f"{ticker.upper()}_fts_{ql}",
-            "text": text[:4000],
-            "ticker": ticker.upper(),
-            "period": period,
-            "quarter_label": ql,
-            "revenue": rev,
-            "net_income": net_income,
-            "operating_cash_flow": op_cf,
-            "free_cash_flow": fcf,
-            "gross_margin": round(gross_margin, 4),
-            "operating_margin": round(op_margin, 4),
-            "net_margin": round(net_margin, 4),
-        })
+        records.append(
+            {
+                "_id": f"{ticker.upper()}_fts_{ql}",
+                "text": text[:4000],
+                "ticker": ticker.upper(),
+                "period": period,
+                "quarter_label": ql,
+                "revenue": rev,
+                "net_income": net_income,
+                "operating_cash_flow": op_cf,
+                "free_cash_flow": fcf,
+                "gross_margin": round(gross_margin, 4),
+                "operating_margin": round(op_margin, 4),
+                "net_margin": round(net_margin, 4),
+            }
+        )
 
     return records
 

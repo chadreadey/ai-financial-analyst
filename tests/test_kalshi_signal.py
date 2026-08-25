@@ -6,9 +6,11 @@ from quant.kalshi_signal import compute_macro_modifier, compute_event_divergence
 
 def _mock_client(fed_prob=0.70, cpi_prob=0.55, jobs_prob=0.50):
     client = MagicMock()
+
     def get_markets(series_ticker, **kwargs):
         probs = {"FED": fed_prob, "CPI": cpi_prob, "JOBS": jobs_prob, "GDP": 0.50}
         return [{"ticker": f"{series_ticker}-TEST", "yes_prob": probs.get(series_ticker, 0.5)}]
+
     client.get_markets.side_effect = get_markets
     return client
 
@@ -46,18 +48,14 @@ def test_event_divergence_no_market_returns_zero():
 
 def test_event_divergence_high_confidence_long():
     client = MagicMock()
-    client.get_markets.return_value = [
-        {"ticker": "EARN-AAPL-Q126", "yes_prob": 0.45}
-    ]
+    client.get_markets.return_value = [{"ticker": "EARN-AAPL-Q126", "yes_prob": 0.45}]
     score = compute_event_divergence(client, ticker="AAPL", our_prob_beat=0.80, threshold=0.20)
     assert score > 0.3
 
 
 def test_event_divergence_below_threshold_returns_zero():
     client = MagicMock()
-    client.get_markets.return_value = [
-        {"ticker": "EARN-AAPL-Q126", "yes_prob": 0.52}
-    ]
+    client.get_markets.return_value = [{"ticker": "EARN-AAPL-Q126", "yes_prob": 0.52}]
     score = compute_event_divergence(client, ticker="AAPL", our_prob_beat=0.58, threshold=0.20)
     assert score == 0.0
 

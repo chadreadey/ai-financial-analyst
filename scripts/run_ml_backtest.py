@@ -36,11 +36,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from quant.backtest import (
-    BacktestConfig, BacktestResult,
-    run_backtest, run_walk_forward,
+    BacktestConfig,
+    BacktestResult,
+    run_backtest,
+    run_walk_forward,
     load_universe_data,
     generate_rebalance_dates,
 )
@@ -64,8 +67,10 @@ def train_lstm_for_window(
     """
     import pandas as pd
     from quant.lstm.model import (
-        ReturnForecaster, LSTMConfig,
-        build_features, build_target,
+        ReturnForecaster,
+        LSTMConfig,
+        build_features,
+        build_target,
     )
 
     lstm_config = LSTMConfig(
@@ -160,10 +165,13 @@ def run_lstm_walk_forward(config: BacktestConfig) -> BacktestResult:
         _compute_daily_portfolio_returns,
         compute_signals_at_date,
         build_target_portfolio,
-        detect_regime, RegimeState,
-        compute_signal_ic, calibrate_weights_from_ic,
+        detect_regime,
+        RegimeState,
+        compute_signal_ic,
+        calibrate_weights_from_ic,
         apply_calibrated_weights,
-        blend_lstm_into_signals, compute_lstm_scores,
+        blend_lstm_into_signals,
+        compute_lstm_scores,
     )
 
     api_key = os.getenv("TIINGO_API_KEY", "").strip()
@@ -175,7 +183,9 @@ def run_lstm_walk_forward(config: BacktestConfig) -> BacktestResult:
 
     # Load data
     all_tickers = list(set(config.tickers + [BENCHMARK]))
-    fetch_start = (pd.Timestamp(config.start_date) - pd.DateOffset(months=config.train_months + 6)).strftime("%Y-%m-%d")
+    fetch_start = (
+        pd.Timestamp(config.start_date) - pd.DateOffset(months=config.train_months + 6)
+    ).strftime("%Y-%m-%d")
 
     progress("Loading price data...")
     universe_data = load_universe_data(all_tickers, fetch_start, api_key, progress)
@@ -192,10 +202,12 @@ def run_lstm_walk_forward(config: BacktestConfig) -> BacktestResult:
     vix_df = None
     if config.enable_regime_filter:
         from quant.backtest import load_vix_data
+
         vix_df = load_vix_data(fetch_start)
 
     # Generate walk-forward windows (rolling: advance by test_months each step)
     from datetime import timedelta
+
     bt_start = pd.Timestamp(config.start_date)
     bt_end = pd.Timestamp(config.end_date)
 
@@ -206,15 +218,19 @@ def run_lstm_walk_forward(config: BacktestConfig) -> BacktestResult:
         test_end = train_end + timedelta(days=config.test_months * 30)
         if test_end > bt_end:
             break
-        windows.append({
-            "train_start": cursor.strftime("%Y-%m-%d"),
-            "train_end": train_end.strftime("%Y-%m-%d"),
-            "test_start": train_end.strftime("%Y-%m-%d"),
-            "test_end": test_end.strftime("%Y-%m-%d"),
-        })
+        windows.append(
+            {
+                "train_start": cursor.strftime("%Y-%m-%d"),
+                "train_end": train_end.strftime("%Y-%m-%d"),
+                "test_start": train_end.strftime("%Y-%m-%d"),
+                "test_end": test_end.strftime("%Y-%m-%d"),
+            }
+        )
         cursor += timedelta(days=config.test_months * 30)
 
-    progress(f"Walk-forward: {len(windows)} windows, train={config.train_months}mo, test={config.test_months}mo")
+    progress(
+        f"Walk-forward: {len(windows)} windows, train={config.train_months}mo, test={config.test_months}mo"
+    )
 
     result = BacktestResult()
     result.config = {
@@ -232,8 +248,10 @@ def run_lstm_walk_forward(config: BacktestConfig) -> BacktestResult:
     window_results = []
 
     for wi, window in enumerate(windows):
-        progress(f"Window {wi+1}/{len(windows)}: train {window['train_start']}→{window['train_end']}, "
-                 f"test {window['test_start']}→{window['test_end']}")
+        progress(
+            f"Window {wi + 1}/{len(windows)}: train {window['train_start']}→{window['train_end']}, "
+            f"test {window['test_start']}→{window['test_end']}"
+        )
 
         # Train LSTM on this window's training data
         progress(f"  Training LSTM...")
@@ -241,12 +259,14 @@ def run_lstm_walk_forward(config: BacktestConfig) -> BacktestResult:
 
         if forecaster is None:
             progress("  LSTM training failed for this window — skipping")
-            window_results.append({
-                "test_start": window["test_start"],
-                "test_end": window["test_end"],
-                "return_pct": 0.0,
-                "error": "lstm_training_failed",
-            })
+            window_results.append(
+                {
+                    "test_start": window["test_start"],
+                    "test_end": window["test_end"],
+                    "return_pct": 0.0,
+                    "error": "lstm_training_failed",
+                }
+            )
             continue
 
         # Set forecaster for this window
@@ -259,16 +279,21 @@ def run_lstm_walk_forward(config: BacktestConfig) -> BacktestResult:
         test_end_ts = pd.Timestamp(window["test_end"])
 
         rebalance_dates = generate_rebalance_dates(
-            test_start, test_end_ts, config.rebalance_freq, trading_dates,
+            test_start,
+            test_end_ts,
+            config.rebalance_freq,
+            trading_dates,
         )
 
         if len(rebalance_dates) < 2:
-            window_results.append({
-                "test_start": window["test_start"],
-                "test_end": window["test_end"],
-                "return_pct": 0.0,
-                "error": "insufficient_rebalance_dates",
-            })
+            window_results.append(
+                {
+                    "test_start": window["test_start"],
+                    "test_end": window["test_end"],
+                    "return_pct": 0.0,
+                    "error": "insufficient_rebalance_dates",
+                }
+            )
             continue
 
         # Run rebalance loop for this window
@@ -293,13 +318,22 @@ def run_lstm_walk_forward(config: BacktestConfig) -> BacktestResult:
                 regime = RegimeState(level="unknown")
 
             positions = build_target_portfolio(
-                signals, universe_data, reb_date, config, capital, regime=regime,
+                signals,
+                universe_data,
+                reb_date,
+                config,
+                capital,
+                regime=regime,
             )
             if not positions:
                 continue
 
             trades, period_pnl = _compute_daily_portfolio_returns(
-                positions, universe_data, reb_date, next_reb, config,
+                positions,
+                universe_data,
+                reb_date,
+                next_reb,
+                config,
             )
             window_trades.extend(trades)
             window_pnl = pd.concat([window_pnl, period_pnl])
@@ -309,12 +343,14 @@ def run_lstm_walk_forward(config: BacktestConfig) -> BacktestResult:
         window_return_pct = round(window_return / capital * 100, 2)
         capital += window_return
 
-        window_results.append({
-            "test_start": window["test_start"],
-            "test_end": window["test_end"],
-            "return_pct": window_return_pct,
-            "trades": len(window_trades),
-        })
+        window_results.append(
+            {
+                "test_start": window["test_start"],
+                "test_end": window["test_end"],
+                "return_pct": window_return_pct,
+                "trades": len(window_trades),
+            }
+        )
         all_trades.extend(window_trades)
         all_daily_pnl = pd.concat([all_daily_pnl, window_pnl])
 
@@ -339,8 +375,8 @@ def run_lstm_walk_forward(config: BacktestConfig) -> BacktestResult:
         # Benchmark
         if benchmark_df is not None:
             bench = benchmark_df[
-                (benchmark_df.index >= cumulative.index[0]) &
-                (benchmark_df.index <= cumulative.index[-1])
+                (benchmark_df.index >= cumulative.index[0])
+                & (benchmark_df.index <= cumulative.index[-1])
             ]
             if len(bench) > 10:
                 result.benchmark_return_pct = round(
@@ -359,18 +395,22 @@ def run_lstm_walk_forward(config: BacktestConfig) -> BacktestResult:
 
         # Equity curve
         result.equity_curve = [
-            {"date": str(d.date()), "equity": round(float(v), 2)}
-            for d, v in cumulative.items()
+            {"date": str(d.date()), "equity": round(float(v), 2)} for d, v in cumulative.items()
         ]
 
         # Trade log
         result.trade_log = [
             {
-                "ticker": t.ticker, "direction": t.direction,
-                "entry_date": t.entry_date, "entry_price": t.entry_price,
-                "exit_date": t.exit_date, "exit_price": t.exit_price,
-                "pnl_pct": t.pnl_pct, "pnl_dollar": t.pnl_dollar,
-                "exit_reason": t.exit_reason, "composite_score": t.composite_score,
+                "ticker": t.ticker,
+                "direction": t.direction,
+                "entry_date": t.entry_date,
+                "entry_price": t.entry_price,
+                "exit_date": t.exit_date,
+                "exit_price": t.exit_price,
+                "pnl_pct": t.pnl_pct,
+                "pnl_dollar": t.pnl_dollar,
+                "exit_reason": t.exit_reason,
+                "composite_score": t.composite_score,
                 "holding_days": t.holding_days,
             }
             for t in all_trades
@@ -445,41 +485,68 @@ def print_comparison(baseline: BacktestResult, overlay: BacktestResult, weight: 
 
 def main():
     parser = argparse.ArgumentParser(description="LSTM overlay backtest comparison")
-    parser.add_argument("--universe", default="liquid_10",
-                        help="Universe name (default: liquid_10)")
-    parser.add_argument("--tickers", default="",
-                        help="Comma-separated tickers (overrides --universe)")
-    parser.add_argument("--start", default="2022-01-01",
-                        help="Start date (default: 2022-01-01)")
+    parser.add_argument(
+        "--universe", default="liquid_10", help="Universe name (default: liquid_10)"
+    )
+    parser.add_argument(
+        "--tickers", default="", help="Comma-separated tickers (overrides --universe)"
+    )
+    parser.add_argument("--start", default="2022-01-01", help="Start date (default: 2022-01-01)")
     parser.add_argument("--end", default="", help="End date (default: today)")
     parser.add_argument("--rebalance", default="monthly", choices=["weekly", "monthly"])
-    parser.add_argument("--walk-forward", action="store_true",
-                        help="Use walk-forward validation with per-window LSTM training")
-    parser.add_argument("--lstm-weight", type=float, default=0.15,
-                        help="Weight for LSTM signal (default: 0.15)")
-    parser.add_argument("--sweep-weights", action="store_true",
-                        help="Sweep LSTM weights: 0.05, 0.10, 0.15, 0.20, 0.25, 0.30")
-    parser.add_argument("--skip-baseline", action="store_true",
-                        help="Skip baseline, only run LSTM overlay")
+    parser.add_argument(
+        "--walk-forward",
+        action="store_true",
+        help="Use walk-forward validation with per-window LSTM training",
+    )
+    parser.add_argument(
+        "--lstm-weight", type=float, default=0.15, help="Weight for LSTM signal (default: 0.15)"
+    )
+    parser.add_argument(
+        "--sweep-weights",
+        action="store_true",
+        help="Sweep LSTM weights: 0.05, 0.10, 0.15, 0.20, 0.25, 0.30",
+    )
+    parser.add_argument(
+        "--skip-baseline", action="store_true", help="Skip baseline, only run LSTM overlay"
+    )
     # LSTM hyperparams
     parser.add_argument("--hidden-size", type=int, default=64)
     parser.add_argument("--num-layers", type=int, default=2)
     parser.add_argument("--dropout", type=float, default=0.3)
-    parser.add_argument("--lookback", type=int, default=60,
-                        help="LSTM sequence length in trading days (default: 60)")
-    parser.add_argument("--horizon", type=int, default=20,
-                        help="Forward return prediction horizon in days (default: 20)")
+    parser.add_argument(
+        "--lookback",
+        type=int,
+        default=60,
+        help="LSTM sequence length in trading days (default: 60)",
+    )
+    parser.add_argument(
+        "--horizon",
+        type=int,
+        default=20,
+        help="Forward return prediction horizon in days (default: 20)",
+    )
     parser.add_argument("--max-epochs", type=int, default=100)
-    parser.add_argument("--no-shorts", action="store_true",
-                        help="Disable short selling entirely (long-only mode)")
-    parser.add_argument("--no-ic-calibration", action="store_true",
-                        help="Disable IC-based signal weight calibration")
-    parser.add_argument("--train-months", type=int, default=24,
-                        help="Walk-forward train window months (default: 24)")
-    parser.add_argument("--test-months", type=int, default=6,
-                        help="Walk-forward test window months (default: 6)")
-    parser.add_argument("--enable-news-sentiment", action="store_true",
-                        help="Enable Finnhub news sentiment signal")
+    parser.add_argument(
+        "--no-shorts", action="store_true", help="Disable short selling entirely (long-only mode)"
+    )
+    parser.add_argument(
+        "--no-ic-calibration",
+        action="store_true",
+        help="Disable IC-based signal weight calibration",
+    )
+    parser.add_argument(
+        "--train-months",
+        type=int,
+        default=24,
+        help="Walk-forward train window months (default: 24)",
+    )
+    parser.add_argument(
+        "--test-months", type=int, default=6, help="Walk-forward test window months (default: 6)"
+    )
+    parser.add_argument(
+        "--enable-news-sentiment", action="store_true", help="Enable Finnhub news sentiment signal"
+    )
     parser.add_argument("--output", default="", help="Save results to JSON file")
     parser.add_argument("--verbose", "-v", action="store_true")
 
@@ -493,18 +560,24 @@ def main():
     # Check torch is available
     try:
         import torch
+
         device = "CUDA" if torch.cuda.is_available() else "CPU"
         print(f"PyTorch: found (device: {device})")
     except ImportError:
         print("ERROR: PyTorch not installed. Run: pip install torch")
         sys.exit(1)
 
-    tickers = ([t.strip().upper() for t in args.tickers.split(",") if t.strip()]
-               if args.tickers else get_universe(args.universe))
+    tickers = (
+        [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
+        if args.tickers
+        else get_universe(args.universe)
+    )
 
     print(f"\nLSTM Backtest: {len(tickers)} tickers, {args.start} to {args.end or 'today'}")
-    print(f"Rebalance: {args.rebalance}, LSTM hidden={args.hidden_size}, "
-          f"layers={args.num_layers}, lookback={args.lookback}d, horizon={args.horizon}d")
+    print(
+        f"Rebalance: {args.rebalance}, LSTM hidden={args.hidden_size}, "
+        f"layers={args.num_layers}, lookback={args.lookback}d, horizon={args.horizon}d"
+    )
 
     base_config = BacktestConfig(
         tickers=tickers,

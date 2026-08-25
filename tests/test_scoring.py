@@ -16,6 +16,7 @@ from quant.signals import SignalResult, SignalVector
 
 # ── Constants ────────────────────────────────────────────────────────────
 
+
 class TestConstants:
     def test_thresholds_are_symmetric(self):
         assert BUY_THRESHOLD == -SELL_THRESHOLD
@@ -30,6 +31,7 @@ class TestConstants:
 
 
 # ── classify_direction ───────────────────────────────────────────────────
+
 
 class TestClassifyDirection:
     def test_strong_buy(self):
@@ -91,6 +93,7 @@ class TestClassifyDirection:
 
 # ── reclassify ───────────────────────────────────────────────────────────
 
+
 def _make_sv(composite_score: float = 0.0) -> SignalVector:
     """Create a minimal SignalVector with a given composite score."""
     sv = SignalVector(
@@ -143,6 +146,7 @@ class TestReclassify:
 
 
 # ── Integration: compute_composite uses reclassify ───────────────────────
+
 
 class TestComputeCompositeIntegration:
     def test_compute_composite_sets_direction(self):

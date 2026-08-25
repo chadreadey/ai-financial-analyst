@@ -58,7 +58,9 @@ def format_eps_signals(ticker: str, signals: dict) -> str:
     band = signals.get("confidence_band", [])
     if band:
         p50_vals = [e["p50"] for e in band[:4]]
-        lines.append(f"  Forward EPS P50 (next {len(p50_vals)} steps): {[round(v, 2) for v in p50_vals]}")
+        lines.append(
+            f"  Forward EPS P50 (next {len(p50_vals)} steps): {[round(v, 2) for v in p50_vals]}"
+        )
 
     try:
         dr = signals["downside_risk_pct"]

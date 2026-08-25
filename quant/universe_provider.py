@@ -98,9 +98,7 @@ class UniverseProvider:
 
     def _cache_age_hours(self) -> float:
         conn = self._conn()
-        row = conn.execute(
-            "SELECT value FROM sp500_meta WHERE key = 'last_refresh'"
-        ).fetchone()
+        row = conn.execute("SELECT value FROM sp500_meta WHERE key = 'last_refresh'").fetchone()
         conn.close()
         if row is None:
             return float("inf")
@@ -137,7 +135,10 @@ class UniverseProvider:
             if isinstance(data, list) and len(data) > 100:
                 logger.info("FMP returned %d S&P 500 constituents", len(data))
                 return data
-            logger.warning("FMP sp500_constituent returned unexpected data: %d items", len(data) if isinstance(data, list) else 0)
+            logger.warning(
+                "FMP sp500_constituent returned unexpected data: %d items",
+                len(data) if isinstance(data, list) else 0,
+            )
             return []
         except Exception as exc:
             logger.warning("FMP sp500_constituent failed: %s", exc)
@@ -173,6 +174,7 @@ class UniverseProvider:
         try:
             import pandas as pd
             import io
+
             # Wikipedia blocks default urllib User-Agent; use requests instead
             resp = requests.get(
                 "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
@@ -186,13 +188,15 @@ class UniverseProvider:
             df = tables[0]
             results = []
             for _, row in df.iterrows():
-                results.append({
-                    "symbol": str(row.get("Symbol", "")).replace(".", "-"),  # BRK.B → BRK-B
-                    "name": str(row.get("Security", "")),
-                    "sector": str(row.get("GICS Sector", "")),
-                    "subSector": str(row.get("GICS Sub-Industry", "")),
-                    "dateFirstAdded": str(row.get("Date added", "")),
-                })
+                results.append(
+                    {
+                        "symbol": str(row.get("Symbol", "")).replace(".", "-"),  # BRK.B → BRK-B
+                        "name": str(row.get("Security", "")),
+                        "sector": str(row.get("GICS Sector", "")),
+                        "subSector": str(row.get("GICS Sub-Industry", "")),
+                        "dateFirstAdded": str(row.get("Date added", "")),
+                    }
+                )
             logger.info("Wikipedia returned %d S&P 500 constituents", len(results))
             return results
         except Exception as exc:
@@ -211,8 +215,11 @@ class UniverseProvider:
             count = conn.execute("SELECT COUNT(*) FROM sp500_constituents").fetchone()[0]
             conn.close()
             if count > 400:
-                logger.debug("Universe cache fresh (%d constituents, %.1fh old)",
-                             count, self._cache_age_hours())
+                logger.debug(
+                    "Universe cache fresh (%d constituents, %.1fh old)",
+                    count,
+                    self._cache_age_hours(),
+                )
                 return count
 
         # Try FMP first, fallback to Wikipedia
@@ -237,20 +244,23 @@ class UniverseProvider:
             ticker = item.get("symbol", "").strip().upper()
             if not ticker or len(ticker) > 10:
                 continue
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO sp500_constituents
                     (ticker, name, sector, sub_sector, market_cap, weight, date_first_added, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                ticker,
-                item.get("name", item.get("Security", "")),
-                item.get("sector", item.get("GICS Sector", "")),
-                item.get("subSector", item.get("GICS Sub-Industry", "")),
-                float(item.get("marketCap", 0) or 0),
-                weights.get(ticker, 0.0),
-                item.get("dateFirstAdded", item.get("Date added", "")),
-                now,
-            ))
+            """,
+                (
+                    ticker,
+                    item.get("name", item.get("Security", "")),
+                    item.get("sector", item.get("GICS Sector", "")),
+                    item.get("subSector", item.get("GICS Sub-Industry", "")),
+                    float(item.get("marketCap", 0) or 0),
+                    weights.get(ticker, 0.0),
+                    item.get("dateFirstAdded", item.get("Date added", "")),
+                    now,
+                ),
+            )
         conn.commit()
 
         count = conn.execute("SELECT COUNT(*) FROM sp500_constituents").fetchone()[0]
@@ -265,9 +275,7 @@ class UniverseProvider:
         """Return all S&P 500 constituents."""
         self.refresh()
         conn = self._conn()
-        rows = conn.execute(
-            "SELECT * FROM sp500_constituents ORDER BY market_cap DESC"
-        ).fetchall()
+        rows = conn.execute("SELECT * FROM sp500_constituents ORDER BY market_cap DESC").fetchall()
         conn.close()
         return [self._row_to_constituent(r) for r in rows]
 
@@ -279,13 +287,16 @@ class UniverseProvider:
         self.refresh()
         conn = self._conn()
         # Prefer weight (from ETF holdings), fall back to market_cap
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT * FROM sp500_constituents
             ORDER BY
                 CASE WHEN weight > 0 THEN weight ELSE 0 END DESC,
                 market_cap DESC
             LIMIT ?
-        """, (n,)).fetchall()
+        """,
+            (n,),
+        ).fetchall()
         conn.close()
         return [self._row_to_constituent(r) for r in rows]
 

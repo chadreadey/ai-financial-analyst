@@ -11,8 +11,12 @@ logger = logging.getLogger(__name__)
 
 _REQUIRED_INCOME_FIELDS = ("date", "revenue", "netIncome", "eps", "epsDil", "grossProfit")
 _REQUIRED_BALANCE_FIELDS = (
-    "date", "totalAssets", "totalStockholdersEquity",
-    "totalCurrentAssets", "totalCurrentLiabilities", "totalDebt",
+    "date",
+    "totalAssets",
+    "totalStockholdersEquity",
+    "totalCurrentAssets",
+    "totalCurrentLiabilities",
+    "totalDebt",
     "cashAndCashEquivalents",
 )
 _REQUIRED_ESTIMATE_FIELDS = ("date", "epsAvg")
@@ -22,7 +26,9 @@ def _validate_fmp_record(record: dict, schema: tuple, record_type: str, symbol: 
     """Log warning if required FMP fields are missing. Returns record unchanged."""
     missing = [k for k in schema if k not in record]
     if missing:
-        logger.warning("schema: %s response for %s missing fields: %s", record_type, symbol, ", ".join(missing))
+        logger.warning(
+            "schema: %s response for %s missing fields: %s", record_type, symbol, ", ".join(missing)
+        )
     return record
 
 
@@ -50,7 +56,9 @@ class FMPClient:
         elif count == 250:
             logger.error("FMP call count reached %d", count)
         resp = self._session.get(
-            f"{self.BASE}{path}", params=merged, timeout=(5, 15),
+            f"{self.BASE}{path}",
+            params=merged,
+            timeout=(5, 15),
         )
         resp.raise_for_status()
         return resp.json()
@@ -83,7 +91,10 @@ class FMPClient:
                 "/stable/analyst-estimates",
                 {"symbol": symbol, "period": "annual", "limit": limit},
             )
-            return [_validate_fmp_record(r, _REQUIRED_ESTIMATE_FIELDS, "analyst_estimates", symbol) for r in data]
+            return [
+                _validate_fmp_record(r, _REQUIRED_ESTIMATE_FIELDS, "analyst_estimates", symbol)
+                for r in data
+            ]
         except Exception as exc:
             logger.debug("fmp analyst-estimates/%s failed: %s", symbol, exc, exc_info=True)
             return []
@@ -112,7 +123,10 @@ class FMPClient:
                 "/stable/income-statement",
                 {"symbol": symbol, "period": "quarter", "limit": limit},
             )
-            return [_validate_fmp_record(r, _REQUIRED_INCOME_FIELDS, "income_statement", symbol) for r in data]
+            return [
+                _validate_fmp_record(r, _REQUIRED_INCOME_FIELDS, "income_statement", symbol)
+                for r in data
+            ]
         except Exception as exc:
             logger.debug("fmp income-statement (Q)/%s failed: %s", symbol, exc, exc_info=True)
             return []
@@ -123,7 +137,10 @@ class FMPClient:
                 "/stable/balance-sheet-statement",
                 {"symbol": symbol, "period": "quarter", "limit": limit},
             )
-            return [_validate_fmp_record(r, _REQUIRED_BALANCE_FIELDS, "balance_sheet", symbol) for r in data]
+            return [
+                _validate_fmp_record(r, _REQUIRED_BALANCE_FIELDS, "balance_sheet", symbol)
+                for r in data
+            ]
         except Exception as exc:
             logger.debug("fmp balance-sheet (Q)/%s failed: %s", symbol, exc, exc_info=True)
             return []

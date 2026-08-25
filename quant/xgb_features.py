@@ -87,7 +87,9 @@ def build_feature_matrix(
         if wrds_provider is not None:
             try:
                 earn_scores = compute_earnings_signal_scores(
-                    active_tickers, wrds_provider, as_of_date=reb_date.date(),
+                    active_tickers,
+                    wrds_provider,
+                    as_of_date=reb_date.date(),
                 )
             except Exception:
                 pass
@@ -97,7 +99,8 @@ def build_feature_matrix(
         if inst_wrds_store is not None:
             try:
                 inst_scores = compute_institutional_flow_scores(
-                    active_tickers, as_of_date=reb_date.date(),
+                    active_tickers,
+                    as_of_date=reb_date.date(),
                     wrds_store=inst_wrds_store,
                 )
             except Exception:
@@ -108,7 +111,9 @@ def build_feature_matrix(
         if wrds_provider is not None:
             try:
                 quality_scores = compute_quality_scores(
-                    active_tickers, wrds_provider, as_of_date=reb_date.date(),
+                    active_tickers,
+                    wrds_provider,
+                    as_of_date=reb_date.date(),
                 )
             except Exception:
                 pass
@@ -121,7 +126,8 @@ def build_feature_matrix(
         if finnhub_client is not None or sentiment_cache is not None:
             try:
                 insider_scores = compute_insider_scores(
-                    active_tickers, reb_date,
+                    active_tickers,
+                    reb_date,
                     finnhub_client=finnhub_client,
                     sentiment_cache=sentiment_cache,
                 )
@@ -134,9 +140,12 @@ def build_feature_matrix(
             try:
                 from quant.event_timing import compute_event_timing_scores
                 from quant.wrds_store import WRDSPointInTimeStore
+
                 _evt_store = WRDSPointInTimeStore()
                 event_scores = compute_event_timing_scores(
-                    active_tickers, reb_date, wrds_store=_evt_store,
+                    active_tickers,
+                    reb_date,
+                    wrds_store=_evt_store,
                 )
             except Exception:
                 pass
@@ -166,33 +175,40 @@ def build_feature_matrix(
             earn_entry = earn_scores.get(ticker)
             inst_entry = inst_scores.get(ticker)
 
-            rows.append({
-                "date": reb_date.strftime("%Y-%m-%d"),
-                "ticker": ticker,
-                "qid": qid,
-                # 7 signal features
-                "obv_trend": sv.obv_trend.score,
-                "earnings": earn_entry[0] if earn_entry else 0.0,
-                "inst_flow": inst_entry[0] if inst_entry else 0.0,
-                "sentiment": 0.0,  # sparse, often zero in backtest
-                "quality": quality_scores.get(ticker, 0.0),
-                "price_mom": mom_scores.get(ticker, 0.0),
-                "insider": insider_scores.get(ticker, 0.0),
-                "event_timing": event_scores.get(ticker, (0.0, {}))[0] if isinstance(event_scores.get(ticker), tuple) else 0.0,
-                # Context features
-                "atr_pct": sv.atr_regime.metadata.get("atr_pct", 0.0),
-                "vix_level": vix_level or 0.0,
-                # Live-computed signals (placeholder 0.0 in offline build)
-                "price_regression": 0.0,
-                "arima_forecast": 0.0,
-                # Label
-                "fwd_21d_return": fwd_return,
-            })
+            rows.append(
+                {
+                    "date": reb_date.strftime("%Y-%m-%d"),
+                    "ticker": ticker,
+                    "qid": qid,
+                    # 7 signal features
+                    "obv_trend": sv.obv_trend.score,
+                    "earnings": earn_entry[0] if earn_entry else 0.0,
+                    "inst_flow": inst_entry[0] if inst_entry else 0.0,
+                    "sentiment": 0.0,  # sparse, often zero in backtest
+                    "quality": quality_scores.get(ticker, 0.0),
+                    "price_mom": mom_scores.get(ticker, 0.0),
+                    "insider": insider_scores.get(ticker, 0.0),
+                    "event_timing": event_scores.get(ticker, (0.0, {}))[0]
+                    if isinstance(event_scores.get(ticker), tuple)
+                    else 0.0,
+                    # Context features
+                    "atr_pct": sv.atr_regime.metadata.get("atr_pct", 0.0),
+                    "vix_level": vix_level or 0.0,
+                    # Live-computed signals (placeholder 0.0 in offline build)
+                    "price_regression": 0.0,
+                    "arima_forecast": 0.0,
+                    # Label
+                    "fwd_21d_return": fwd_return,
+                }
+            )
 
     fm = pd.DataFrame(rows)
-    logger.info("Feature matrix: %d rows, %d dates, %d tickers",
-                len(fm), fm["qid"].nunique() if len(fm) > 0 else 0,
-                fm["ticker"].nunique() if len(fm) > 0 else 0)
+    logger.info(
+        "Feature matrix: %d rows, %d dates, %d tickers",
+        len(fm),
+        fm["qid"].nunique() if len(fm) > 0 else 0,
+        fm["ticker"].nunique() if len(fm) > 0 else 0,
+    )
     return fm
 
 

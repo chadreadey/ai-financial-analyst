@@ -49,18 +49,18 @@ def _format_risk_lines(returns, close) -> str:
         "=== Quantitative Risk Metrics ===",
         f"  Sharpe Ratio (ann.): {sharpe:.2f}",
         f"  Sortino Ratio (ann.): {sortino:.2f}",
-        f"  Max Drawdown: {max_dd*100:.1f}%",
+        f"  Max Drawdown: {max_dd * 100:.1f}%",
         f"  Calmar Ratio: {calmar:.2f}",
-        f"  Value at Risk (95%): {var_95*100:.2f}% daily",
+        f"  Value at Risk (95%): {var_95 * 100:.2f}% daily",
         f"  Return Skewness: {skew:.2f}",
         f"  Return Kurtosis: {kurt:.2f}",
-        f"  Annualized Return: {ann_ret*100:.1f}%",
-        f"  Annualized Volatility: {std_ret * np.sqrt(ann_factor)*100:.1f}%",
+        f"  Annualized Return: {ann_ret * 100:.1f}%",
+        f"  Annualized Volatility: {std_ret * np.sqrt(ann_factor) * 100:.1f}%",
     ]
     if best_month is not None:
-        lines.append(f"  Best Month: {best_month*100:+.1f}%")
+        lines.append(f"  Best Month: {best_month * 100:+.1f}%")
     if worst_month is not None:
-        lines.append(f"  Worst Month: {worst_month*100:+.1f}%")
+        lines.append(f"  Worst Month: {worst_month * 100:+.1f}%")
 
     return "\n".join(lines)
 

@@ -29,11 +29,14 @@ def _validate_news_item(item: dict, symbol: str) -> dict:
     """Log warning if required news fields are missing. Returns item unchanged."""
     missing = [k for k in _REQUIRED_NEWS_FIELDS if k not in item]
     if missing:
-        logger.warning("schema: news_item response for %s missing fields: %s", symbol, ", ".join(missing))
+        logger.warning(
+            "schema: news_item response for %s missing fields: %s", symbol, ", ".join(missing)
+        )
     return item
 
 
 # ── REST Client ───────────────────────────────────────────────────────
+
 
 class FinnhubClient:
     """Finnhub REST client. Uses query-param auth (avoids header casing issues)."""
@@ -63,7 +66,10 @@ class FinnhubClient:
         return resp.json()
 
     def get_company_news(
-        self, symbol: str, from_date: str, to_date: str,
+        self,
+        symbol: str,
+        from_date: str,
+        to_date: str,
     ) -> list[dict]:
         """
         Fetch company news articles.
@@ -77,18 +83,24 @@ class FinnhubClient:
             id, category, datetime (unix), headline, summary, source, url, related
         """
         try:
-            data = self._get("company-news", {
-                "symbol": symbol,
-                "from": from_date,
-                "to": to_date,
-            })
+            data = self._get(
+                "company-news",
+                {
+                    "symbol": symbol,
+                    "from": from_date,
+                    "to": to_date,
+                },
+            )
             return [_validate_news_item(item, symbol) for item in data]
         except Exception as exc:
             logger.debug("finnhub company-news %s failed: %s", symbol, exc, exc_info=True)
             return []
 
     def get_insider_sentiment(
-        self, symbol: str, from_date: str, to_date: str,
+        self,
+        symbol: str,
+        from_date: str,
+        to_date: str,
     ) -> list[dict]:
         """
         Fetch monthly insider sentiment (MSPR).
@@ -97,18 +109,23 @@ class FinnhubClient:
         MSPR in [-1, +1]: +1 = pure buying, -1 = pure selling.
         """
         try:
-            data = self._get("stock/insider-sentiment", {
-                "symbol": symbol,
-                "from": from_date,
-                "to": to_date,
-            })
+            data = self._get(
+                "stock/insider-sentiment",
+                {
+                    "symbol": symbol,
+                    "from": from_date,
+                    "to": to_date,
+                },
+            )
             return data.get("data", []) if isinstance(data, dict) else []
         except Exception as exc:
             logger.debug("finnhub insider-sentiment %s failed: %s", symbol, exc, exc_info=True)
             return []
 
     def get_economic_calendar(
-        self, from_date: str, to_date: str,
+        self,
+        from_date: str,
+        to_date: str,
     ) -> list[dict]:
         """
         Fetch economic calendar events (FOMC, CPI, NFP, GDP, etc.).
@@ -119,17 +136,22 @@ class FinnhubClient:
         Historical depth: several years back.
         """
         try:
-            data = self._get("calendar/economic", {
-                "from": from_date,
-                "to": to_date,
-            })
+            data = self._get(
+                "calendar/economic",
+                {
+                    "from": from_date,
+                    "to": to_date,
+                },
+            )
             return data.get("economicCalendar", []) if isinstance(data, dict) else []
         except Exception as exc:
             logger.debug("finnhub economic-calendar failed: %s", exc, exc_info=True)
             return []
 
     def get_earnings_calendar(
-        self, from_date: str, to_date: str,
+        self,
+        from_date: str,
+        to_date: str,
     ) -> list[dict]:
         """
         Fetch earnings calendar (upcoming and past).
@@ -139,10 +161,13 @@ class FinnhubClient:
             revenueEstimate, symbol, year
         """
         try:
-            data = self._get("calendar/earnings", {
-                "from": from_date,
-                "to": to_date,
-            })
+            data = self._get(
+                "calendar/earnings",
+                {
+                    "from": from_date,
+                    "to": to_date,
+                },
+            )
             return data.get("earningsCalendar", []) if isinstance(data, dict) else []
         except Exception as exc:
             logger.debug("finnhub earnings-calendar failed: %s", exc, exc_info=True)
@@ -156,10 +181,13 @@ class FinnhubClient:
             actual, estimate, period, quarter, year, surprise, surprisePercent, symbol
         """
         try:
-            return self._get("stock/earnings", {
-                "symbol": symbol,
-                "limit": limit,
-            })
+            return self._get(
+                "stock/earnings",
+                {
+                    "symbol": symbol,
+                    "limit": limit,
+                },
+            )
         except Exception as exc:
             logger.debug("finnhub earnings %s failed: %s", symbol, exc, exc_info=True)
             return []
@@ -185,6 +213,7 @@ class FinnhubClient:
 
 # ── In-Memory Cache ───────────────────────────────────────────────────
 
+
 class FinnhubCache:
     """Per-run thread-safe cache. Same two-lock pattern as TiingoCache."""
 
@@ -196,7 +225,10 @@ class FinnhubCache:
         self._earnings_cache: Dict[str, list] = {}
 
     def get_company_news(
-        self, symbol: str, from_date: str, to_date: str,
+        self,
+        symbol: str,
+        from_date: str,
+        to_date: str,
     ) -> list[dict]:
         sym = symbol.upper()
         key = f"{sym}:{from_date}:{to_date}"
@@ -212,7 +244,10 @@ class FinnhubCache:
             return list(result)
 
     def get_insider_sentiment(
-        self, symbol: str, from_date: str, to_date: str,
+        self,
+        symbol: str,
+        from_date: str,
+        to_date: str,
     ) -> list[dict]:
         sym = symbol.upper()
         key = f"{sym}:{from_date}:{to_date}"
@@ -242,6 +277,7 @@ class FinnhubCache:
 
 
 # ── Disk Cache ────────────────────────────────────────────────────────
+
 
 class SentimentDiskCache:
     """
@@ -345,6 +381,7 @@ class SentimentDiskCache:
 
 
 # ── Pre-fetch Helper ──────────────────────────────────────────────────
+
 
 def prefetch_sentiment_cache(
     tickers: list[str],

@@ -48,7 +48,8 @@ def parse_args() -> argparse.Namespace:
         help="Save the report to a file in the reports/ directory",
     )
     parser.add_argument(
-        "--output", "-o",
+        "--output",
+        "-o",
         type=str,
         default=None,
         help="Save the report to a specific file path",
@@ -125,8 +126,11 @@ async def main() -> None:
             logger.debug(
                 "  - %s: system=%d chars, context_raw=%d chars, "
                 "context_sent=%d chars, context_cap=%d chars",
-                agent.name, len(system), len(context),
-                len(trimmed), agent.get_context_limit(),
+                agent.name,
+                len(system),
+                len(context),
+                len(trimmed),
+                agent.get_context_limit(),
             )
         preview_chars = max(200, args.preview_chars)
         summary = data.financial_summary
@@ -146,9 +150,7 @@ async def main() -> None:
         raise
 
     result_dict = result.model_dump()
-    result_dict["agent_reports"] = [
-        (r.agent_name, r.analysis) for r in result.agent_reports
-    ]
+    result_dict["agent_reports"] = [(r.agent_name, r.analysis) for r in result.agent_reports]
     report = format_report(result_dict)
     print(f"\n{report}")
 

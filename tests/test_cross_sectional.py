@@ -21,7 +21,6 @@ def _make_sv(obv=0.0, earnings=0.0, inst_flow=0.0, sentiment=0.0):
 
 
 class TestNormalizeSignals:
-
     def test_normalization_centers_scores(self):
         from quant.cross_sectional import normalize_signals_cross_sectionally
 
@@ -39,10 +38,16 @@ class TestNormalizeSignals:
         }
 
         sector_fn = lambda t: {
-            "AAPL": "Tech", "MSFT": "Tech", "GOOGL": "Tech",
-            "JPM": "Financials", "BAC": "Financials", "GS": "Financials",
-            "XOM": "Energy", "CVX": "Energy",
-            "KO": "Staples", "PG": "Staples",
+            "AAPL": "Tech",
+            "MSFT": "Tech",
+            "GOOGL": "Tech",
+            "JPM": "Financials",
+            "BAC": "Financials",
+            "GS": "Financials",
+            "XOM": "Energy",
+            "CVX": "Energy",
+            "KO": "Staples",
+            "PG": "Staples",
         }[t]
 
         result = normalize_signals_cross_sectionally(signals, sector_fn)
@@ -67,10 +72,16 @@ class TestNormalizeSignals:
         }
 
         sector_fn = lambda t: {
-            "AAPL": "Tech", "MSFT": "Tech", "GOOGL": "Tech",
-            "DUK": "Utilities", "SO": "Utilities", "AEP": "Utilities",
-            "JPM": "Financials", "BAC": "Financials",
-            "KO": "Staples", "PG": "Staples",
+            "AAPL": "Tech",
+            "MSFT": "Tech",
+            "GOOGL": "Tech",
+            "DUK": "Utilities",
+            "SO": "Utilities",
+            "AEP": "Utilities",
+            "JPM": "Financials",
+            "BAC": "Financials",
+            "KO": "Staples",
+            "PG": "Staples",
         }[t]
 
         result = normalize_signals_cross_sectionally(signals, sector_fn)
@@ -82,10 +93,7 @@ class TestNormalizeSignals:
     def test_scores_bounded(self):
         from quant.cross_sectional import normalize_signals_cross_sectionally
 
-        signals = {
-            f"T{i}": _make_sv(obv=float(i) / 10 - 0.5)
-            for i in range(15)
-        }
+        signals = {f"T{i}": _make_sv(obv=float(i) / 10 - 0.5) for i in range(15)}
 
         result = normalize_signals_cross_sectionally(signals, lambda t: "Same")
 
@@ -107,7 +115,6 @@ class TestNormalizeSignals:
 
 
 class TestComputeNormalizedComposite:
-
     def test_weighted_average(self):
         from quant.cross_sectional import compute_normalized_composite
 
@@ -121,7 +128,7 @@ class TestComputeNormalizedComposite:
         }
 
         score = compute_normalized_composite(sv, weights)
-        expected = (0.8*0.40 + 0.4*0.30 + 0.2*0.15 + 0.1*0.10) / (0.40+0.30+0.15+0.10)
+        expected = (0.8 * 0.40 + 0.4 * 0.30 + 0.2 * 0.15 + 0.1 * 0.10) / (0.40 + 0.30 + 0.15 + 0.10)
         assert abs(score - expected) < 0.01
 
     def test_composite_clipped(self):
@@ -152,5 +159,5 @@ class TestComputeNormalizedComposite:
         }
 
         score = compute_normalized_composite(sv, weights)
-        expected = (0.6*0.40) / (0.40+0.30+0.15+0.10)
+        expected = (0.6 * 0.40) / (0.40 + 0.30 + 0.15 + 0.10)
         assert abs(score - expected) < 0.01

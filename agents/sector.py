@@ -51,11 +51,18 @@ class SectorSpecialistAgent(BaseAgent):
             parts.append("\n── Sector-Relevant Metrics ──")
             m = data.metrics
             for key in [
-                "revenue", "revenue_growth_yoy",
-                "revenue_cagr_3y", "revenue_cagr_5y",
-                "gross_margin", "operating_margin", "net_margin",
-                "gross_profit", "operating_income",
-                "roe", "roa", "roic",
+                "revenue",
+                "revenue_growth_yoy",
+                "revenue_cagr_3y",
+                "revenue_cagr_5y",
+                "gross_margin",
+                "operating_margin",
+                "net_margin",
+                "gross_profit",
+                "operating_income",
+                "roe",
+                "roa",
+                "roic",
             ]:
                 if key in m and m[key] is not None:
                     parts.append(f"  {key}: {m[key]}")

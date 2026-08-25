@@ -20,6 +20,7 @@ def run_batch(tickers: list[str]) -> dict[str, str]:
     model = TimesFMModel.get()
 
     import os, sys
+
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     from tiingo_client import TiingoClient
     from fmp_client import FMPClient
@@ -51,8 +52,15 @@ def run_batch(tickers: list[str]) -> dict[str, str]:
                 point_forecast=point,
                 quantiles=quantiles,
             )
-            cache.put_signals(ticker, "price_forecast", price_signals, ttl_seconds=settings.timesfm_ttl_seconds)
-            logger.info("%s: price_forecast cached (%d points -> %d-step forecast)", ticker, len(prices), horizon)
+            cache.put_signals(
+                ticker, "price_forecast", price_signals, ttl_seconds=settings.timesfm_ttl_seconds
+            )
+            logger.info(
+                "%s: price_forecast cached (%d points -> %d-step forecast)",
+                ticker,
+                len(prices),
+                horizon,
+            )
 
             try:
                 income = fmp.get_income_statement_quarterly(ticker, limit=20)
@@ -73,13 +81,26 @@ def run_batch(tickers: list[str]) -> dict[str, str]:
                             point_forecast=eps_point,
                             quantiles=eps_quantiles,
                         )
-                        cache.put_signals(ticker, "eps_forecast", eps_signals, ttl_seconds=settings.timesfm_ttl_seconds)
+                        cache.put_signals(
+                            ticker,
+                            "eps_forecast",
+                            eps_signals,
+                            ttl_seconds=settings.timesfm_ttl_seconds,
+                        )
                         logger.info("%s: eps_forecast cached (%d quarters)", ticker, len(eps_pairs))
                     else:
-                        logger.warning("%s: insufficient EPS data (%d pairs), skipping eps_forecast", ticker, len(eps_pairs))
+                        logger.warning(
+                            "%s: insufficient EPS data (%d pairs), skipping eps_forecast",
+                            ticker,
+                            len(eps_pairs),
+                        )
                 else:
                     qcount = len(income) if income else 0
-                    logger.warning("%s: insufficient EPS data (%d quarters), skipping eps_forecast", ticker, qcount)
+                    logger.warning(
+                        "%s: insufficient EPS data (%d quarters), skipping eps_forecast",
+                        ticker,
+                        qcount,
+                    )
             except Exception as eps_exc:
                 logger.warning("%s: EPS forecast failed — %s", ticker, eps_exc)
 

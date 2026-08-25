@@ -24,6 +24,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 import pandas as pd
@@ -50,36 +51,46 @@ def progress(msg: str):
 
 def main():
     parser = argparse.ArgumentParser(description="Phase 0: Signal Validation Diagnostic")
-    parser.add_argument("--universe", default="liquid_20",
-                        help="Universe (default: liquid_20)")
-    parser.add_argument("--tickers", default="",
-                        help="Comma-separated tickers (overrides --universe)")
-    parser.add_argument("--start", default="2018-01-01",
-                        help="Start date (default: 2018-01-01)")
-    parser.add_argument("--end", default="",
-                        help="End date (default: today)")
-    parser.add_argument("--skip-redundancy", action="store_true",
-                        help="Skip Phase 0a (redundancy analysis)")
-    parser.add_argument("--skip-cpcv", action="store_true",
-                        help="Skip Phase 0b (CPCV validation)")
-    parser.add_argument("--skip-ff5", action="store_true",
-                        help="Skip Phase 0c (factor attribution)")
-    parser.add_argument("--n-groups", type=int, default=16,
-                        help="CPCV groups (default: 16)")
-    parser.add_argument("--cpcv-max-combos", type=int, default=500,
-                        help="CPCV max combos (default: 500, 0=all)")
-    parser.add_argument("--train-months", type=int, default=24,
-                        help="Walk-forward train window (default: 24)")
-    parser.add_argument("--test-months", type=int, default=6,
-                        help="Walk-forward test window (default: 6)")
-    parser.add_argument("--enable-institutional-flow", action="store_true",
-                        help="Enable institutional flow signal (FMP + Finnhub)")
-    parser.add_argument("--institutional-flow-weight", type=float, default=0.15,
-                        help="Institutional flow signal weight (default: 0.15)")
-    parser.add_argument("--enable-xgb-ranker", action="store_true",
-                        help="Use XGBoost ranking instead of linear composite")
-    parser.add_argument("--output", default="",
-                        help="Save results to JSON")
+    parser.add_argument("--universe", default="liquid_20", help="Universe (default: liquid_20)")
+    parser.add_argument(
+        "--tickers", default="", help="Comma-separated tickers (overrides --universe)"
+    )
+    parser.add_argument("--start", default="2018-01-01", help="Start date (default: 2018-01-01)")
+    parser.add_argument("--end", default="", help="End date (default: today)")
+    parser.add_argument(
+        "--skip-redundancy", action="store_true", help="Skip Phase 0a (redundancy analysis)"
+    )
+    parser.add_argument("--skip-cpcv", action="store_true", help="Skip Phase 0b (CPCV validation)")
+    parser.add_argument(
+        "--skip-ff5", action="store_true", help="Skip Phase 0c (factor attribution)"
+    )
+    parser.add_argument("--n-groups", type=int, default=16, help="CPCV groups (default: 16)")
+    parser.add_argument(
+        "--cpcv-max-combos", type=int, default=500, help="CPCV max combos (default: 500, 0=all)"
+    )
+    parser.add_argument(
+        "--train-months", type=int, default=24, help="Walk-forward train window (default: 24)"
+    )
+    parser.add_argument(
+        "--test-months", type=int, default=6, help="Walk-forward test window (default: 6)"
+    )
+    parser.add_argument(
+        "--enable-institutional-flow",
+        action="store_true",
+        help="Enable institutional flow signal (FMP + Finnhub)",
+    )
+    parser.add_argument(
+        "--institutional-flow-weight",
+        type=float,
+        default=0.15,
+        help="Institutional flow signal weight (default: 0.15)",
+    )
+    parser.add_argument(
+        "--enable-xgb-ranker",
+        action="store_true",
+        help="Use XGBoost ranking instead of linear composite",
+    )
+    parser.add_argument("--output", default="", help="Save results to JSON")
     parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args()
 
@@ -90,8 +101,11 @@ def main():
     # Suppress noisy loggers
     logging.getLogger("urllib3").setLevel(logging.WARNING)
 
-    tickers = ([t.strip().upper() for t in args.tickers.split(",") if t.strip()]
-               if args.tickers else get_universe(args.universe))
+    tickers = (
+        [t.strip().upper() for t in args.tickers.split(",") if t.strip()]
+        if args.tickers
+        else get_universe(args.universe)
+    )
 
     end_date = args.end or datetime.now().strftime("%Y-%m-%d")
 
@@ -149,9 +163,11 @@ def main():
     if wf_result.walk_forward:
         print(f"\n  Windows:")
         for w in wf_result.walk_forward:
-            print(f"    {w['test_start']} → {w['test_end']}: "
-                  f"{w['return_pct']:+6.2f}% | {w['n_trades']} trades | "
-                  f"win {w['win_rate_pct']:.0f}%")
+            print(
+                f"    {w['test_start']} → {w['test_end']}: "
+                f"{w['return_pct']:+6.2f}% | {w['n_trades']} trades | "
+                f"win {w['win_rate_pct']:.0f}%"
+            )
 
     results["walk_forward"] = {
         "total_return_pct": wf_result.total_return_pct,
@@ -181,9 +197,7 @@ def main():
             mean_corr, std_corr, diag = compute_signal_correlation_matrix(
                 universe_data, list(rebalance_dates)
             )
-            ic_table = compute_signal_ic_table(
-                universe_data, list(rebalance_dates)
-            )
+            ic_table = compute_signal_ic_table(universe_data, list(rebalance_dates))
             report = print_correlation_report(mean_corr, std_corr, diag, ic_table)
             print(report)
 
@@ -200,7 +214,9 @@ def main():
                 results["redundancy"]["ic_summary"] = {
                     sig: {
                         "mean_ic": round(float(ic_means[sig]), 4),
-                        "t_stat": round(float(ic_tstats[sig]), 2) if not pd.isna(ic_tstats[sig]) else 0,
+                        "t_stat": round(float(ic_tstats[sig]), 2)
+                        if not pd.isna(ic_tstats[sig])
+                        else 0,
                     }
                     for sig in ic_table.columns
                 }
@@ -258,8 +274,10 @@ def main():
 
                 progress("Computing daily returns from equity curve...")
                 daily_returns = equity_curve_to_daily_returns(wf_result.equity_curve)
-                progress(f"Portfolio returns: {len(daily_returns)} days, "
-                         f"{daily_returns.index.min().date()} to {daily_returns.index.max().date()}")
+                progress(
+                    f"Portfolio returns: {len(daily_returns)} days, "
+                    f"{daily_returns.index.min().date()} to {daily_returns.index.max().date()}"
+                )
 
                 # Full-sample regression
                 progress("Running full-sample FF5+Mom regression...")
@@ -287,12 +305,15 @@ def main():
                         rolling = rolling_factor_regression(daily_returns, factors)
                         print(print_rolling_summary(rolling))
                     else:
-                        print(f"\n  Skipping rolling regression: need 5+ years, have "
-                              f"{len(daily_returns) / 252:.1f} years")
+                        print(
+                            f"\n  Skipping rolling regression: need 5+ years, have "
+                            f"{len(daily_returns) / 252:.1f} years"
+                        )
 
             except Exception as e:
                 print(f"  Factor attribution failed: {e}")
                 import traceback
+
                 traceback.print_exc()
 
     # ── Phase 0d: Summary Verdict ──────────────────────────────────────

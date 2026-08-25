@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 import os
@@ -31,20 +32,23 @@ def main():
     parser = argparse.ArgumentParser(description="XGBoost Meta-Model Test")
     parser.add_argument("--universe", default="liquid_50")
     parser.add_argument("--start", default="2014-01-01")
-    parser.add_argument("--train-end", default="2023-01-01",
-                        help="End of training period (default: 2023-01-01)")
-    parser.add_argument("--val-months", type=int, default=12,
-                        help="Validation months after train-end (default: 12)")
-    parser.add_argument("--rebuild-features", action="store_true",
-                        help="Force rebuild feature matrix (skip cache)")
+    parser.add_argument(
+        "--train-end", default="2023-01-01", help="End of training period (default: 2023-01-01)"
+    )
+    parser.add_argument(
+        "--val-months", type=int, default=12, help="Validation months after train-end (default: 12)"
+    )
+    parser.add_argument(
+        "--rebuild-features", action="store_true", help="Force rebuild feature matrix (skip cache)"
+    )
     args = parser.parse_args()
 
     tickers = get_universe(args.universe)
     feature_path = f".xgb_features_{args.universe}.csv"
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  XGBOOST META-MODEL TEST")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"  Universe: {args.universe} ({len(tickers)} tickers)")
     print(f"  Train: {args.start} to {args.train_end}")
     print(f"  Validation: {args.val_months} months after train-end")
@@ -53,6 +57,7 @@ def main():
     if os.path.exists(feature_path) and not args.rebuild_features:
         progress(f"Loading cached feature matrix from {feature_path}")
         from quant.xgb_features import load_feature_matrix
+
         fm = load_feature_matrix(feature_path)
         progress(f"Loaded {len(fm)} rows")
     else:
@@ -71,6 +76,7 @@ def main():
         # Load sector ETFs
         from quant.backtest import _load_sector_etf_data
         from price_provider import get_price_provider
+
         provider = get_price_provider()
         sector_etf_data = _load_sector_etf_data(args.start, provider)
 
@@ -80,6 +86,7 @@ def main():
         try:
             from quant.wrds_store import WRDSPointInTimeStore
             from quant.fundamental_provider import WRDSFundamentalProvider
+
             store = WRDSPointInTimeStore()
             if store.summary().get("compustat_quarterly", 0) > 0:
                 wrds_provider = WRDSFundamentalProvider(store)
@@ -98,6 +105,7 @@ def main():
         sentiment_cache = None
         try:
             from finnhub_client import FinnhubClient, SentimentDiskCache
+
             sentiment_cache = SentimentDiskCache()
             finnhub_key = os.getenv("FINNHUB_API_KEY", "").strip()
             if finnhub_key:
@@ -127,15 +135,17 @@ def main():
         save_feature_matrix(fm, feature_path)
 
     # ── Phase 2: Train and validate ──
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  TRAINING XGBOOST RANKER")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     from quant.xgb_ranker import train_with_temporal_split
 
     t0 = time.time()
     model, metrics = train_with_temporal_split(
-        fm, train_end_date=args.train_end, val_months=args.val_months,
+        fm,
+        train_end_date=args.train_end,
+        val_months=args.val_months,
     )
     elapsed = time.time() - t0
 
@@ -167,13 +177,21 @@ def main():
 
     if len(val) > 0:
         # Equal-weight linear composite
-        signal_cols = ["obv_trend", "earnings", "inst_flow", "sentiment",
-                       "quality", "price_mom", "insider"]
+        signal_cols = [
+            "obv_trend",
+            "earnings",
+            "inst_flow",
+            "sentiment",
+            "quality",
+            "price_mom",
+            "insider",
+        ]
         linear_score = val[signal_cols].mean(axis=1)
         linear_ic, _ = spearmanr(linear_score, val["fwd_21d_return"])
 
         # XGB score
         from quant.xgb_ranker import FEATURE_COLS
+
         xgb_score = model.predict(val[FEATURE_COLS])
         xgb_ic, _ = spearmanr(xgb_score, val["fwd_21d_return"])
 
@@ -181,9 +199,9 @@ def main():
         print(f"  XGBoost IC:             {xgb_ic:+.4f}")
         print(f"  Improvement:            {(xgb_ic - linear_ic):+.4f}")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"  DONE")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
 
 if __name__ == "__main__":

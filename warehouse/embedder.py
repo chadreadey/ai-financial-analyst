@@ -39,6 +39,7 @@ def _fetch_sections(
       ticker, accession, section_key, text, form_type, filing_date
     """
     from warehouse.db import WarehouseDB
+
     db = WarehouseDB(db_path)
     return db.list_filing_sections(tickers=tickers)
 
@@ -74,15 +75,17 @@ def upsert_ticker_sections(
         records = []
         for row in chunk:
             rid = _make_vector_id(row["ticker"], row["accession"], row["section_key"])
-            records.append({
-                "_id": rid,
-                "text": row["text"][:4000],
-                "ticker": row["ticker"],
-                "accession": row["accession"],
-                "section_key": row["section_key"],
-                "form_type": row["form_type"],
-                "filing_date": row["filing_date"],
-            })
+            records.append(
+                {
+                    "_id": rid,
+                    "text": row["text"][:4000],
+                    "ticker": row["ticker"],
+                    "accession": row["accession"],
+                    "section_key": row["section_key"],
+                    "form_type": row["form_type"],
+                    "filing_date": row["filing_date"],
+                }
+            )
 
         ns = namespace or "__default__"
         if dry_run:

@@ -6,6 +6,7 @@ canonicalize NaN / +inf / -inf to deterministic string sentinels so that
 `json.dumps(..., allow_nan=False)` succeeds while preserving hash stability
 across identical configs.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -24,9 +25,8 @@ class _FakeConfig:
 
 # ── Basic scalar non-finite floats ────────────────────────────────────────
 
-@pytest.mark.parametrize(
-    "bad", [float("nan"), float("inf"), float("-inf")]
-)
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
 def test_non_finite_floats_are_hashable_and_deterministic(bad):
     a = _FakeConfig(tickers=["AAPL"], long_threshold=bad)
     b = _FakeConfig(tickers=["AAPL"], long_threshold=bad)
@@ -55,6 +55,7 @@ def test_non_finite_differs_from_finite():
 
 
 # ── Nested structures ────────────────────────────────────────────────────
+
 
 def test_nested_dict_with_nan_is_hashable():
     cfg = {"tickers": ["AAPL"], "nested": {"x": float("nan"), "y": 0.3}}
@@ -88,6 +89,7 @@ def test_nested_dict_with_all_three_non_finite():
 
 
 # ── Numpy scalar coverage ────────────────────────────────────────────────
+
 
 def test_numpy_float_nan_is_hashable():
     np = pytest.importorskip("numpy")
@@ -131,6 +133,7 @@ def test_numpy_neg_inf_differs_from_pos_inf():
 
 
 # ── Strict JSON invariant: allow_nan=False enforced ───────────────────────
+
 
 def test_serialized_hash_does_not_contain_nan_or_infinity_literals():
     """Defense-in-depth: a successful hash run must never have relied on

@@ -44,7 +44,7 @@ def compute_price_regression_score(
     series = np.log(raw)
     x = np.arange(len(series), dtype=float)
     slope, _, r_value, _, _ = linregress(x, series)
-    r2 = r_value ** 2
+    r2 = r_value**2
     if r2 < r2_threshold:
         return 0.0
     raw = np.tanh(slope * window * 5.0)

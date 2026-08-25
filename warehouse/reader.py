@@ -105,9 +105,7 @@ def _reconstruct_metrics(facts: list[dict]) -> dict[str, Any]:
     total_liabilities = _latest_10k_value(facts, ["Liabilities"])
     equity = _latest_10k_value(facts, ["StockholdersEquity"])
     cash = _latest_10k_value(facts, ["CashAndCashEquivalentsAtCarryingValue"])
-    long_term_debt = _latest_10k_value(
-        facts, ["LongTermDebt", "LongTermDebtNoncurrent"]
-    )
+    long_term_debt = _latest_10k_value(facts, ["LongTermDebt", "LongTermDebtNoncurrent"])
     metrics["total_assets"] = total_assets
     metrics["total_liabilities"] = total_liabilities
     metrics["stockholders_equity"] = equity
@@ -123,12 +121,8 @@ def _reconstruct_metrics(facts: list[dict]) -> dict[str, Any]:
     if total_assets and total_assets != 0 and net_income is not None:
         metrics["roa"] = round(net_income / total_assets, 4)
 
-    operating_cf = _latest_10k_value(
-        facts, ["NetCashProvidedByUsedInOperatingActivities"]
-    )
-    capex = _latest_10k_value(
-        facts, ["PaymentsToAcquirePropertyPlantAndEquipment"]
-    )
+    operating_cf = _latest_10k_value(facts, ["NetCashProvidedByUsedInOperatingActivities"])
+    capex = _latest_10k_value(facts, ["PaymentsToAcquirePropertyPlantAndEquipment"])
     metrics["operating_cash_flow"] = operating_cf
     metrics["capex"] = capex
     if operating_cf is not None and capex is not None:
@@ -136,9 +130,7 @@ def _reconstruct_metrics(facts: list[dict]) -> dict[str, Any]:
 
     metrics["eps_basic"] = _latest_10k_value(facts, ["EarningsPerShareBasic"])
     metrics["eps_diluted"] = _latest_10k_value(facts, ["EarningsPerShareDiluted"])
-    metrics["shares_outstanding"] = _latest_10k_value(
-        facts, ["CommonStockSharesOutstanding"]
-    )
+    metrics["shares_outstanding"] = _latest_10k_value(facts, ["CommonStockSharesOutstanding"])
 
     rev_series = _resolve_revenue_series(facts)
     if len(rev_series) >= 2:

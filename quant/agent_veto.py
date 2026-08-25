@@ -82,10 +82,12 @@ def compute_balance_sheet_veto(
         # D/E change
         equity_now = current.get("totalStockholdersEquity") or 0
         equity_prior = prior.get("totalStockholdersEquity") or 0
-        debt_now = (current.get("totalDebt") or
-                    ((current.get("shortTermDebt") or 0) + (current.get("longTermDebt") or 0)))
-        debt_prior = (prior.get("totalDebt") or
-                      ((prior.get("shortTermDebt") or 0) + (prior.get("longTermDebt") or 0)))
+        debt_now = current.get("totalDebt") or (
+            (current.get("shortTermDebt") or 0) + (current.get("longTermDebt") or 0)
+        )
+        debt_prior = prior.get("totalDebt") or (
+            (prior.get("shortTermDebt") or 0) + (prior.get("longTermDebt") or 0)
+        )
 
         if equity_now > 0 and equity_prior > 0:
             de_now = debt_now / equity_now
@@ -97,11 +99,11 @@ def compute_balance_sheet_veto(
         cash_now = current.get("cashAndCashEquivalents") or 0
         cash_prior = prior.get("cashAndCashEquivalents") or 0
         if cash_prior > 0 and (cash_now - cash_prior) / cash_prior < -0.15:
-            flags.append(f"cash burn: {cash_prior/1e6:.0f}M→{cash_now/1e6:.0f}M")
+            flags.append(f"cash burn: {cash_prior / 1e6:.0f}M→{cash_now / 1e6:.0f}M")
 
         # Equity erosion
         if equity_prior > 0 and (equity_now - equity_prior) / abs(equity_prior) < -0.10:
-            flags.append(f"equity erosion: {equity_prior/1e6:.0f}M→{equity_now/1e6:.0f}M")
+            flags.append(f"equity erosion: {equity_prior / 1e6:.0f}M→{equity_now / 1e6:.0f}M")
 
         veto = len(flags) >= 2
         return veto, {"flags": flags, "n_flags": len(flags)}
@@ -253,25 +255,31 @@ def apply_agent_veto(
         n_vetos = sum([bs_veto, earn_veto, analyst_veto])
 
         if n_vetos >= min_flags:
-            veto_log.append({
-                "ticker": ticker,
-                "score": round(score, 3),
-                "n_vetos": n_vetos,
-                "bs_veto": bs_veto,
-                "earn_veto": earn_veto,
-                "analyst_veto": analyst_veto,
-                "bs_detail": bs_meta,
-                "earn_detail": earn_meta,
-                "analyst_detail": analyst_meta,
-            })
+            veto_log.append(
+                {
+                    "ticker": ticker,
+                    "score": round(score, 3),
+                    "n_vetos": n_vetos,
+                    "bs_veto": bs_veto,
+                    "earn_veto": earn_veto,
+                    "analyst_veto": analyst_veto,
+                    "bs_detail": bs_meta,
+                    "earn_detail": earn_meta,
+                    "analyst_detail": analyst_meta,
+                }
+            )
             sv.flags.append(f"VETOED(n={n_vetos})")
         else:
             survivors.append((ticker, score, sv))
 
     if veto_log:
         vetoed_tickers = [v["ticker"] for v in veto_log]
-        logger.info("Agent veto removed %d/%d candidates: %s",
-                     len(veto_log), len(candidates), ", ".join(vetoed_tickers))
+        logger.info(
+            "Agent veto removed %d/%d candidates: %s",
+            len(veto_log),
+            len(candidates),
+            ", ".join(vetoed_tickers),
+        )
 
     return survivors, veto_log
 
@@ -334,6 +342,7 @@ def compute_fundamental_strength_veto(
     # ERM via earnings_signals
     try:
         from quant.earnings_signals import compute_erm_score
+
         erm_score, erm_meta = compute_erm_score(ticker, provider, as_of_date)
         # compute_erm_score returns 0.0 when data missing; treat 0 with an
         # 'error' meta as missing (don't count as strength signal).
@@ -357,6 +366,7 @@ def compute_fundamental_strength_veto(
     # SUE via earnings_signals
     try:
         from quant.earnings_signals import compute_sue_score
+
         sue_score, sue_meta = compute_sue_score(ticker, provider, as_of_date)
         if isinstance(sue_meta, dict) and sue_meta.get("error"):
             sue_score = None
@@ -420,7 +430,10 @@ def apply_short_fundamental_veto(
 
     for ticker, score, sv in short_candidates:
         is_strong, meta = compute_fundamental_strength_veto(
-            ticker, provider, sv, as_of_date,
+            ticker,
+            provider,
+            sv,
+            as_of_date,
             erm_threshold=erm_threshold,
             quality_threshold=quality_threshold,
             sue_threshold=sue_threshold,
@@ -428,21 +441,26 @@ def apply_short_fundamental_veto(
         n_flags = meta.get("n_flags", 0)
 
         if is_strong and n_flags >= min_strong_signals:
-            veto_log.append({
-                "ticker": ticker,
-                "score": round(float(score), 3),
-                "n_flags": n_flags,
-                "flags": meta.get("flags", []),
-                "erm_score": meta.get("erm_score"),
-                "quality_score": meta.get("quality_score"),
-                "sue_score": meta.get("sue_score"),
-                "inputs_seen": meta.get("inputs_seen", 0),
-            })
+            veto_log.append(
+                {
+                    "ticker": ticker,
+                    "score": round(float(score), 3),
+                    "n_flags": n_flags,
+                    "flags": meta.get("flags", []),
+                    "erm_score": meta.get("erm_score"),
+                    "quality_score": meta.get("quality_score"),
+                    "sue_score": meta.get("sue_score"),
+                    "inputs_seen": meta.get("inputs_seen", 0),
+                }
+            )
             if sv is not None and hasattr(sv, "flags"):
                 sv.flags.append(f"SHORT_VETOED(strength={n_flags})")
             logger.debug(
                 "Short veto %s (score=%.3f): %d strength flags — %s",
-                ticker, score, n_flags, ", ".join(meta.get("flags", [])),
+                ticker,
+                score,
+                n_flags,
+                ", ".join(meta.get("flags", [])),
             )
         else:
             survivors.append((ticker, score, sv))
@@ -451,7 +469,9 @@ def apply_short_fundamental_veto(
         vetoed = [v["ticker"] for v in veto_log]
         logger.info(
             "Short fundamental-strength veto removed %d/%d candidates: %s",
-            len(veto_log), len(short_candidates), ", ".join(vetoed),
+            len(veto_log),
+            len(short_candidates),
+            ", ".join(vetoed),
         )
 
     return survivors, veto_log

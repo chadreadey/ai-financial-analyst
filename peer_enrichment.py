@@ -36,6 +36,7 @@ def _get_sec_ticker_set() -> set:
             return _SEC_TICKERS
         try:
             import requests
+
             resp = requests.get(
                 "https://www.sec.gov/files/company_tickers.json",
                 headers={"User-Agent": "ai-financial-analyst research@example.com"},
@@ -63,15 +64,88 @@ PEER_METRICS = [
 ]
 
 TICKER_BLOCKLIST = {
-    "THE", "AND", "FOR", "ARE", "BUT", "NOT", "YOU", "ALL", "CAN", "HAD",
-    "HER", "WAS", "ONE", "OUR", "OUT", "ITS", "HAS", "HIS", "HOW", "TOP",
-    "NEW", "NOW", "OLD", "SEE", "WAY", "WHO", "DID", "GET", "LET", "SAY",
-    "SHE", "TOO", "USE", "CEO", "CFO", "COO", "IPO", "ETF", "GDP", "USA",
-    "NYSE", "SEC", "AI", "EPS", "PE", "PS", "ROE", "ROA", "FCF", "YOY",
-    "QOQ", "VS", "EST", "AVG", "TTM", "FWD", "USD", "EUR", "GBP", "CAD",
-    "WITH", "FROM", "THIS", "THAT", "WILL", "HAVE", "BEEN", "ALSO", "THAN",
-    "MOST", "INTO", "OVER", "SUCH", "MORE", "SOME", "VERY", "WHEN", "WHAT",
-    "INC", "LLC", "LTD", "CORP",
+    "THE",
+    "AND",
+    "FOR",
+    "ARE",
+    "BUT",
+    "NOT",
+    "YOU",
+    "ALL",
+    "CAN",
+    "HAD",
+    "HER",
+    "WAS",
+    "ONE",
+    "OUR",
+    "OUT",
+    "ITS",
+    "HAS",
+    "HIS",
+    "HOW",
+    "TOP",
+    "NEW",
+    "NOW",
+    "OLD",
+    "SEE",
+    "WAY",
+    "WHO",
+    "DID",
+    "GET",
+    "LET",
+    "SAY",
+    "SHE",
+    "TOO",
+    "USE",
+    "CEO",
+    "CFO",
+    "COO",
+    "IPO",
+    "ETF",
+    "GDP",
+    "USA",
+    "NYSE",
+    "SEC",
+    "AI",
+    "EPS",
+    "PE",
+    "PS",
+    "ROE",
+    "ROA",
+    "FCF",
+    "YOY",
+    "QOQ",
+    "VS",
+    "EST",
+    "AVG",
+    "TTM",
+    "FWD",
+    "USD",
+    "EUR",
+    "GBP",
+    "CAD",
+    "WITH",
+    "FROM",
+    "THIS",
+    "THAT",
+    "WILL",
+    "HAVE",
+    "BEEN",
+    "ALSO",
+    "THAN",
+    "MOST",
+    "INTO",
+    "OVER",
+    "SUCH",
+    "MORE",
+    "SOME",
+    "VERY",
+    "WHEN",
+    "WHAT",
+    "INC",
+    "LLC",
+    "LTD",
+    "CORP",
 }
 
 
@@ -141,6 +215,7 @@ def _industry_match_score(
 
 def _market_cap_proximity(subject_cap: float, peer_cap: float) -> float:
     import math
+
     if subject_cap <= 0 or peer_cap <= 0:
         return 0.0
     ratio = max(subject_cap, peer_cap) / min(subject_cap, peer_cap)
@@ -192,8 +267,7 @@ def discover_peers(
                 f"of {company_name} stock ticker symbols list"
             )
         queries.append(
-            f"{company_name} ({ticker}) top direct competitors "
-            f"publicly traded stock ticker symbols"
+            f"{company_name} ({ticker}) top direct competitors publicly traded stock ticker symbols"
         )
 
         try:
@@ -212,9 +286,7 @@ def discover_peers(
                     )
                     for item in results.get("results", []):
                         text = f"{item.get('title', '')} {item.get('content', '')}"
-                        found = re.findall(
-                            r'(?:^|[\s(,;|])([A-Z]{2,5})(?:[\s),;|.]|$)', text
-                        )
+                        found = re.findall(r"(?:^|[\s(,;|])([A-Z]{2,5})(?:[\s),;|.]|$)", text)
                         for t in found:
                             t = t.strip()
                             if (
@@ -254,9 +326,7 @@ def discover_peers(
         peer_sector = peer_info.get("sector", "")
         peer_cap = peer_info.get("marketCap", 0) or 0
 
-        ind_score = _industry_match_score(
-            peer_industry, peer_sector, industry, sector
-        )
+        ind_score = _industry_match_score(peer_industry, peer_sector, industry, sector)
         cap_score = _market_cap_proximity(subject_cap, peer_cap) if subject_cap else 0.5
 
         composite = ind_score * 3.0 + cap_score
@@ -399,9 +469,7 @@ def build_peer_comparison(
     peer_data: List[Dict[str, Any]] = []
     metrics_by_ticker: Dict[str, Optional[Dict[str, Any]]] = {}
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        fut_to_peer = {
-            pool.submit(_fetch_peer_metrics, p, cache, fmp_cache): p for p in peers
-        }
+        fut_to_peer = {pool.submit(_fetch_peer_metrics, p, cache, fmp_cache): p for p in peers}
         for fut in as_completed(fut_to_peer):
             p = fut_to_peer[fut]
             metrics_by_ticker[p] = fut.result()
@@ -423,14 +491,11 @@ def build_peer_comparison(
         if peer_industries == {subject_industry}:
             lines.append("Peer match quality: EXACT industry match")
         elif all(
-            _industry_match_score(pi, "", subject_industry, "") >= 2
-            for pi in peer_industries
+            _industry_match_score(pi, "", subject_industry, "") >= 2 for pi in peer_industries
         ):
             lines.append("Peer match quality: RELATED industries")
         else:
-            lines.append(
-                f"Peer industries: {', '.join(sorted(peer_industries))}"
-            )
+            lines.append(f"Peer industries: {', '.join(sorted(peer_industries))}")
     lines.append("")
 
     medians: Dict[str, Optional[float]] = {}
@@ -452,7 +517,7 @@ def build_peer_comparison(
             if k in ("marketCap", "totalRevenue"):
                 return format_money(v)
             if k in ("grossMargins", "operatingMargins", "revenueGrowth"):
-                return f"{float(v)*100:.1f}%"
+                return f"{float(v) * 100:.1f}%"
             return f"{float(v):.2f}"
 
         lines.append(f"{label:<16} {_fmt(sub_val, key):>12} {_fmt(med_val, key):>12}")
@@ -464,11 +529,13 @@ def build_peer_comparison(
         ind = d.get("industry", "")
         cap = format_money(d.get("marketCap"))
         pe = f"P/E {float(d['trailingPE']):.1f}" if d.get("trailingPE") else "P/E N/A"
-        gm = f"GM {float(d['grossMargins'])*100:.0f}%" if d.get("grossMargins") else "GM N/A"
+        gm = f"GM {float(d['grossMargins']) * 100:.0f}%" if d.get("grossMargins") else "GM N/A"
         ind_tag = f" [{ind}]" if ind and ind != subject_industry else ""
         lines.append(f"  {d['ticker']} ({name}): {cap} | {pe} | {gm}{ind_tag}")
 
     section = "\n".join(lines)
     section = trim_text(section, settings.max_peer_section_chars)
-    source_label = "FMP (peer data)" if fmp_cache and env_flag("ENABLE_FMP") else "Yahoo Finance (peer data)"
+    source_label = (
+        "FMP (peer data)" if fmp_cache and env_flag("ENABLE_FMP") else "Yahoo Finance (peer data)"
+    )
     return section, [source_label]

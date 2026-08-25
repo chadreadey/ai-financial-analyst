@@ -35,6 +35,17 @@ class LLMProvider(ABC):
         """Generate text for a system + user prompt pair."""
 
 
+# Models that reject sampling params (temperature/top_p/top_k return 400).
+_NO_SAMPLING_MODEL_PREFIXES = (
+    "claude-opus-5",
+    "claude-opus-4-8",
+    "claude-opus-4-7",
+    "claude-sonnet-5",
+    "claude-fable-5",
+    "claude-mythos-5",
+)
+
+
 class AnthropicProvider(LLMProvider):
     """Anthropic Claude provider."""
 
@@ -43,6 +54,7 @@ class AnthropicProvider(LLMProvider):
 
     def __init__(self, api_key: Optional[str] = None):
         import os
+
         key = api_key or os.getenv("ANTHROPIC_API_KEY") or settings.anthropic_api_key or None
         self._client = AsyncAnthropic(api_key=key)
         self._prompt_caching = settings.enable_prompt_caching
@@ -59,14 +71,20 @@ class AnthropicProvider(LLMProvider):
             if self._prompt_caching
             else system
         )
+        resolved_model = model or self.default_model
+        kwargs = {}
+        if not resolved_model.startswith(_NO_SAMPLING_MODEL_PREFIXES):
+            kwargs["temperature"] = 0.0
         message = await self._client.messages.create(
-            model=model or self.default_model,
+            model=resolved_model,
             max_tokens=max_tokens,
-            temperature=0.0,
             system=system_param,
             messages=[{"role": "user", "content": user}],
+            **kwargs,
         )
-        return message.content[0].text
+        if message.stop_reason == "refusal":
+            raise RuntimeError(f"Model {resolved_model} refused the request")
+        return next(b.text for b in message.content if b.type == "text")
 
 
 class OpenAIProvider(LLMProvider):
@@ -81,6 +99,7 @@ class OpenAIProvider(LLMProvider):
         base_url: Optional[str] = None,
     ):
         import os
+
         # Read live env vars so per-request overrides from jobs.py take effect.
         # settings.* is a frozen Pydantic singleton and won't see runtime changes.
         key = api_key or os.getenv("OPENAI_API_KEY") or settings.openai_api_key or None

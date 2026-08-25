@@ -83,11 +83,13 @@ QUARTERLY_SERIES: Dict[str, str] = {
 
 # ── REST Client ────────────────────────────────────────────────────────
 
+
 class FREDClient:
     """FRED API client via fredapi. Handles rate-limit backoff."""
 
     def __init__(self, api_key: str) -> None:
         from fredapi import Fred
+
         self._fred = Fred(api_key=api_key)
         self._call_count = 0
 
@@ -132,6 +134,7 @@ class FREDClient:
 
 
 # ── In-Memory Cache ────────────────────────────────────────────────────
+
 
 class FREDCache:
     """Per-run thread-safe cache. Same two-lock pattern as FinnhubCache."""
@@ -183,6 +186,7 @@ class FREDCache:
 
 
 # ── Disk Cache ─────────────────────────────────────────────────────────
+
 
 class FREDDiskCache:
     """
@@ -243,6 +247,7 @@ class FREDDiskCache:
 
 # ── Cached Client (Disk + Memory) ─────────────────────────────────────
 
+
 class CachedFREDClient:
     """
     Full-featured FRED client with disk + in-memory caching.
@@ -296,7 +301,9 @@ class CachedFREDClient:
                 curve[mat] = val
         return curve if len(curve) >= 3 else None
 
-    def get_macro_snapshot(self, lookback_days: int = 365) -> Dict[str, Tuple[Optional[float], Optional[float]]]:
+    def get_macro_snapshot(
+        self, lookback_days: int = 365
+    ) -> Dict[str, Tuple[Optional[float], Optional[float]]]:
         """
         Return {series_id: (current_value, 1Y_change)} for all macro series.
         Used by market_enrichment.py for the macro section.
@@ -354,6 +361,7 @@ def get_fred_client(api_key: Optional[str] = None) -> Optional[CachedFREDClient]
         if not api_key:
             try:
                 from config import settings
+
                 api_key = settings.fred_api_key.strip()
             except ImportError:
                 pass

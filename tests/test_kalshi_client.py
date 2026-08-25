@@ -60,6 +60,7 @@ def test_get_markets_caches_to_disk(client, tmp_path):
 
 import requests as _requests
 
+
 @resp_mock.activate
 def test_get_markets_returns_empty_on_network_error(client):
     resp_mock.add(

@@ -87,9 +87,7 @@ class SECCache:
         ]
         for column, col_type in migration_columns:
             if not self._column_exists("analysis_history", column):
-                self._conn.execute(
-                    f"ALTER TABLE analysis_history ADD COLUMN {column} {col_type}"
-                )
+                self._conn.execute(f"ALTER TABLE analysis_history ADD COLUMN {column} {col_type}")
 
         if not self._column_exists("analysis_history", "analysis_id"):
             return
@@ -128,9 +126,7 @@ class SECCache:
             return None
         return json.loads(value)
 
-    def set(
-        self, namespace: str, key: str, value: Any, ttl: int = DEFAULT_TTL_SECONDS
-    ) -> None:
+    def set(self, namespace: str, key: str, value: Any, ttl: int = DEFAULT_TTL_SECONDS) -> None:
         """Store a value with a TTL."""
         expires = time.time() + ttl
         self._conn.execute(
@@ -317,21 +313,23 @@ class SECCache:
                 stop_loss_unit,
                 entry_price_at_run,
             ) = row
-            results.append({
-                "analysis_id": analysis_id or "",
-                "ticker": ticker_val,
-                "run_at": run_at,
-                "company_name": company_name or "",
-                "verdict": verdict,
-                "conviction": conviction,
-                "time_horizon": time_horizon,
-                "composite_score": score,
-                "health_scores": json.loads(hs_json) if hs_json else {},
-                "price_target": price_target,
-                "stop_loss_value": stop_loss_value,
-                "stop_loss_unit": stop_loss_unit or "",
-                "entry_price_at_run": entry_price_at_run,
-            })
+            results.append(
+                {
+                    "analysis_id": analysis_id or "",
+                    "ticker": ticker_val,
+                    "run_at": run_at,
+                    "company_name": company_name or "",
+                    "verdict": verdict,
+                    "conviction": conviction,
+                    "time_horizon": time_horizon,
+                    "composite_score": score,
+                    "health_scores": json.loads(hs_json) if hs_json else {},
+                    "price_target": price_target,
+                    "stop_loss_value": stop_loss_value,
+                    "stop_loss_unit": stop_loss_unit or "",
+                    "entry_price_at_run": entry_price_at_run,
+                }
+            )
         return results
 
     def get_analysis_detail(self, analysis_id: str) -> Optional[dict]:

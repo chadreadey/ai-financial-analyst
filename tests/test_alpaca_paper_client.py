@@ -1,4 +1,5 @@
 """Tests for Alpaca paper trading client."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -11,6 +12,7 @@ import pytest
 def mock_settings(tmp_path):
     """Settings with a temp DB path and fake Alpaca keys."""
     from config import Settings
+
     return Settings(
         alpaca_api_key="test-key-id",
         alpaca_secret_key="test-secret-key",
@@ -33,6 +35,7 @@ def test_get_account(mock_tc_class, mock_settings):
     mock_tc_class.return_value = mock_tc
 
     from backend.alpaca_paper_client import AlpacaPaperClient
+
     client = AlpacaPaperClient(mock_settings)
     result = client.get_account()
 
@@ -57,6 +60,7 @@ def test_submit_market_order(mock_tc_class, mock_settings):
     mock_tc_class.return_value = mock_tc
 
     from backend.alpaca_paper_client import AlpacaPaperClient
+
     client = AlpacaPaperClient(mock_settings)
     result = client.submit_market_order("AAPL", qty=10, side="buy")
 
@@ -82,6 +86,7 @@ def test_get_positions(mock_tc_class, mock_settings):
     mock_tc_class.return_value = mock_tc
 
     from backend.alpaca_paper_client import AlpacaPaperClient
+
     client = AlpacaPaperClient(mock_settings)
     positions = client.get_positions()
 
@@ -108,6 +113,7 @@ def test_get_orders(mock_tc_class, mock_settings):
     mock_tc_class.return_value = mock_tc
 
     from backend.alpaca_paper_client import AlpacaPaperClient
+
     client = AlpacaPaperClient(mock_settings)
     orders = client.get_orders()
 
@@ -132,6 +138,7 @@ def test_sync_positions_to_sqlite(mock_tc_class, mock_settings):
     mock_tc_class.return_value = mock_tc
 
     from backend.alpaca_paper_client import AlpacaPaperClient
+
     client = AlpacaPaperClient(mock_settings)
     client.sync_positions_to_db()
 
@@ -160,6 +167,7 @@ def test_close_position(mock_tc_class, mock_settings):
     mock_tc_class.return_value = mock_tc
 
     from backend.alpaca_paper_client import AlpacaPaperClient
+
     client = AlpacaPaperClient(mock_settings)
     result = client.close_position("AAPL")
 

@@ -31,6 +31,11 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
+    "pre-commit>=4.0",
+    "ruff>=0.15",
+    "detect-secrets>=1.5",
+    "mypy>=1.13",
+    "responses>=0.25",   # HTTP mocking used by tests/test_kalshi_client.py
 ]
 
 [build-system]
@@ -40,6 +45,68 @@ build-backend = "setuptools.build_meta"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [".venv", ".worktrees", ".price_cache", ".guardrail-cache", "docs/audit"]
+
+[tool.ruff.lint]
+# Phase-0 ruleset: catches REAL bugs, ignores style/import-hygiene noise on
+# legacy code. New modules added under the agent-first-pm plan will be held to
+# a stricter bar via per-file-ignores below as they land.
+select = [
+    "F",     # pyflakes — undefined names, redefined names (real bugs)
+    "B",     # bugbear — common Python bug patterns (late binding, mutable defaults, etc.)
+    "E9",    # runtime errors (syntax errors, IndentationError)
+    "E7",    # statement errors (multiple statements per line, comparisons to None/True/False)
+]
+ignore = [
+    "F401",  # unused-import — legacy code has many; addressed incrementally
+    "F541",  # f-string-missing-placeholders — cosmetic
+    "F811",  # redefined-while-unused — legacy: 1 case, addressed later
+    "F821",  # undefined-name — legacy false positives from quoted type refs
+    "F841",  # unused-variable — legacy: 12 cases, addressed later
+    "F402",  # import-shadowed-by-loop-var — legacy: 2 cases, addressed later
+    "B007",  # unused-loop-var — often intentional in legacy code
+    "B008",  # function call in default arg — commonly used for FastAPI Depends
+    "B009",  # get-attr-with-constant — minor legacy
+    "B023",  # function-uses-loop-variable — real bug pattern, defer to cleanup arc
+    "B904",  # raise-without-from-inside-except — style, defer
+    "B905",  # zip strict= — legacy code compatibility
+    "E701",  # multiple-statements-on-one-line-colon — legacy
+    "E702",  # multiple-statements-on-one-line-semicolon — legacy
+    "E712",  # true-false-comparison — legacy
+    "E731",  # lambda-assignment — legacy usage
+    "E741",  # ambiguous-variable-name — case-by-case, not a bug
+    # NOTE: as this refactor ships, per-directory strict overrides go in
+    # per-file-ignores below. Legacy tolerance here becomes narrower over time.
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["F401", "F811", "E741", "B011"]
+"scripts/*" = []
+"__init__.py" = ["F401"]
+# NEW modules from the agent-first-pm plan — held to stricter standards:
+# (uncomment as new files land in each phase)
+# "quant/ranks.py" = []
+# "quant/optimizer.py" = []
+# "quant/portfolio_guardrails.py" = []
+# "warehouse/signal_ranks.py" = []
+# "agents/macro_context.py" = []
+# "agents/portfolio_manager.py" = []
+# "integrations/*" = []
+
+[tool.mypy]
+# Permissive on legacy code; strict enforcement lives in per-module overrides
+# added when NEW modules land under this plan.
+python_version = "3.11"
+warn_unused_configs = true
+ignore_missing_imports = true
+disallow_untyped_defs = false
+warn_return_any = false
+namespace_packages = true
+explicit_package_bases = true
 
 [tool.setuptools]
 py-modules = [
