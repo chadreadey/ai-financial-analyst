@@ -66,6 +66,7 @@ def _fetch_current_price(ticker: str) -> Optional[float]:
     if tiingo_key:
         try:
             from tiingo_client import TiingoClient
+
             client = TiingoClient(tiingo_key)
             data = client.get_quote(ticker)
             if data and isinstance(data, list) and data:
@@ -101,22 +102,27 @@ async def get_positions():
         if r["entry_date"]:
             try:
                 from datetime import datetime
+
                 days_held = (datetime.now() - datetime.strptime(r["entry_date"], "%Y-%m-%d")).days
             except Exception:
                 pass
 
-        positions.append({
-            "ticker": r["ticker"],
-            "entry_price": entry,
-            "entry_date": r["entry_date"] or "",
-            "current_price": current,
-            "verdict": r["verdict"] or "",
-            "exit_conditions": r["exit_conditions"] or "",
-            "direction": direction,
-            "conviction_score": r["conviction_score"] if "conviction_score" in r.keys() else None,
-            "unrealized_pnl_pct": unrealized,
-            "days_held": days_held,
-        })
+        positions.append(
+            {
+                "ticker": r["ticker"],
+                "entry_price": entry,
+                "entry_date": r["entry_date"] or "",
+                "current_price": current,
+                "verdict": r["verdict"] or "",
+                "exit_conditions": r["exit_conditions"] or "",
+                "direction": direction,
+                "conviction_score": r["conviction_score"]
+                if "conviction_score" in r.keys()
+                else None,
+                "unrealized_pnl_pct": unrealized,
+                "days_held": days_held,
+            }
+        )
 
     return {"positions": positions}
 
@@ -174,7 +180,16 @@ async def close_position(ticker: str, body: dict):
     conn.execute(
         "INSERT INTO paper_trades (ticker, entry_price, entry_date, exit_price, exit_date, pnl_pct, exit_reason, direction) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (ticker, entry_price, row["entry_date"], exit_price, time.strftime("%Y-%m-%d"), pnl_pct, exit_reason, direction),
+        (
+            ticker,
+            entry_price,
+            row["entry_date"],
+            exit_price,
+            time.strftime("%Y-%m-%d"),
+            pnl_pct,
+            exit_reason,
+            direction,
+        ),
     )
     conn.execute("DELETE FROM paper_positions WHERE ticker = ?", (ticker,))
     conn.commit()
@@ -194,17 +209,19 @@ async def get_trade_history():
     equity = 10000.0
     curve = []
     for r in rows:
-        trades.append({
-            "id": r["id"],
-            "ticker": r["ticker"],
-            "entry_price": r["entry_price"],
-            "entry_date": r["entry_date"] or "",
-            "exit_price": r["exit_price"],
-            "exit_date": r["exit_date"] or "",
-            "pnl_pct": r["pnl_pct"],
-            "exit_reason": r["exit_reason"] or "",
-        })
-        equity *= (1 + (r["pnl_pct"] or 0) / 100)
+        trades.append(
+            {
+                "id": r["id"],
+                "ticker": r["ticker"],
+                "entry_price": r["entry_price"],
+                "entry_date": r["entry_date"] or "",
+                "exit_price": r["exit_price"],
+                "exit_date": r["exit_date"] or "",
+                "pnl_pct": r["pnl_pct"],
+                "exit_reason": r["exit_reason"] or "",
+            }
+        )
+        equity *= 1 + (r["pnl_pct"] or 0) / 100
         curve.append({"date": r["exit_date"] or "", "equity": round(equity, 2)})
 
     return {"trades": trades, "equity_curve": curve}
@@ -285,7 +302,9 @@ async def get_positions_with_verdicts():
             implied_upside_pct: Optional[float] = None
             if target and current and current > 0:
                 try:
-                    implied_upside_pct = round((float(target) - float(current)) / float(current) * 100, 2)
+                    implied_upside_pct = round(
+                        (float(target) - float(current)) / float(current) * 100, 2
+                    )
                 except Exception:
                     implied_upside_pct = None
             latest_verdict = {
@@ -307,19 +326,23 @@ async def get_positions_with_verdicts():
             if unrealized is not None:
                 total_unrealized_pnl_pct_weighted += float(entry) * unrealized
 
-        positions.append({
-            "ticker": ticker,
-            "entry_price": entry,
-            "entry_date": r["entry_date"] or "",
-            "current_price": current,
-            "entry_verdict": r["verdict"] or "",
-            "exit_conditions": r["exit_conditions"] or "",
-            "direction": direction,
-            "conviction_score": r["conviction_score"] if "conviction_score" in r.keys() else None,
-            "unrealized_pnl_pct": unrealized,
-            "days_held": days_held,
-            "latest_verdict": latest_verdict,
-        })
+        positions.append(
+            {
+                "ticker": ticker,
+                "entry_price": entry,
+                "entry_date": r["entry_date"] or "",
+                "current_price": current,
+                "entry_verdict": r["verdict"] or "",
+                "exit_conditions": r["exit_conditions"] or "",
+                "direction": direction,
+                "conviction_score": r["conviction_score"]
+                if "conviction_score" in r.keys()
+                else None,
+                "unrealized_pnl_pct": unrealized,
+                "days_held": days_held,
+                "latest_verdict": latest_verdict,
+            }
+        )
 
     avg_unrealized_pnl_pct: Optional[float] = None
     if total_equity > 0:
@@ -329,7 +352,10 @@ async def get_positions_with_verdicts():
         1
         for p in positions
         if p["latest_verdict"] is None
-        or (p["latest_verdict"].get("days_stale") is not None and p["latest_verdict"]["days_stale"] > 7)
+        or (
+            p["latest_verdict"].get("days_stale") is not None
+            and p["latest_verdict"]["days_stale"] > 7
+        )
     )
 
     return {
@@ -352,17 +378,24 @@ async def get_metrics():
     conn.close()
 
     if not rows:
-        return {"sharpe": None, "sortino": None, "win_rate_pct": None, "total_pnl_pct": None, "total_trades": 0}
+        return {
+            "sharpe": None,
+            "sortino": None,
+            "win_rate_pct": None,
+            "total_pnl_pct": None,
+            "total_trades": 0,
+        }
 
     returns = [r["pnl_pct"] / 100 for r in rows]
     wins = sum(1 for r in returns if r > 0)
     total_pnl = 1.0
     for r in returns:
-        total_pnl *= (1 + r)
+        total_pnl *= 1 + r
     total_pnl_pct = round((total_pnl - 1) * 100, 2)
 
     import pandas as pd
     from quant.metrics import compute_sharpe, compute_sortino
+
     returns_series = pd.Series(returns)
     sharpe = compute_sharpe(returns_series, min_observations=2)
     sortino = compute_sortino(returns_series, min_observations=2)

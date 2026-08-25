@@ -9,6 +9,7 @@ dicts and the orchestrator converts each yield into the appropriate event.
 This keeps Supabase credentials off worker containers and gives us a
 single source of truth for run status (per architect review §5).
 """
+
 from __future__ import annotations
 
 import logging
@@ -81,12 +82,14 @@ def emit_event(
 
     try:
         from backend import cpcv_sqlite
+
         cpcv_sqlite.insert_event(event.to_sqlite_row())
     except Exception as exc:  # noqa: BLE001
         logger.warning("SQLite event write failed: %s", exc)
 
     try:
         from backend import supabase_backtest
+
         if supabase_backtest.is_enabled():
             supabase_backtest.insert_event(event.to_supabase_row())
     except Exception as exc:  # noqa: BLE001

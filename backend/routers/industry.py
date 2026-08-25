@@ -15,10 +15,12 @@ async def list_sectors():
     for sector, etf in SECTOR_ETF_MAP.items():
         if any(s["sector"] == sector for s in sectors):
             continue
-        sectors.append(SectorOverview(
-            sector=sector,
-            etf_symbol=etf,
-        ).model_dump())
+        sectors.append(
+            SectorOverview(
+                sector=sector,
+                etf_symbol=etf,
+            ).model_dump()
+        )
     return {"sectors": sectors}
 
 

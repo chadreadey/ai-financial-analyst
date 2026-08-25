@@ -42,12 +42,12 @@ TECHNICAL_SIGNAL_NAMES = [
 # fundamental layer that has historically carried weight in the
 # composite without ever being individually IC-validated.
 FUNDAMENTAL_SIGNAL_NAMES = [
-    "erm",                  # earnings revision momentum
-    "sue",                  # standardized unexpected earnings
-    "analyst_dispersion",   # consensus dispersion (NEGATIVE signal)
-    "quality_score",        # ROIC + gross margin blend
-    "price_momentum",       # 12-1M classic momentum
-    "insider_mspr",         # insider buying/selling
+    "erm",  # earnings revision momentum
+    "sue",  # standardized unexpected earnings
+    "analyst_dispersion",  # consensus dispersion (NEGATIVE signal)
+    "quality_score",  # ROIC + gross margin blend
+    "price_momentum",  # 12-1M classic momentum
+    "insider_mspr",  # insider buying/selling
 ]
 
 # Default IC harness scope used by the audit runner.
@@ -91,8 +91,9 @@ def compute_signal_scores_at_date(
     try:
         from quant.institutional_flow import compute_institutional_flow_scores
         from quant.fmp_cache import FMPFundamentalCache
+
         fmp_cache = FMPFundamentalCache()
-        as_of = as_of_date.date() if hasattr(as_of_date, 'date') else as_of_date
+        as_of = as_of_date.date() if hasattr(as_of_date, "date") else as_of_date
         inst_flow_scores = compute_institutional_flow_scores(
             list(universe_data.keys()),
             as_of_date=as_of,
@@ -106,8 +107,10 @@ def compute_signal_scores_at_date(
     if include_fundamentals:
         try:
             from quant.additional_signals import compute_price_momentum_scores
+
             momentum_scores = compute_price_momentum_scores(
-                universe_data, as_of_date,
+                universe_data,
+                as_of_date,
             )
         except Exception as exc:
             logger.debug("price_momentum precompute failed at %s: %s", as_of_date, exc)
@@ -117,11 +120,8 @@ def compute_signal_scores_at_date(
     if include_fundamentals and wrds_provider is not None:
         try:
             from quant.additional_signals import compute_quality_scores
-            as_of_d = (
-                as_of_date.date()
-                if hasattr(as_of_date, "date")
-                else as_of_date
-            )
+
+            as_of_d = as_of_date.date() if hasattr(as_of_date, "date") else as_of_date
             quality_scores = compute_quality_scores(
                 list(universe_data.keys()),
                 wrds_provider,
@@ -135,6 +135,7 @@ def compute_signal_scores_at_date(
     if include_fundamentals and (finnhub_client is not None or sentiment_cache is not None):
         try:
             from quant.additional_signals import compute_insider_scores
+
             insider_scores = compute_insider_scores(
                 list(universe_data.keys()),
                 as_of_date,
@@ -184,15 +185,15 @@ def compute_signal_scores_at_date(
             row["erm"] = erm_score
             row["sue"] = sue_score
             row["analyst_dispersion"] = disp_score
-            row["quality_score"] = float(
-                quality_scores[ticker]
-            ) if ticker in quality_scores else float("nan")
-            row["price_momentum"] = float(
-                momentum_scores[ticker]
-            ) if ticker in momentum_scores else float("nan")
-            row["insider_mspr"] = float(
-                insider_scores[ticker]
-            ) if ticker in insider_scores else float("nan")
+            row["quality_score"] = (
+                float(quality_scores[ticker]) if ticker in quality_scores else float("nan")
+            )
+            row["price_momentum"] = (
+                float(momentum_scores[ticker]) if ticker in momentum_scores else float("nan")
+            )
+            row["insider_mspr"] = (
+                float(insider_scores[ticker]) if ticker in insider_scores else float("nan")
+            )
 
         rows[ticker] = row
 
@@ -208,6 +209,7 @@ def _maybe_score_erm(ticker: str, provider, as_of_d) -> float:
         return float("nan")
     try:
         from quant.earnings_signals import compute_erm_score
+
         score, meta = compute_erm_score(ticker, provider, as_of_d)
         if "error" in meta:
             return float("nan")
@@ -222,6 +224,7 @@ def _maybe_score_sue(ticker: str, provider, as_of_d) -> float:
         return float("nan")
     try:
         from quant.earnings_signals import compute_sue_score
+
         score, meta = compute_sue_score(ticker, provider, as_of_d)
         if "error" in meta:
             return float("nan")
@@ -236,6 +239,7 @@ def _maybe_score_dispersion(ticker: str, provider, as_of_d) -> float:
         return float("nan")
     try:
         from quant.earnings_signals import compute_dispersion_score
+
         score, meta = compute_dispersion_score(ticker, provider, as_of_d)
         if "error" in meta:
             return float("nan")
@@ -348,7 +352,7 @@ def compute_forward_returns(
         price_now = float(current.iloc[-1]["close"])
         price_future = float(future.iloc[forward_days - 1]["close"])
         if price_now > 0:
-            returns[ticker] = (price_future / price_now - 1)
+            returns[ticker] = price_future / price_now - 1
 
     if len(returns) < 5:
         return None
@@ -439,7 +443,7 @@ def print_correlation_report(
         for i, e in enumerate(eigs):
             cumulative += e
             bar = "█" * int(e * 60)
-            lines.append(f"    PC{i+1}: {e:.3f} (cumul {cumulative:.3f}) {bar}")
+            lines.append(f"    PC{i + 1}: {e:.3f} (cumul {cumulative:.3f}) {bar}")
         lines.append("")
 
     # Correlation matrix
@@ -450,11 +454,19 @@ def print_correlation_report(
     # extended fundamental signal sets.
     sigs_in_report = list(mean_corr.index)
     short = {
-        "sma_trend": "SMA", "mean_reversion_z": "MR", "bollinger_pctb": "BB",
-        "rsi": "RSI", "obv_trend": "OBV", "high_52w": "52W",
+        "sma_trend": "SMA",
+        "mean_reversion_z": "MR",
+        "bollinger_pctb": "BB",
+        "rsi": "RSI",
+        "obv_trend": "OBV",
+        "high_52w": "52W",
         "institutional_flow": "INST",
-        "erm": "ERM", "sue": "SUE", "analyst_dispersion": "DISP",
-        "quality_score": "QUAL", "price_momentum": "MOM", "insider_mspr": "MSPR",
+        "erm": "ERM",
+        "sue": "SUE",
+        "analyst_dispersion": "DISP",
+        "quality_score": "QUAL",
+        "price_momentum": "MOM",
+        "insider_mspr": "MSPR",
     }
 
     def _label(name: str) -> str:

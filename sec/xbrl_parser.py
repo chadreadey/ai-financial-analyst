@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # US-GAAP concept name to its IFRS equivalent(s) so the existing metric
 # pipeline can consume both without duplication.
 
-IFRS_ANNUAL_FORMS = {"20-F", "40-F"}   # 40-F is used by Canadian filers
+IFRS_ANNUAL_FORMS = {"20-F", "40-F"}  # 40-F is used by Canadian filers
 IFRS_QUARTERLY_FORMS = {"6-K"}
 
 # US-GAAP concept → list of IFRS concept names to try (in priority order)
@@ -30,7 +30,7 @@ IFRS_CONCEPT_MAP: Dict[str, List[str]] = {
     "RevenueFromContractWithCustomerExcludingAssessedTax": ["Revenue"],
     "SalesRevenueNet": ["Revenue"],
     "GrossProfit": ["GrossProfit"],
-    "OperatingIncomeLoss": ["ProfitLossBeforeTax"],   # closest IFRS proxy
+    "OperatingIncomeLoss": ["ProfitLossBeforeTax"],  # closest IFRS proxy
     "NetIncomeLoss": [
         "ProfitLossAttributableToOwnersOfParent",
         "ProfitLoss",
@@ -76,9 +76,20 @@ IFRS_CONCEPT_MAP: Dict[str, List[str]] = {
 
 # Common currencies reported by major foreign filers (for display context)
 _CURRENCY_SYMBOLS: Dict[str, str] = {
-    "TWD": "NT$", "EUR": "€", "GBP": "£", "JPY": "¥", "CNY": "¥",
-    "KRW": "₩", "INR": "₹", "CAD": "C$", "AUD": "A$", "CHF": "CHF ",
-    "DKK": "DKK ", "SEK": "SEK ", "HKD": "HK$", "SGD": "S$",
+    "TWD": "NT$",
+    "EUR": "€",
+    "GBP": "£",
+    "JPY": "¥",
+    "CNY": "¥",
+    "KRW": "₩",
+    "INR": "₹",
+    "CAD": "C$",
+    "AUD": "A$",
+    "CHF": "CHF ",
+    "DKK": "DKK ",
+    "SEK": "SEK ",
+    "HKD": "HK$",
+    "SGD": "S$",
 }
 
 
@@ -223,7 +234,11 @@ class XBRLParser:
             if "end" in df.columns:
                 df["end"] = pd.to_datetime(df["end"])
 
-            cols = [c for c in ["end", "val", "form", "filed", "fiscal_year", "fiscal_period"] if c in df.columns]
+            cols = [
+                c
+                for c in ["end", "val", "form", "filed", "fiscal_year", "fiscal_period"]
+                if c in df.columns
+            ]
             return df[cols].reset_index(drop=True)
 
         return pd.DataFrame()
@@ -260,9 +275,8 @@ class XBRLParser:
             records = units.get("shares", [])
         if not records:
             # Try per-share denominated in the reporting currency or USD
-            records = (
-                units.get(f"{self.reporting_currency}/shares", [])
-                or units.get("USD/shares", [])
+            records = units.get(f"{self.reporting_currency}/shares", []) or units.get(
+                "USD/shares", []
             )
         if not records:
             return pd.DataFrame()
@@ -285,17 +299,11 @@ class XBRLParser:
         # Keep only point-in-time or full-period entries
         # (filter out quarterly fragments for income/cash flow items)
         if "start" in df.columns and "end" in df.columns:
-            df["duration_days"] = (
-                pd.to_datetime(df["end"]) - pd.to_datetime(df["start"])
-            ).dt.days
+            df["duration_days"] = (pd.to_datetime(df["end"]) - pd.to_datetime(df["start"])).dt.days
             annual_forms = {"10-K"} | IFRS_ANNUAL_FORMS
             quarterly_forms = {"10-Q"} | IFRS_QUARTERLY_FORMS
-            df_annual = df[
-                df["form"].isin(annual_forms) & (df["duration_days"] > 300)
-            ]
-            df_quarterly = df[
-                df["form"].isin(quarterly_forms) & (df["duration_days"] < 120)
-            ]
+            df_annual = df[df["form"].isin(annual_forms) & (df["duration_days"] > 300)]
+            df_quarterly = df[df["form"].isin(quarterly_forms) & (df["duration_days"] < 120)]
             df = pd.concat([df_annual, df_quarterly])
 
         if df.empty:
@@ -310,7 +318,11 @@ class XBRLParser:
             df["end"] = pd.to_datetime(df["end"])
 
         return df[
-            [c for c in ["end", "val", "form", "filed", "fiscal_year", "fiscal_period"] if c in df.columns]
+            [
+                c
+                for c in ["end", "val", "form", "filed", "fiscal_year", "fiscal_period"]
+                if c in df.columns
+            ]
         ].reset_index(drop=True)
 
     def get_income_statement(self, years: int = 5) -> Dict[str, pd.DataFrame]:
@@ -418,9 +430,8 @@ class XBRLParser:
         total_liabilities = self._latest_annual_value("Liabilities")
         equity = self._latest_annual_value("StockholdersEquity")
         cash = self._latest_annual_value("CashAndCashEquivalentsAtCarryingValue")
-        long_term_debt = (
-            self._latest_annual_value("LongTermDebt")
-            or self._latest_annual_value("LongTermDebtNoncurrent")
+        long_term_debt = self._latest_annual_value("LongTermDebt") or self._latest_annual_value(
+            "LongTermDebtNoncurrent"
         )
         metrics["total_assets"] = total_assets
         metrics["total_liabilities"] = total_liabilities
@@ -439,12 +450,8 @@ class XBRLParser:
             metrics["roa"] = round(net_income / total_assets, 4)
 
         # Cash flow
-        operating_cf = self._latest_annual_value(
-            "NetCashProvidedByUsedInOperatingActivities"
-        )
-        capex = self._latest_annual_value(
-            "PaymentsToAcquirePropertyPlantAndEquipment"
-        )
+        operating_cf = self._latest_annual_value("NetCashProvidedByUsedInOperatingActivities")
+        capex = self._latest_annual_value("PaymentsToAcquirePropertyPlantAndEquipment")
         metrics["operating_cash_flow"] = operating_cf
         metrics["capex"] = capex
 
@@ -457,9 +464,7 @@ class XBRLParser:
         metrics["eps_diluted"] = self._latest_annual_value("EarningsPerShareDiluted")
 
         # Shares outstanding
-        metrics["shares_outstanding"] = self._latest_annual_value(
-            "CommonStockSharesOutstanding"
-        )
+        metrics["shares_outstanding"] = self._latest_annual_value("CommonStockSharesOutstanding")
 
         # Revenue growth (YoY) and multi-year CAGRs
         revenue_df = self._resolve_revenue_df(form_filter=["10-K"])
@@ -514,14 +519,21 @@ class XBRLParser:
             if rev == 0:
                 continue
 
-            entry: Dict[str, Any] = {"fiscal_year": int(fy) if pd.notna(fy) else None, "period_end": end}
+            entry: Dict[str, Any] = {
+                "fiscal_year": int(fy) if pd.notna(fy) else None,
+                "period_end": end,
+            }
 
             for label, src_df, concept_col in [
                 ("gross_margin", gp_df, "val"),
                 ("operating_margin", oi_df, "val"),
                 ("net_margin", ni_df, "val"),
             ]:
-                matched = src_df[src_df["fiscal_year"] == fy] if not src_df.empty and "fiscal_year" in src_df.columns else pd.DataFrame()
+                matched = (
+                    src_df[src_df["fiscal_year"] == fy]
+                    if not src_df.empty and "fiscal_year" in src_df.columns
+                    else pd.DataFrame()
+                )
                 if not matched.empty:
                     entry[label] = round(float(matched.iloc[0][concept_col]) / rev, 4)
 
@@ -548,7 +560,11 @@ class XBRLParser:
                 "operating_cf": ocf,
             }
 
-            matched = capex_df[capex_df["fiscal_year"] == fy] if not capex_df.empty and "fiscal_year" in capex_df.columns else pd.DataFrame()
+            matched = (
+                capex_df[capex_df["fiscal_year"] == fy]
+                if not capex_df.empty and "fiscal_year" in capex_df.columns
+                else pd.DataFrame()
+            )
             if not matched.empty:
                 cx = float(matched.iloc[0]["val"])
                 entry["capex"] = cx
@@ -562,7 +578,9 @@ class XBRLParser:
         revenue_df = self._resolve_revenue_df(form_filter=["10-Q"]).head(quarters)
         ni_df = self._extract_concept("NetIncomeLoss", form_filter=["10-Q"]).head(quarters)
         oi_df = self._extract_concept("OperatingIncomeLoss", form_filter=["10-Q"]).head(quarters)
-        eps_df = self._extract_concept("EarningsPerShareDiluted", form_filter=["10-Q"]).head(quarters)
+        eps_df = self._extract_concept("EarningsPerShareDiluted", form_filter=["10-Q"]).head(
+            quarters
+        )
 
         if revenue_df.empty:
             return []
@@ -581,10 +599,17 @@ class XBRLParser:
                 "revenue": rev,
             }
 
-            for label, src_df in [("net_income", ni_df), ("operating_income", oi_df), ("eps_diluted", eps_df)]:
+            for label, src_df in [
+                ("net_income", ni_df),
+                ("operating_income", oi_df),
+                ("eps_diluted", eps_df),
+            ]:
                 if src_df.empty:
                     continue
-                match = src_df[(src_df.get("fiscal_year", pd.Series()) == fy) & (src_df.get("fiscal_period", pd.Series()) == fp)]
+                match = src_df[
+                    (src_df.get("fiscal_year", pd.Series()) == fy)
+                    & (src_df.get("fiscal_period", pd.Series()) == fp)
+                ]
                 if not match.empty:
                     entry[label] = float(match.iloc[0]["val"])
 
@@ -597,11 +622,13 @@ class XBRLParser:
         for i, entry in enumerate(results):
             if i + 1 < len(results) and results[i + 1].get("revenue", 0) != 0:
                 entry["revenue_qoq_growth"] = round(
-                    (entry["revenue"] - results[i + 1]["revenue"]) / abs(results[i + 1]["revenue"]), 4
+                    (entry["revenue"] - results[i + 1]["revenue"]) / abs(results[i + 1]["revenue"]),
+                    4,
                 )
             if i + 4 < len(results) and results[i + 4].get("revenue", 0) != 0:
                 entry["revenue_yoy_growth"] = round(
-                    (entry["revenue"] - results[i + 4]["revenue"]) / abs(results[i + 4]["revenue"]), 4
+                    (entry["revenue"] - results[i + 4]["revenue"]) / abs(results[i + 4]["revenue"]),
+                    4,
                 )
         return results
 
@@ -617,13 +644,13 @@ class XBRLParser:
             rev_str = format_money(q.get("revenue"))
             parts = [f"  {period}: Rev {rev_str}"]
             if "operating_margin" in q:
-                parts.append(f"OpMgn {q['operating_margin']*100:.1f}%")
+                parts.append(f"OpMgn {q['operating_margin'] * 100:.1f}%")
             if "eps_diluted" in q:
                 parts.append(f"EPS ${q['eps_diluted']:.2f}")
             if "revenue_qoq_growth" in q:
-                parts.append(f"QoQ {q['revenue_qoq_growth']*100:+.1f}%")
+                parts.append(f"QoQ {q['revenue_qoq_growth'] * 100:+.1f}%")
             if "revenue_yoy_growth" in q:
-                parts.append(f"YoY {q['revenue_yoy_growth']*100:+.1f}%")
+                parts.append(f"YoY {q['revenue_yoy_growth'] * 100:+.1f}%")
             lines.append(" | ".join(parts))
         return "\n".join(lines)
 
@@ -688,15 +715,21 @@ class XBRLParser:
         lines.append(f"  Free Cash Flow:   {fmt(metrics.get('free_cash_flow'))}")
         lines.append("")
 
-        lines.append(f"  Shares Out:       {fmt(metrics.get('shares_outstanding'), is_dollars=False)}")
+        lines.append(
+            f"  Shares Out:       {fmt(metrics.get('shares_outstanding'), is_dollars=False)}"
+        )
 
         # Trend summary block
         lines.append("")
         lines.append("── Trends ──")
         lines.append(f"  Revenue CAGR (3Y): {fmt(metrics.get('revenue_cagr_3y'), is_pct=True)}")
         lines.append(f"  Revenue CAGR (5Y): {fmt(metrics.get('revenue_cagr_5y'), is_pct=True)}")
-        lines.append(f"  Net Income CAGR (3Y): {fmt(metrics.get('net_income_cagr_3y'), is_pct=True)}")
-        lines.append(f"  Net Income CAGR (5Y): {fmt(metrics.get('net_income_cagr_5y'), is_pct=True)}")
+        lines.append(
+            f"  Net Income CAGR (3Y): {fmt(metrics.get('net_income_cagr_3y'), is_pct=True)}"
+        )
+        lines.append(
+            f"  Net Income CAGR (5Y): {fmt(metrics.get('net_income_cagr_5y'), is_pct=True)}"
+        )
         ol = metrics.get("operating_leverage_5y")
         lines.append(f"  Operating Leverage (5Y): {ol if ol is not None else 'N/A'}")
 
@@ -705,10 +738,18 @@ class XBRLParser:
             gm_vals = [m["gross_margin"] for m in margins if "gross_margin" in m]
             om_vals = [m["operating_margin"] for m in margins if "operating_margin" in m]
             if len(gm_vals) >= 2:
-                direction = "expanding" if gm_vals[0] > gm_vals[-1] else ("contracting" if gm_vals[0] < gm_vals[-1] else "stable")
+                direction = (
+                    "expanding"
+                    if gm_vals[0] > gm_vals[-1]
+                    else ("contracting" if gm_vals[0] < gm_vals[-1] else "stable")
+                )
                 lines.append(f"  Gross Margin Direction (5Y): {direction}")
             if len(om_vals) >= 2:
-                direction = "expanding" if om_vals[0] > om_vals[-1] else ("contracting" if om_vals[0] < om_vals[-1] else "stable")
+                direction = (
+                    "expanding"
+                    if om_vals[0] > om_vals[-1]
+                    else ("contracting" if om_vals[0] < om_vals[-1] else "stable")
+                )
                 lines.append(f"  Operating Margin Direction (5Y): {direction}")
 
         return "\n".join(lines)
@@ -727,7 +768,9 @@ class XBRLParser:
                     rows.append(
                         {
                             "period_end": str(row["end"].date()) if pd.notna(row["end"]) else None,
-                            "fiscal_year": int(row["fiscal_year"]) if pd.notna(row.get("fiscal_year")) else None,
+                            "fiscal_year": int(row["fiscal_year"])
+                            if pd.notna(row.get("fiscal_year"))
+                            else None,
                             "revenue": float(row["val"]),
                         }
                     )
@@ -744,7 +787,9 @@ class XBRLParser:
             rows.append(
                 {
                     "period_end": str(row["end"].date()) if pd.notna(row["end"]) else None,
-                    "fiscal_year": int(row["fiscal_year"]) if pd.notna(row.get("fiscal_year")) else None,
+                    "fiscal_year": int(row["fiscal_year"])
+                    if pd.notna(row.get("fiscal_year"))
+                    else None,
                     "net_income": float(row["val"]),
                 }
             )
@@ -805,7 +850,9 @@ class XBRLParser:
                             if any(kw in label_lower for kw in segment_keywords):
                                 val = df_det.iloc[df_det.index.get_loc(idx_label), 0]
                                 if pd.notna(val):
-                                    segment_lines.append(f"  {idx_label}: {format_money(float(val))}")
+                                    segment_lines.append(
+                                        f"  {idx_label}: {format_money(float(val))}"
+                                    )
                         if segment_lines:
                             supplemented["_segment_data"] = "\n".join(segment_lines)
             except Exception:

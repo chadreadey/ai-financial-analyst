@@ -132,9 +132,7 @@ def _format_history_delta(ticker: str) -> Optional[str]:
     lines.append(f"Compared to analysis on {prev_date}:")
 
     if current.get("verdict") != previous.get("verdict"):
-        lines.append(
-            f"  Verdict: {previous.get('verdict', '?')} → {current.get('verdict', '?')}"
-        )
+        lines.append(f"  Verdict: {previous.get('verdict', '?')} → {current.get('verdict', '?')}")
     else:
         lines.append(f"  Verdict: unchanged ({current.get('verdict', '?')})")
 
@@ -152,8 +150,14 @@ def _format_history_delta(ticker: str) -> Optional[str]:
     cur_hs = current.get("health_scores", {})
     prev_hs = previous.get("health_scores", {})
     changed_dims = []
-    for dim in ["valuation", "risk_profile", "earnings_quality",
-                 "competitive_position", "quantitative_signals", "macro_environment"]:
+    for dim in [
+        "valuation",
+        "risk_profile",
+        "earnings_quality",
+        "competitive_position",
+        "quantitative_signals",
+        "macro_environment",
+    ]:
         c = cur_hs.get(dim)
         p = prev_hs.get(dim)
         if c is not None and p is not None and c != p:
@@ -179,9 +183,7 @@ def format_report(result: Dict[str, Any]) -> str:
 
     # Header
     lines.append(DIVIDER)
-    lines.append(
-        f"  AI FINANCIAL ANALYST — INVESTMENT BRIEF"
-    )
+    lines.append(f"  AI FINANCIAL ANALYST — INVESTMENT BRIEF")
     lines.append(f"  {cleaned_result['company_name']} ({cleaned_result['ticker']})")
     lines.append(f"  Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     lines.append(DIVIDER)

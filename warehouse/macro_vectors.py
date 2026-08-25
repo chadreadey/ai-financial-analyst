@@ -28,6 +28,7 @@ FRED_SERIES = QUARTERLY_SERIES
 
 # ── regime labellers ─────────────────────────────────────────────────────────
 
+
 def _rate_regime(fed_funds: Optional[float]) -> str:
     if fed_funds is None:
         return "unknown"
@@ -94,7 +95,14 @@ def _fmt(v: Optional[float], decimals: int = 2, suffix: str = "") -> str:
 
 # ── build one snapshot ────────────────────────────────────────────────────────
 
-def _build_macro_text(ql: str, period: str, row: Dict[str, Optional[float]], cpi_yoy: Optional[float], core_cpi_yoy: Optional[float]) -> str:
+
+def _build_macro_text(
+    ql: str,
+    period: str,
+    row: Dict[str, Optional[float]],
+    cpi_yoy: Optional[float],
+    core_cpi_yoy: Optional[float],
+) -> str:
     fed = row.get("fed_funds")
     dgs10 = row.get("dgs10")
     dgs2 = row.get("dgs2")
@@ -139,6 +147,7 @@ def _build_macro_text(ql: str, period: str, row: Dict[str, Optional[float]], cpi
 
 # ── fetch & resample ─────────────────────────────────────────────────────────
 
+
 def fetch_fred_quarterly(
     fred_api_key: str,
     start_year: int = 2000,
@@ -157,6 +166,7 @@ def fetch_fred_quarterly(
 
 # ── public API ────────────────────────────────────────────────────────────────
 
+
 def build_macro_records(df: pd.DataFrame) -> List[Dict]:
     """
     Convert a quarterly-resampled FRED DataFrame into Pinecone-ready records.
@@ -167,8 +177,16 @@ def build_macro_records(df: pd.DataFrame) -> List[Dict]:
     # Compute CPI YoY (12-month % change before resampling happens to monthly anyway)
     # After quarterly resampling CPI is the last monthly reading in that quarter.
     # YoY = 4 quarters back
-    cpi_yoy_series = df["cpi"].pct_change(4, fill_method=None) * 100 if "cpi" in df.columns else pd.Series(dtype=float)
-    core_cpi_yoy_series = df["core_cpi"].pct_change(4, fill_method=None) * 100 if "core_cpi" in df.columns else pd.Series(dtype=float)
+    cpi_yoy_series = (
+        df["cpi"].pct_change(4, fill_method=None) * 100
+        if "cpi" in df.columns
+        else pd.Series(dtype=float)
+    )
+    core_cpi_yoy_series = (
+        df["core_cpi"].pct_change(4, fill_method=None) * 100
+        if "core_cpi" in df.columns
+        else pd.Series(dtype=float)
+    )
 
     for date, row in df.iterrows():
         period = date.strftime("%Y-%m-%d")

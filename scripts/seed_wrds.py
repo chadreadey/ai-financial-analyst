@@ -70,9 +70,7 @@ def build_ticker_links(db, tickers):
     progress(f"  CRSP links: {len(crsp_links)} gvkey-permno mappings")
 
     # Step 3: IBES ticker via CUSIP (first 8 chars)
-    cusip8_list = ",".join(
-        f"'{c[:8]}'" for c in comp_ids["cusip"].dropna().unique() if len(c) >= 8
-    )
+    cusip8_list = ",".join(f"'{c[:8]}'" for c in comp_ids["cusip"].dropna().unique() if len(c) >= 8)
     ibes_ids = pd.DataFrame()
     if cusip8_list:
         ibes_ids = db.raw_sql(f"""
@@ -88,8 +86,9 @@ def build_ticker_links(db, tickers):
 
     # Add CRSP permno (take most recent link per gvkey)
     crsp_dedup = crsp_links.drop_duplicates(subset="gvkey", keep="first")
-    links = links.merge(crsp_dedup[["gvkey", "permno", "link_start", "link_end"]],
-                        on="gvkey", how="left")
+    links = links.merge(
+        crsp_dedup[["gvkey", "permno", "link_start", "link_end"]], on="gvkey", how="left"
+    )
 
     # Add IBES ticker via CUSIP
     if not ibes_ids.empty:
@@ -103,8 +102,10 @@ def build_ticker_links(db, tickers):
     links["link_start"] = links["link_start"].fillna("1900-01-01")
     links["link_end"] = links["link_end"].fillna("2099-12-31")
 
-    progress(f"  Final crosswalk: {len(links)} rows, "
-             f"{links['ibes_ticker'].notna().sum()} have IBES mapping")
+    progress(
+        f"  Final crosswalk: {len(links)} rows, "
+        f"{links['ibes_ticker'].notna().sum()} have IBES mapping"
+    )
 
     # Report unmapped tickers
     unmapped = links[links["ibes_ticker"].isna()]["ticker"].unique()
@@ -135,7 +136,7 @@ def pull_compustat(db, gvkeys, start_year):
     """)
 
     rdq_null = df["rdq"].isna().sum()
-    progress(f"  Pulled {len(df)} rows, {rdq_null} with NULL rdq ({rdq_null/len(df)*100:.1f}%)")
+    progress(f"  Pulled {len(df)} rows, {rdq_null} with NULL rdq ({rdq_null / len(df) * 100:.1f}%)")
     return df
 
 
@@ -211,22 +212,26 @@ def pull_13f_holdings(db, tickers, start_year):
         ORDER BY ticker, rdate
     """)
 
-    progress(f"  Pulled {len(df)} ticker-quarter rows "
-             f"({df['ticker'].nunique()} tickers, "
-             f"{df['rdate'].nunique()} quarters)")
+    progress(
+        f"  Pulled {len(df)} ticker-quarter rows "
+        f"({df['ticker'].nunique()} tickers, "
+        f"{df['rdate'].nunique()} quarters)"
+    )
     return df
 
 
 def main():
     parser = argparse.ArgumentParser(description="Seed WRDS point-in-time store")
-    parser.add_argument("--universe", default="",
-                        help="Universe: liquid_10/20/50 (default: use --tickers)")
-    parser.add_argument("--tickers", default="",
-                        help="Comma-separated tickers")
-    parser.add_argument("--start-year", type=int, default=2013,
-                        help="Start year for data pull (default: 2013)")
-    parser.add_argument("--db-path", default="",
-                        help="Path to SQLite store (default: .wrds_pit.db)")
+    parser.add_argument(
+        "--universe", default="", help="Universe: liquid_10/20/50 (default: use --tickers)"
+    )
+    parser.add_argument("--tickers", default="", help="Comma-separated tickers")
+    parser.add_argument(
+        "--start-year", type=int, default=2013, help="Start year for data pull (default: 2013)"
+    )
+    parser.add_argument(
+        "--db-path", default="", help="Path to SQLite store (default: .wrds_pit.db)"
+    )
     args = parser.parse_args()
 
     if args.tickers:

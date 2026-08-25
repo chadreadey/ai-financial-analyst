@@ -11,9 +11,7 @@ def test_specialist_loads_correct_prompt(tmp_path, fake_provider):
     prompt = tmp_path / "sector_test.md"
     prompt.write_text("You are a test sector analyst for [COMPANY NAME] ([TICKER]).")
 
-    agent = SectorSpecialistAgent(
-        prompt_file=str(prompt), provider=fake_provider
-    )
+    agent = SectorSpecialistAgent(prompt_file=str(prompt), provider=fake_provider)
     data = AnalysisData(
         ticker="PFE",
         company_name="Pfizer Inc.",
@@ -35,9 +33,7 @@ def test_specialist_respects_max_tokens(fake_provider):
 
 
 def test_specialist_enrichment_sections_include_external_sector():
-    agent = SectorSpecialistAgent(
-        prompt_file="prompts/sector_healthcare.md"
-    )
+    agent = SectorSpecialistAgent(prompt_file="prompts/sector_healthcare.md")
     assert "external_sector" in agent.enrichment_sections
     assert agent.enrichment_sections[0] == "external_sector"
 
@@ -66,9 +62,7 @@ async def test_specialist_analyze_returns_string(tmp_path, fake_provider):
     prompt = tmp_path / "sector_test.md"
     prompt.write_text("You are a test sector analyst.")
 
-    agent = SectorSpecialistAgent(
-        prompt_file=str(prompt), provider=fake_provider
-    )
+    agent = SectorSpecialistAgent(prompt_file=str(prompt), provider=fake_provider)
     data = AnalysisData(
         ticker="PFE",
         company_name="Pfizer Inc.",

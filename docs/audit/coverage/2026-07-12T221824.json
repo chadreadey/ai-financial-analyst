@@ -1,0 +1,3482 @@
+{
+  "generated_at": "2026-07-12T22:18:24",
+  "start_date": "2014-03-25",
+  "requested": 496,
+  "loaded": 495,
+  "dropped": 1,
+  "drop_reasons": {
+    "post_ipo": 1
+  },
+  "tickers": [
+    {
+      "ticker": "ESS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SJM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ADSK",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "WEC",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CAT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ABBV",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "COO",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PHM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CTVA",
+      "loaded": true,
+      "rows": 1791,
+      "first_date": "2019-05-24",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DELL",
+      "loaded": true,
+      "rows": 1896,
+      "first_date": "2018-12-21",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "HSIC",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SWK",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PGR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "NWSA",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "RF",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CNP",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "NRG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TAP",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TRGP",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "WAB",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SPY",
+      "loaded": true,
+      "rows": 3281,
+      "first_date": "2013-03-25",
+      "last_date": "2026-04-09"
+    },
+    {
+      "ticker": "CLX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "FANG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "INTC",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "LDOS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "LNT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "GRMN",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "KLAC",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "NFLX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "NEM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "EG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ETR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CVX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PRU",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "URI",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "WELL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "EXPE",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MCD",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CSGP",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MTB",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "POOL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "IDXX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "EQR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "FSLR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "NVR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DHI",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CVS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DLR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "EME",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DUK",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CCI",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "BAC",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AXON",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "XEL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "EQIX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TXT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CINF",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MRSH",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AXP",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "BSX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ECL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ARES",
+      "loaded": true,
+      "rows": 3065,
+      "first_date": "2014-05-02",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TPR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TYL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CHTR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "V",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "HOLX",
+      "loaded": true,
+      "rows": 3027,
+      "first_date": "2014-03-25",
+      "last_date": "2026-04-07"
+    },
+    {
+      "ticker": "PYPL",
+      "loaded": true,
+      "rows": 2760,
+      "first_date": "2015-07-20",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "BBY",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SYK",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "VST",
+      "loaded": true,
+      "rows": 2453,
+      "first_date": "2016-10-04",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AME",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TFC",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ANET",
+      "loaded": true,
+      "rows": 3041,
+      "first_date": "2014-06-06",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "HSY",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "APA",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "COP",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "UPS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "LII",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "FDX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "META",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SCHW",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "GM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MAR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CSX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "GEN",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ADI",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DIS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PCAR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "GPN",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "EOG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "LYB",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MLM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "HD",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "JBL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TTWO",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AMT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CAG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AZO",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "NOW",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "EA",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PLD",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TRMB",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "WST",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "FICO",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AEP",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "GIS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CF",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "EPAM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "UHS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TSCO",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "FE",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CME",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "WMB",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "COIN",
+      "loaded": true,
+      "rows": 1316,
+      "first_date": "2021-04-14",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TSLA",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MDT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DVA",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "FRT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "RL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "GPC",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "NXPI",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PTC",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "BRO",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "NI",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CTRA",
+      "loaded": true,
+      "rows": 3048,
+      "first_date": "2014-03-25",
+      "last_date": "2026-05-06"
+    },
+    {
+      "ticker": "MCK",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CCL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ORLY",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "OXY",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "BR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TER",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "NTRS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PPL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "VZ",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CPAY",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "FIX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AMZN",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CARR",
+      "loaded": true,
+      "rows": 1585,
+      "first_date": "2020-03-19",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "UNH",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CIEN",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "EVRG",
+      "loaded": true,
+      "rows": 2036,
+      "first_date": "2018-06-04",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PKG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "WTW",
+      "loaded": true,
+      "rows": 2643,
+      "first_date": "2016-01-05",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ISRG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "Q",
+      "loaded": true,
+      "rows": 171,
+      "first_date": "2025-11-03",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CFG",
+      "loaded": true,
+      "rows": 2965,
+      "first_date": "2014-09-24",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "STZ",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "VICI",
+      "loaded": true,
+      "rows": 2193,
+      "first_date": "2017-10-17",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ORCL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CBRE",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TJX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "NDSN",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ACGL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "FITB",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "VRSK",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ALGN",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PSA",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "GWW",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AMCR",
+      "loaded": true,
+      "rows": 1780,
+      "first_date": "2019-06-11",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TEL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AMD",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "COF",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "EMR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "C",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "WYNN",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "WM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CPB",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "JCI",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "BEN",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TSN",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SHW",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "VTRS",
+      "loaded": true,
+      "rows": 1417,
+      "first_date": "2020-11-16",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CPT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ADP",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TGT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "IQV",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TDG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SYY",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DDOG",
+      "loaded": true,
+      "rows": 1710,
+      "first_date": "2019-09-19",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MSCI",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "FISV",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ON",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "OTIS",
+      "loaded": true,
+      "rows": 1585,
+      "first_date": "2020-03-19",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MKC",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ARE",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "INCY",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CI",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "FDS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TDY",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MAA",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "J",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "VRT",
+      "loaded": true,
+      "rows": 1997,
+      "first_date": "2018-07-30",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "STX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SPG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CAH",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "WMT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AVGO",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "HOOD",
+      "loaded": true,
+      "rows": 1242,
+      "first_date": "2021-07-29",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "LLY",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ADM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "USB",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "UDR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MGM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MCO",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AIZ",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "KMI",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ITW",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "GS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CRH",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "WDC",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DE",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SRE",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "LEN",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "WAT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AON",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "WSM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "EBAY",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "HII",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DECK",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "FIS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AWK",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CVNA",
+      "loaded": true,
+      "rows": 2312,
+      "first_date": "2017-04-28",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "NUE",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MMM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "BX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AMAT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "FTV",
+      "loaded": true,
+      "rows": 2519,
+      "first_date": "2016-07-01",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ALB",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SNA",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "IEX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MSI",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MCHP",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "LITE",
+      "loaded": true,
+      "rows": 2749,
+      "first_date": "2015-08-04",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "EW",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "WRB",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "IT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "BG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PNR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DD",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ED",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "FTNT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "RVTY",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DGX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ROST",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CRM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SW",
+      "loaded": true,
+      "rows": 504,
+      "first_date": "2024-07-08",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "APH",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ATO",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DXCM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SO",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "WY",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ALLE",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "FAST",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "WFC",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MRNA",
+      "loaded": true,
+      "rows": 1906,
+      "first_date": "2018-12-07",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "REGN",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "BK",
+      "loaded": false,
+      "reason": "post_ipo"
+    },
+    {
+      "ticker": "AVB",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ROP",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CMG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "IFF",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "EIX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MET",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DASH",
+      "loaded": true,
+      "rows": 1401,
+      "first_date": "2020-12-09",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "HUBB",
+      "loaded": true,
+      "rows": 2649,
+      "first_date": "2015-12-24",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "RMD",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "EXE",
+      "loaded": true,
+      "rows": 1359,
+      "first_date": "2021-02-10",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "GEHC",
+      "loaded": true,
+      "rows": 881,
+      "first_date": "2023-01-04",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "BLK",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "COR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "IBKR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "COHR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PNC",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ULTA",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "STT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CRWD",
+      "loaded": true,
+      "rows": 1779,
+      "first_date": "2019-06-12",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SBUX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "IRM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "BKNG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PANW",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "UBER",
+      "loaded": true,
+      "rows": 1801,
+      "first_date": "2019-05-10",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MRK",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AIG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ICE",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TROW",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "LOW",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "LULU",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AKAM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PNW",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "HPE",
+      "loaded": true,
+      "rows": 2696,
+      "first_date": "2015-10-19",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SATS",
+      "loaded": true,
+      "rows": 3080,
+      "first_date": "2014-03-25",
+      "last_date": "2026-06-23"
+    },
+    {
+      "ticker": "KR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "A",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "INVH",
+      "loaded": true,
+      "rows": 2372,
+      "first_date": "2017-02-01",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "IP",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "JNJ",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AEE",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AES",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "APO",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "IR",
+      "loaded": true,
+      "rows": 2302,
+      "first_date": "2017-05-12",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "HUM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "JKHY",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "VMC",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ROL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AAPL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ACN",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "JBHT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "LIN",
+      "loaded": true,
+      "rows": 1953,
+      "first_date": "2018-10-01",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "LVS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TXN",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "F",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PEG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CMS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CSCO",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "BDX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MAS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CDNS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "JPM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SPGI",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "QCOM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "LUV",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PODD",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "NOC",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "VRSN",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CDW",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "FCX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SNPS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ELV",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "HCA",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MU",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MDLZ",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "HLT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "KEYS",
+      "loaded": true,
+      "rows": 2947,
+      "first_date": "2014-10-20",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PCG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SMCI",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CHD",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CHRW",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "BALL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "KMB",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "HAS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "BMY",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DOC",
+      "loaded": true,
+      "rows": 3091,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SNDK",
+      "loaded": true,
+      "rows": 346,
+      "first_date": "2025-02-24",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TRV",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "NTAP",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AOS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "BLDR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TPL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ROK",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "APD",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "APTV",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "KIM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "KEY",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "HON",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "XYZ",
+      "loaded": true,
+      "rows": 2673,
+      "first_date": "2015-11-19",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ABT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "NSC",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DOW",
+      "loaded": true,
+      "rows": 1837,
+      "first_date": "2019-03-20",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TECH",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "XYL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MPC",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "T",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CNC",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "HWM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CBOE",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "EFX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "LHX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CMCSA",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "GLW",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PEP",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "D",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PFE",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MA",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "EXPD",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "BA",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DHR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "APP",
+      "loaded": true,
+      "rows": 1315,
+      "first_date": "2021-04-15",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "HRL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ADBE",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "RTX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "FOXA",
+      "loaded": true,
+      "rows": 1843,
+      "first_date": "2019-03-12",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CB",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "GOOGL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MSFT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "COST",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "REG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "LH",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "WBD",
+      "loaded": true,
+      "rows": 3090,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AVY",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SOLV",
+      "loaded": true,
+      "rows": 574,
+      "first_date": "2024-03-26",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CTSH",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DPZ",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DTE",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AMP",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "BKR",
+      "loaded": true,
+      "rows": 2266,
+      "first_date": "2017-07-05",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "RCL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "RJF",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "GE",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "KVUE",
+      "loaded": true,
+      "rows": 798,
+      "first_date": "2023-05-04",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MNST",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "LRCX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "NEE",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "STE",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "FFIV",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "HIG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "YUM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SYF",
+      "loaded": true,
+      "rows": 3003,
+      "first_date": "2014-07-31",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ERIE",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "LYV",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PH",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TMO",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ODFL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "KHC",
+      "loaded": true,
+      "rows": 2770,
+      "first_date": "2015-07-06",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AMGN",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TTD",
+      "loaded": true,
+      "rows": 2463,
+      "first_date": "2016-09-21",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "BAX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SWKS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "RSG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "VTR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CMI",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "IVZ",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "VRTX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "GILD",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "L",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "GL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CRL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PSKY",
+      "loaded": true,
+      "rows": 233,
+      "first_date": "2025-08-06",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ETN",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ALL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "EXR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PWR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "IBM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PPG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SBAC",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "EL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ABNB",
+      "loaded": true,
+      "rows": 1400,
+      "first_date": "2020-12-10",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PSX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "HAL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CPRT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "NVDA",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "NDAQ",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PLTR",
+      "loaded": true,
+      "rows": 1450,
+      "first_date": "2020-09-30",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "XOM",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "HPQ",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DAL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "GNRC",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "KDP",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "INTU",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "OKE",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PAYX",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MO",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AJG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "BXP",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MTD",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "VLO",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MOS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "VLTO",
+      "loaded": true,
+      "rows": 695,
+      "first_date": "2023-10-02",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "KO",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "UAL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "BIIB",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CTAS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DVN",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "NKE",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "STLD",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DLTR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "WDAY",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "LMT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "EXC",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "PFG",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TMUS",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DRI",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "KKR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "OMC",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "O",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "SLB",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "HST",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "NCLH",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "EQT",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "GD",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "UNP",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "GEV",
+      "loaded": true,
+      "rows": 573,
+      "first_date": "2024-03-27",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "TKO",
+      "loaded": true,
+      "rows": 709,
+      "first_date": "2023-09-12",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "HBAN",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "DOV",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "GDDY",
+      "loaded": true,
+      "rows": 2835,
+      "first_date": "2015-04-01",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "MPWR",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "AFL",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "ES",
+      "loaded": true,
+      "rows": 3092,
+      "first_date": "2014-03-25",
+      "last_date": "2026-07-10"
+    },
+    {
+      "ticker": "CEG",
+      "loaded": true,
+      "rows": 1112,
+      "first_date": "2022-02-02",
+      "last_date": "2026-07-10"
+    }
+  ]
+}

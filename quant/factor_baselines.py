@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 # ── Helpers ─────────────────────────────────────────────────────────────
 
+
 def _f(row: dict, *keys: str) -> Optional[float]:
     """Fetch the first non-None numeric value for any of `keys`. None on miss.
 
@@ -61,6 +62,7 @@ def _safe_div(num: Optional[float], den: Optional[float]) -> Optional[float]:
 
 
 # ── IC-2: Piotroski F-score ─────────────────────────────────────────────
+
 
 def compute_piotroski_score(
     ticker: str,
@@ -240,6 +242,7 @@ def compute_piotroski_score(
 
 # ── IC-3: QMJ proxy ─────────────────────────────────────────────────────
 
+
 def compute_qmj_score(
     ticker: str,
     as_of_date: date,
@@ -319,6 +322,7 @@ def compute_qmj_score(
 
 
 # ── IC-4: HML proxy ─────────────────────────────────────────────────────
+
 
 def compute_hml_score(
     ticker: str,

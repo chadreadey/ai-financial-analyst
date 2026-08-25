@@ -10,6 +10,14 @@ __pycache__/
 *.pyc
 *.pyo
 
+# Python venvs and tool caches
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
 # Runtime artifacts
 .sec_cache.db
 .warehouse.db
@@ -27,9 +35,17 @@ backtest_wf_*.json
 phase0_*.json
 .xgb_features_*.csv
 # Modal CPCV run summaries (written by scripts/run_modal_cpcv.py)
+# also: Phase 1/2 candidate + AI-pick artifacts (regenerable)
 runs/
 # Assumption logger runtime sink (quant/assumption_audit.py)
 logs/
+
+# Trained-model binaries and large training frames (regenerable)
+models/*.pkl
+models/training_frame.csv
+
+# Large daily-returns dumps from Phase 3 eval (small metrics files are tracked)
+docs/eval/three_series/daily_returns.csv
 
 # Superpowers / agent workspaces
 .superpowers/
@@ -53,4 +69,5 @@ frontend/.env.local
 .claude/
 .vercel
 .price_cache/
+.fred_cache/
 .sentiment_cache/

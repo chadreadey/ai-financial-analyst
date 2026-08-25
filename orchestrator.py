@@ -82,8 +82,8 @@ def _extract_structured_block(synthesis_text: str) -> Tuple[Optional[dict], str]
     if not isinstance(data, dict):
         return None, synthesis_text
 
-    before = synthesis_text[:match.start()].strip()
-    after = synthesis_text[match.end():].strip()
+    before = synthesis_text[: match.start()].strip()
+    after = synthesis_text[match.end() :].strip()
     prose = f"{before}\n\n{after}".strip() if before and after else (before or after)
     return data, prose
 
@@ -247,9 +247,13 @@ def _auto_paper_trade(ticker: str, structured: dict) -> None:
         elif conv_str == "LOW":
             conviction_score = 0.30
 
-    logger.info("Auto-paper-trade: %s conviction=%.2f (threshold=%.2f) verdict=%s",
-                ticker, conviction_score, settings.auto_paper_trade_min_conviction,
-                structured.get("verdict", "?"))
+    logger.info(
+        "Auto-paper-trade: %s conviction=%.2f (threshold=%.2f) verdict=%s",
+        ticker,
+        conviction_score,
+        settings.auto_paper_trade_min_conviction,
+        structured.get("verdict", "?"),
+    )
 
     if conviction_score < settings.auto_paper_trade_min_conviction:
         logger.info("Auto-paper-trade: conviction below threshold for %s, skipping", ticker)
@@ -277,7 +281,9 @@ def _auto_paper_trade(ticker: str, structured: dict) -> None:
         stop_value = f"stop_loss=${stop_loss}"
 
     horizon = structured.get("primary_horizon_days") or structured.get("horizon_days") or ""
-    exit_conditions = f"{stop_value}; horizon={horizon}d; sizing={structured.get('sizing_guidance', '')}"
+    exit_conditions = (
+        f"{stop_value}; horizon={horizon}d; sizing={structured.get('sizing_guidance', '')}"
+    )
 
     try:
         conn = _sqlite3.connect(settings.warehouse_db_path)
@@ -305,8 +311,13 @@ def _auto_paper_trade(ticker: str, structured: dict) -> None:
         )
         conn.commit()
         conn.close()
-        logger.info("Auto-paper-trade: %s %s @ $%.2f (conviction=%.2f)",
-                     direction, ticker, entry_price, conviction_score)
+        logger.info(
+            "Auto-paper-trade: %s %s @ $%.2f (conviction=%.2f)",
+            direction,
+            ticker,
+            entry_price,
+            conviction_score,
+        )
     except Exception as exc:
         logger.warning("Auto-paper-trade failed for %s: %s", ticker, exc)
 
@@ -314,6 +325,7 @@ def _auto_paper_trade(ticker: str, structured: dict) -> None:
     if settings.alpaca_api_key and settings.alpaca_secret_key:
         try:
             from backend.alpaca_paper_client import get_alpaca_client
+
             _alpaca = get_alpaca_client()
             _side = "buy" if direction == "LONG" else "sell"
             _order = _alpaca.submit_market_order(
@@ -323,7 +335,11 @@ def _auto_paper_trade(ticker: str, structured: dict) -> None:
             )
             logger.info(
                 "Auto-paper-trade: Alpaca order %s %s %s qty=%d status=%s",
-                _order["order_id"], _side, ticker, settings.paper_default_qty, _order["status"],
+                _order["order_id"],
+                _side,
+                ticker,
+                settings.paper_default_qty,
+                _order["status"],
             )
         except Exception as _alpaca_exc:
             logger.warning("Auto-paper-trade: Alpaca order failed for %s: %s", ticker, _alpaca_exc)
@@ -356,9 +372,7 @@ class Orchestrator:
             PatternAgent(provider=self.provider, model=self.synthesis_model),
         ]
         if settings.enable_macro_agent:
-            self.agents.append(
-                MacroAgent(provider=self.provider, model=self.synthesis_model)
-            )
+            self.agents.append(MacroAgent(provider=self.provider, model=self.synthesis_model))
 
     def prepare_data(
         self,
@@ -369,6 +383,7 @@ class Orchestrator:
         Fetch and parse all SEC data for a ticker.
         Returns the unified AnalysisData that agents consume.
         """
+
         def emit(message: str, pct: Optional[int] = None) -> None:
             if progress_callback:
                 try:
@@ -430,6 +445,7 @@ class Orchestrator:
                     try:
                         from quant.fmp_cache import FMPFundamentalCache
                         from quant.fundamentals import load_cached_fundamentals
+
                         fund_cache = FMPFundamentalCache()
                         if fund_cache.ticker_count() > 0:
                             data.cached_fundamentals = load_cached_fundamentals(
@@ -487,7 +503,8 @@ class Orchestrator:
         if settings.enable_filing_text:
             try:
                 tenk_filings = [
-                    f for f in raw["recent_filings"]
+                    f
+                    for f in raw["recent_filings"]
                     if f.get("form") == "10-K" and f.get("primaryDocument")
                 ]
                 if tenk_filings:
@@ -509,11 +526,17 @@ class Orchestrator:
         if filing_sections.get("mda"):
             enrichment_sections["filing_mda"] = f"=== 10-K MD&A ===\n{filing_sections['mda']}"
         if filing_sections.get("risk_factors"):
-            enrichment_sections["filing_risk_factors"] = f"=== 10-K Risk Factors ===\n{filing_sections['risk_factors']}"
+            enrichment_sections["filing_risk_factors"] = (
+                f"=== 10-K Risk Factors ===\n{filing_sections['risk_factors']}"
+            )
         if filing_sections.get("business_description"):
-            enrichment_sections["filing_business"] = f"=== 10-K Business Description ===\n{filing_sections['business_description']}"
+            enrichment_sections["filing_business"] = (
+                f"=== 10-K Business Description ===\n{filing_sections['business_description']}"
+            )
 
-        segment_data = metrics.pop("_segment_data", None)  # always pop, even if edgartools was skipped
+        segment_data = metrics.pop(
+            "_segment_data", None
+        )  # always pop, even if edgartools was skipped
         if segment_data:
             enrichment_sections["segment_data"] = f"=== Revenue Segments ===\n{segment_data}"
 
@@ -523,14 +546,19 @@ class Orchestrator:
                 emit("Loading TimesFM cached signals...", 22)
                 from quant.timesfm.cache import get_signals
                 from quant.timesfm.enrichment import format_price_signals, format_eps_signals
+
                 tfm_signals = get_signals(ticker_upper)
                 if tfm_signals:
                     price_sig = tfm_signals.get("price_forecast")
                     eps_sig = tfm_signals.get("eps_forecast")
                     if price_sig:
-                        enrichment_sections["timesfm_price"] = format_price_signals(ticker_upper, price_sig)
+                        enrichment_sections["timesfm_price"] = format_price_signals(
+                            ticker_upper, price_sig
+                        )
                     if eps_sig:
-                        enrichment_sections["timesfm_eps"] = format_eps_signals(ticker_upper, eps_sig)
+                        enrichment_sections["timesfm_eps"] = format_eps_signals(
+                            ticker_upper, eps_sig
+                        )
             except Exception as exc:
                 logger.warning("TimesFM enrichment injection failed: %s", exc)
 
@@ -539,6 +567,7 @@ class Orchestrator:
             try:
                 emit("Running LSTM price forecast...", 22)
                 from quant.lstm.model import ReturnForecaster, build_features, LSTMConfig
+
                 lstm_model_path = Path(__file__).parent / ".lstm_model"
                 if lstm_model_path.exists():
                     forecaster = ReturnForecaster.load(lstm_model_path)
@@ -550,7 +579,13 @@ class Orchestrator:
                         last_score = score_series.dropna()
                         if not last_score.empty:
                             score = float(last_score.iloc[-1])
-                            trend = "bullish" if score > 0.1 else "bearish" if score < -0.1 else "neutral"
+                            trend = (
+                                "bullish"
+                                if score > 0.1
+                                else "bearish"
+                                if score < -0.1
+                                else "neutral"
+                            )
                             enrichment_sections["lstm_forecast"] = (
                                 f"=== LSTM Price Forecast ({ticker_upper}) ===\n"
                                 f"  Momentum Score: {score:+.2f}\n"
@@ -559,7 +594,10 @@ class Orchestrator:
                                 f"{forecaster.config.forecast_horizon}d horizon"
                             )
                 else:
-                    logger.info("No saved LSTM model at %s — run scripts/run_ml_backtest.py first", lstm_model_path)
+                    logger.info(
+                        "No saved LSTM model at %s — run scripts/run_ml_backtest.py first",
+                        lstm_model_path,
+                    )
             except Exception as exc:
                 logger.warning("LSTM enrichment injection failed: %s", exc)
 
@@ -580,12 +618,16 @@ class Orchestrator:
         try:
             from quant.fmp_cache import FMPFundamentalCache
             from quant.fundamentals import load_cached_fundamentals
+
             fund_cache = FMPFundamentalCache()
             if fund_cache.ticker_count() > 0:
                 cached_fund = load_cached_fundamentals(raw["ticker"], fmp_cache=fund_cache)
                 if cached_fund:
-                    logger.info("Loaded cached fundamentals for %s: %s",
-                                raw["ticker"], list(cached_fund.keys()))
+                    logger.info(
+                        "Loaded cached fundamentals for %s: %s",
+                        raw["ticker"],
+                        list(cached_fund.keys()),
+                    )
         except Exception as exc:
             logger.debug("Cached fundamentals not available: %s", exc)
 
@@ -700,10 +742,7 @@ class Orchestrator:
                 marker="\n...[agent report trimmed]...",
             )
             report_sections.append(
-                f"{'=' * 60}\n"
-                f"REPORT FROM: {report.agent_name}\n"
-                f"{'=' * 60}\n\n"
-                f"{trimmed_analysis}\n"
+                f"{'=' * 60}\nREPORT FROM: {report.agent_name}\n{'=' * 60}\n\n{trimmed_analysis}\n"
             )
 
         combined_reports = "\n\n".join(report_sections)
@@ -759,9 +798,7 @@ class Orchestrator:
         data = await asyncio.to_thread(self.prepare_data, ticker, progress_callback)
 
         specialist = (
-            self._get_sector_specialist(data)
-            if settings.enable_sector_specialists
-            else None
+            self._get_sector_specialist(data) if settings.enable_sector_specialists else None
         )
 
         if specialist:
@@ -779,22 +816,22 @@ class Orchestrator:
                 self._run_agent(a, data, progress_callback=progress_callback)
                 for a in non_competitive
             ]
-            specialist_result, *wave1_reports = await asyncio.gather(
-                specialist_coro, *wave1_coros
-            )
+            specialist_result, *wave1_reports = await asyncio.gather(specialist_coro, *wave1_coros)
             if progress_callback:
-                progress_callback("Sector specialist completed. Updating competitive context...", 58)
+                progress_callback(
+                    "Sector specialist completed. Updating competitive context...", 58
+                )
 
             data.enrichment_sections = {
                 **data.enrichment_sections,
-                "sector_briefing": trim_text(
-                    specialist_result, settings.max_sector_briefing_chars
-                ),
+                "sector_briefing": trim_text(specialist_result, settings.max_sector_briefing_chars),
             }
 
             logger.info("Phase 1 wave 2: Competitive agent (with sector briefing)")
             if progress_callback:
-                progress_callback("Wave 2: running competitive analysis with sector briefing...", 62)
+                progress_callback(
+                    "Wave 2: running competitive analysis with sector briefing...", 62
+                )
             wave2_reports = [
                 await self._run_agent(a, data, progress_callback=progress_callback)
                 for a in competitive_agents
@@ -837,7 +874,9 @@ class Orchestrator:
                 if llm_entry and abs(llm_entry - data.current_price) / data.current_price > 0.05:
                     logger.warning(
                         "Overriding LLM entry_price %.2f with market price %.2f for %s (%.1f%% drift)",
-                        llm_entry, data.current_price, data.ticker,
+                        llm_entry,
+                        data.current_price,
+                        data.ticker,
                         abs(llm_entry - data.current_price) / data.current_price * 100,
                     )
                 structured["entry_price"] = data.current_price
@@ -852,8 +891,11 @@ class Orchestrator:
                 atr_value = None
                 sv = getattr(data, "_signal_vector", None)
                 if sv and isinstance(sv, dict):
-                    atr_meta = (sv.get("signal_vector", {}).get("atr_regime", {})
-                                if "signal_vector" in sv else sv.get("atr_regime", {}))
+                    atr_meta = (
+                        sv.get("signal_vector", {}).get("atr_regime", {})
+                        if "signal_vector" in sv
+                        else sv.get("atr_regime", {})
+                    )
                     atr_value = _as_float(atr_meta.get("atr_value")) if atr_meta else None
 
                 if atr_value and atr_value > 0:
@@ -889,7 +931,10 @@ class Orchestrator:
                         logger.warning(
                             "Overriding LLM stop_loss $%.2f with computed $%.2f for %s "
                             "(entry=$%.2f, direction=%s)",
-                            llm_stop, computed_stop, data.ticker, entry,
+                            llm_stop,
+                            computed_stop,
+                            data.ticker,
+                            entry,
                             "SHORT" if is_short else "LONG",
                         )
                         structured["stop_loss"] = {"value": computed_stop, "unit": "price"}
@@ -919,7 +964,9 @@ class Orchestrator:
                     if llm_conviction and abs(llm_conviction - conviction_score) > 0.05:
                         logger.info(
                             "Overriding LLM conviction_score %.4f with deterministic %.4f (from weighted_score %.4f)",
-                            llm_conviction, conviction_score, weighted_score,
+                            llm_conviction,
+                            conviction_score,
+                            weighted_score,
                         )
                     structured["conviction_score"] = conviction_score
 
@@ -929,7 +976,9 @@ class Orchestrator:
                     if llm_verdict != det_verdict:
                         logger.info(
                             "Overriding LLM verdict '%s' with deterministic '%s' (weighted_score=%.4f)",
-                            llm_verdict, det_verdict, weighted_score,
+                            llm_verdict,
+                            det_verdict,
+                            weighted_score,
                         )
                     structured["verdict"] = det_verdict
 

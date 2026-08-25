@@ -5,6 +5,7 @@ configured and transparently falls back to SQLite. The POST dispatch spawns
 the orchestrator in a daemon thread and returns the new run_id immediately
 so the frontend can navigate to the detail view before the run completes.
 """
+
 from __future__ import annotations
 
 import hmac
@@ -45,7 +46,7 @@ def _require_api_key(x_api_key: str = Header(..., alias="X-API-Key")) -> None:
 router = APIRouter(dependencies=[Depends(_require_api_key)])
 
 
-_TICKER_RE = re.compile(r'^[A-Z]{1,5}$')
+_TICKER_RE = re.compile(r"^[A-Z]{1,5}$")
 
 
 class ModalCPCVRequest(BaseModel):
@@ -55,6 +56,7 @@ class ModalCPCVRequest(BaseModel):
     tickers/universe so the frontend can send a minimal payload with sensible
     defaults.
     """
+
     tickers: Optional[list[str]] = Field(
         default=None,
         max_length=50,
@@ -92,9 +94,7 @@ class ModalCPCVRequest(BaseModel):
                 raise ValueError(f"each ticker must be a string, got {type(raw)}")
             t = raw.upper().strip()
             if not _TICKER_RE.match(t):
-                raise ValueError(
-                    f"Invalid ticker {raw!r}. Must be 1-5 uppercase ASCII letters."
-                )
+                raise ValueError(f"Invalid ticker {raw!r}. Must be 1-5 uppercase ASCII letters.")
             cleaned.append(t)
         return cleaned
 
@@ -122,6 +122,7 @@ async def dispatch_modal_cpcv(payload: ModalCPCVRequest) -> ModalCPCVKickoff:
             tickers = list(payload.tickers)  # already validated + uppercased by the model
         else:
             from quant.universe import get_universe
+
             tickers = list(get_universe(payload.universe))
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(400, f"Could not resolve universe {payload.universe!r}: {exc}")
@@ -180,13 +181,18 @@ async def list_runs(
         pass
 
     runs = backtest_reader.list_runs(
-        status=status, config_hash=config_hash, limit=limit, offset=offset,
+        status=status,
+        config_hash=config_hash,
+        limit=limit,
+        offset=offset,
     )
     return {"source": backtest_reader.source(), "runs": runs, "count": len(runs)}
 
 
 @router.get("/modal/runs/by-config-hash/{config_hash}")
-async def runs_by_config_hash(config_hash: str, limit: int = Query(20, ge=1, le=100)) -> dict[str, Any]:
+async def runs_by_config_hash(
+    config_hash: str, limit: int = Query(20, ge=1, le=100)
+) -> dict[str, Any]:
     runs = backtest_reader.find_runs_by_config_hash(config_hash, limit=limit)
     return {"config_hash": config_hash, "runs": runs, "count": len(runs)}
 
@@ -208,8 +214,11 @@ async def get_run_combinations(
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     rows = backtest_reader.get_combinations(
-        run_id, order_by=order_by, descending=descending,
-        limit=limit, offset=offset,
+        run_id,
+        order_by=order_by,
+        descending=descending,
+        limit=limit,
+        offset=offset,
     )
     return {"run_id": run_id, "combinations": rows, "count": len(rows)}
 
@@ -223,8 +232,11 @@ async def get_combo_trades(
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     rows = backtest_reader.get_trades(
-        run_id, combo_idx=combo_idx, ticker=ticker,
-        limit=limit, offset=offset,
+        run_id,
+        combo_idx=combo_idx,
+        ticker=ticker,
+        limit=limit,
+        offset=offset,
     )
     return {
         "run_id": run_id,
@@ -242,7 +254,10 @@ async def get_run_trades(
     offset: int = Query(0, ge=0),
 ) -> dict[str, Any]:
     rows = backtest_reader.get_trades(
-        run_id, ticker=ticker, limit=limit, offset=offset,
+        run_id,
+        ticker=ticker,
+        limit=limit,
+        offset=offset,
     )
     return {"run_id": run_id, "trades": rows, "count": len(rows)}
 

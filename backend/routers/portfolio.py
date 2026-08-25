@@ -39,6 +39,7 @@ def _fetch_live_price(ticker: str) -> Optional[float]:
     if tiingo_key:
         try:
             from tiingo_client import TiingoClient
+
             client = TiingoClient(tiingo_key)
             data = client.get_quote(ticker)
             if data:
@@ -50,6 +51,7 @@ def _fetch_live_price(ticker: str) -> Optional[float]:
     if fmp_key:
         try:
             from fmp_client import FMPClient
+
             client = FMPClient(fmp_key)
             data = client.get_quote(ticker)
             if data:
@@ -120,7 +122,12 @@ async def upsert_holding(holding: PortfolioHolding):
         """INSERT INTO portfolio_holdings (ticker, shares, cost_basis, date_added)
            VALUES (?, ?, ?, ?)
            ON CONFLICT(ticker) DO UPDATE SET shares=excluded.shares, cost_basis=excluded.cost_basis""",
-        (holding.ticker.upper(), holding.shares, holding.cost_basis, holding.date_added or time.strftime("%Y-%m-%d")),
+        (
+            holding.ticker.upper(),
+            holding.shares,
+            holding.cost_basis,
+            holding.date_added or time.strftime("%Y-%m-%d"),
+        ),
     )
     conn.commit()
     conn.close()
@@ -342,6 +349,7 @@ async def get_candidates(limit: int = 20, universe: str = "liquid_20", refresh: 
     cached_at_iso = ""
     if ranked_at:
         from datetime import datetime
+
         cached_at_iso = datetime.utcfromtimestamp(ranked_at).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     candidates = []
@@ -352,14 +360,16 @@ async def get_candidates(limit: int = 20, universe: str = "liquid_20", refresh: 
             top_signals = _json.loads(r["top_signals_json"]) or []
         except Exception:
             top_signals = []
-        candidates.append({
-            "ticker": r["ticker"],
-            "composite_score": round(float(r["composite_score"]), 4),
-            "composite_direction": r["composite_direction"],
-            "actionable": bool(r["actionable"]),
-            "top_signals": top_signals,
-            "cached_at": cached_at_iso,
-        })
+        candidates.append(
+            {
+                "ticker": r["ticker"],
+                "composite_score": round(float(r["composite_score"]), 4),
+                "composite_direction": r["composite_direction"],
+                "actionable": bool(r["actionable"]),
+                "top_signals": top_signals,
+                "cached_at": cached_at_iso,
+            }
+        )
         if len(candidates) >= limit:
             break
 

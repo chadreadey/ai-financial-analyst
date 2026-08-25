@@ -13,6 +13,7 @@ CACHE_TTL = 300
 @router.get("/")
 async def get_news(ticker: str = "", sector: str = "", limit: int = 10):
     from config import settings
+
     key = f"{ticker}:{sector}"
     now = time.time()
 
@@ -25,6 +26,7 @@ async def get_news(ticker: str = "", sector: str = "", limit: int = 10):
 
     try:
         from importlib import import_module
+
         tavily_mod = import_module("tavily")
         client = tavily_mod.TavilyClient(api_key=settings.tavily_api_key.strip())
 
@@ -46,14 +48,16 @@ async def get_news(ticker: str = "", sector: str = "", limit: int = 10):
 
         items = []
         for r in results.get("results", [])[:limit]:
-            items.append({
-                "title": r.get("title", ""),
-                "url": r.get("url", ""),
-                "snippet": (r.get("content", "") or "")[:300],
-                "source": r.get("url", "").split("/")[2] if r.get("url") else "",
-                "date": "",
-                "sector": sector,
-            })
+            items.append(
+                {
+                    "title": r.get("title", ""),
+                    "url": r.get("url", ""),
+                    "snippet": (r.get("content", "") or "")[:300],
+                    "source": r.get("url", "").split("/")[2] if r.get("url") else "",
+                    "date": "",
+                    "sector": sector,
+                }
+            )
 
         _news_cache[key] = (now, items)
         return {"items": items}

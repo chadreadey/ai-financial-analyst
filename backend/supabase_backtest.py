@@ -12,6 +12,7 @@ Gated by the existing `ENABLE_SUPABASE_HISTORY` flag. We reuse the single
 flag instead of adding another — if a user wants only backtest sync or only
 analysis sync, we can split in a follow-up.
 """
+
 from __future__ import annotations
 
 import json
@@ -70,9 +71,13 @@ def _append_failed_batch(table: str, rows: list[dict]) -> None:
     """Append a failed batch to a local JSONL for manual replay."""
     try:
         with _FAILED_BATCH_LOG.open("a") as fh:
-            fh.write(json.dumps({"table": table, "rows": rows,
-                                 "ts": datetime.now(timezone.utc).isoformat()},
-                                default=_json_default) + "\n")
+            fh.write(
+                json.dumps(
+                    {"table": table, "rows": rows, "ts": datetime.now(timezone.utc).isoformat()},
+                    default=_json_default,
+                )
+                + "\n"
+            )
     except Exception as exc:
         logger.error("Could not write failed batch to %s: %s", _FAILED_BATCH_LOG, exc)
 
@@ -173,6 +178,7 @@ def _coerce_timestamps(row: dict) -> dict:
 
 # ── backtest_runs ─────────────────────────────────────────────────────────
 
+
 def upsert_run(row: dict) -> bool:
     """Insert-or-update a single backtest_runs row (by run_id).
 
@@ -186,15 +192,31 @@ def upsert_run(row: dict) -> bool:
 
 # Columns patch_run is allowed to touch. Matches the allowlist enforced by
 # `backend.cpcv_sqlite.patch_run` so both stores accept the same writes.
-_PATCHABLE_RUN_COLS: frozenset[str] = frozenset({
-    "config_hash", "git_sha", "status", "universe",
-    "n_groups", "n_test_groups", "n_combinations",
-    "n_completed", "n_skipped", "n_failed",
-    "median_oos_sharpe", "oos_sharpe_min", "oos_sharpe_max",
-    "pbo", "deflated_sharpe",
-    "config_json", "metrics_json", "error", "modal_call_id",
-    "started_at", "finished_at",
-})
+_PATCHABLE_RUN_COLS: frozenset[str] = frozenset(
+    {
+        "config_hash",
+        "git_sha",
+        "status",
+        "universe",
+        "n_groups",
+        "n_test_groups",
+        "n_combinations",
+        "n_completed",
+        "n_skipped",
+        "n_failed",
+        "median_oos_sharpe",
+        "oos_sharpe_min",
+        "oos_sharpe_max",
+        "pbo",
+        "deflated_sharpe",
+        "config_json",
+        "metrics_json",
+        "error",
+        "modal_call_id",
+        "started_at",
+        "finished_at",
+    }
+)
 
 
 def patch_run(run_id: str, patch: dict) -> bool:
@@ -204,13 +226,13 @@ def patch_run(run_id: str, patch: dict) -> bool:
     unknown = set(patch.keys()) - _PATCHABLE_RUN_COLS
     if unknown:
         raise ValueError(
-            f"patch_run: unknown columns {sorted(unknown)} "
-            f"(allowed: {sorted(_PATCHABLE_RUN_COLS)})"
+            f"patch_run: unknown columns {sorted(unknown)} (allowed: {sorted(_PATCHABLE_RUN_COLS)})"
         )
     return _patch("backtest_runs", {"run_id": f"eq.{run_id}"}, patch)
 
 
 # ── backtest_combinations ────────────────────────────────────────────────
+
 
 def insert_combinations_batch(rows: list[dict], chunk: int = _COMBO_CHUNK) -> tuple[int, int]:
     """Batch-insert combo rows. Returns (inserted, failed)."""
@@ -219,8 +241,10 @@ def insert_combinations_batch(rows: list[dict], chunk: int = _COMBO_CHUNK) -> tu
     inserted = 0
     failed = 0
     for i in range(0, len(rows), chunk):
-        batch = rows[i:i + chunk]
-        if _post("backtest_combinations", batch, prefer="resolution=merge-duplicates,return=minimal"):
+        batch = rows[i : i + chunk]
+        if _post(
+            "backtest_combinations", batch, prefer="resolution=merge-duplicates,return=minimal"
+        ):
             inserted += len(batch)
         else:
             failed += len(batch)
@@ -228,6 +252,7 @@ def insert_combinations_batch(rows: list[dict], chunk: int = _COMBO_CHUNK) -> tu
 
 
 # ── backtest_trades ──────────────────────────────────────────────────────
+
 
 def insert_trades_batch(rows: list[dict], chunk: int = _TRADE_CHUNK) -> tuple[int, int]:
     """Batch-insert trade rows. Returns (inserted, failed).
@@ -240,7 +265,7 @@ def insert_trades_batch(rows: list[dict], chunk: int = _TRADE_CHUNK) -> tuple[in
     inserted = 0
     failed = 0
     for i in range(0, len(rows), chunk):
-        batch = rows[i:i + chunk]
+        batch = rows[i : i + chunk]
         if _post("backtest_trades", batch, prefer="return=minimal"):
             inserted += len(batch)
         else:
@@ -249,6 +274,7 @@ def insert_trades_batch(rows: list[dict], chunk: int = _TRADE_CHUNK) -> tuple[in
 
 
 # ── backtest_events ──────────────────────────────────────────────────────
+
 
 def insert_event(row: dict) -> bool:
     """Fire-and-forget event write. Used by `modal_app.events.emit_event`."""
@@ -261,6 +287,7 @@ def insert_event(row: dict) -> bool:
 #
 # Thin PostgREST GETs. Returns `None`/[] when Supabase is disabled so callers
 # can transparently fall back to SQLite via `backend.backtest_reader`.
+
 
 def _get(path: str, params: Optional[dict] = None) -> Optional[list[dict]]:
     if not is_enabled():
@@ -390,15 +417,20 @@ def sweep_stale_runs(max_age_seconds: Optional[float] = None) -> int:
         max_age_seconds = float(getattr(settings, "cpcv_stale_sweep_seconds", 30 * 60))
     cutoff = datetime.fromtimestamp(time.time() - max_age_seconds, tz=timezone.utc).isoformat()
     # Two PostgREST filters: status=eq.running AND updated_at<cutoff
-    qs = urlencode({
-        "status": "eq.running",
-        "updated_at": f"lt.{cutoff}",
-    }, safe=".,:()*")
-    data = json.dumps({
-        "status": "failed",
-        "error": "stale run: no terminal event within timeout",
-        "finished_at": datetime.now(timezone.utc).isoformat(),
-    }).encode("utf-8")
+    qs = urlencode(
+        {
+            "status": "eq.running",
+            "updated_at": f"lt.{cutoff}",
+        },
+        safe=".,:()*",
+    )
+    data = json.dumps(
+        {
+            "status": "failed",
+            "error": "stale run: no terminal event within timeout",
+            "finished_at": datetime.now(timezone.utc).isoformat(),
+        }
+    ).encode("utf-8")
     req = Request(
         f"{_rest_url('backtest_runs')}?{qs}",
         data=data,

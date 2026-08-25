@@ -28,6 +28,7 @@ _vader = None
 
 try:
     from transformers import pipeline as hf_pipeline
+
     _finbert_pipeline = hf_pipeline(
         "sentiment-analysis",
         model="ProsusAI/finbert",
@@ -40,6 +41,7 @@ except Exception as exc:
     logger.debug("FinBERT not available (%s) — trying VADER fallback", exc)
     try:
         from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+
         _vader = SentimentIntensityAnalyzer()
         _scorer_name = "vader"
         logger.info("Using VADER sentiment (FinBERT not available)")
@@ -111,10 +113,7 @@ def compute_news_sentiment_score(
 
     # Point-in-time filter: only articles published BEFORE as_of_date
     cutoff_ts = as_of_date.timestamp()
-    filtered = [
-        a for a in articles
-        if a.get("datetime", 0) < cutoff_ts
-    ]
+    filtered = [a for a in articles if a.get("datetime", 0) < cutoff_ts]
 
     n = len(filtered)
     if n < min_articles:

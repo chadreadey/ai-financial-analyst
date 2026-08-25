@@ -39,8 +39,8 @@ def test_neutral_zone():
 
 def test_bearish_not_persistent():
     """17% below 12M high but prior month only 8% below → not yet bearish."""
-    prior_vals = [8000.0] * 11 + [7360.0]   # prior: 8% below 8000
-    current = 6640.0                          # current: 17% below 8000
+    prior_vals = [8000.0] * 11 + [7360.0]  # prior: 8% below 8000
+    current = 6640.0  # current: 17% below 8000
     s = _copper_series(prior_vals + [current])
     _, _, regime, score = compute_copper_signal(s, s.index[-1])
     assert regime == "neutral"

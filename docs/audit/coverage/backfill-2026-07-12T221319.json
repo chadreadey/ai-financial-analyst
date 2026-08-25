@@ -1,0 +1,3480 @@
+{
+  "run_timestamp": "2026-07-12T221319",
+  "start_date": "2015-01-01",
+  "universe_size": 495,
+  "elapsed_seconds": 244.46,
+  "counts": {
+    "BACKFILL": 445,
+    "POST_IPO": 50,
+    "NO_DATA": 0,
+    "ERROR": 0,
+    "SKIPPED": 0
+  },
+  "per_ticker": [
+    {
+      "ticker": "A",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AAPL",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ABBV",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ABNB",
+      "status": "POST_IPO",
+      "old_first": "2020-12-10",
+      "new_first": "2020-12-10",
+      "rows": 1400
+    },
+    {
+      "ticker": "ABT",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ACGL",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ACN",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ADBE",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ADI",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ADM",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ADP",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ADSK",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AEE",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AEP",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AES",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AFL",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AIG",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AIZ",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AJG",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AKAM",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ALB",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ALGN",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ALL",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ALLE",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AMAT",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AMCR",
+      "status": "POST_IPO",
+      "old_first": "2019-06-11",
+      "new_first": "2019-06-11",
+      "rows": 1780
+    },
+    {
+      "ticker": "AMD",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AME",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AMGN",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AMP",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AMT",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AMZN",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ANET",
+      "status": "BACKFILL",
+      "old_first": "2014-06-06",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AON",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AOS",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "APA",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "APD",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "APH",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "APO",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "APP",
+      "status": "POST_IPO",
+      "old_first": "2021-04-15",
+      "new_first": "2021-04-15",
+      "rows": 1315
+    },
+    {
+      "ticker": "APTV",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ARE",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ARES",
+      "status": "BACKFILL",
+      "old_first": "2014-05-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ATO",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AVB",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AVGO",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AVY",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AWK",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AXON",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AXP",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "AZO",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "BA",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "BAC",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "BALL",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "BAX",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "BBY",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "BDX",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "BEN",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "BG",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "BIIB",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "BK",
+      "status": "POST_IPO",
+      "old_first": "2014-01-02",
+      "new_first": "2026-06-04",
+      "rows": 5
+    },
+    {
+      "ticker": "BKNG",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "BKR",
+      "status": "POST_IPO",
+      "old_first": "2017-07-05",
+      "new_first": "2017-07-05",
+      "rows": 2266
+    },
+    {
+      "ticker": "BLDR",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "BLK",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "BMY",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "BR",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "BRO",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "BSX",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "BX",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "BXP",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "C",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CAG",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CAH",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CARR",
+      "status": "POST_IPO",
+      "old_first": "2020-03-19",
+      "new_first": "2020-03-19",
+      "rows": 1585
+    },
+    {
+      "ticker": "CAT",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CB",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CBOE",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CBRE",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CCI",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CCL",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CDNS",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CDW",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CEG",
+      "status": "POST_IPO",
+      "old_first": "2022-02-02",
+      "new_first": "2022-02-02",
+      "rows": 1112
+    },
+    {
+      "ticker": "CF",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CFG",
+      "status": "BACKFILL",
+      "old_first": "2014-09-24",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CHD",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CHRW",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CHTR",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CI",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CIEN",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CINF",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CL",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CLX",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CMCSA",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CME",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CMG",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CMI",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CMS",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CNC",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CNP",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "COF",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "COHR",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "COIN",
+      "status": "POST_IPO",
+      "old_first": "2021-04-14",
+      "new_first": "2021-04-14",
+      "rows": 1316
+    },
+    {
+      "ticker": "COO",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "COP",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "COR",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "COST",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CPAY",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CPB",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CPRT",
+      "status": "BACKFILL",
+      "old_first": "2014-01-02",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CPT",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CRH",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CRL",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CRM",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CRWD",
+      "status": "POST_IPO",
+      "old_first": "2019-06-12",
+      "new_first": "2019-06-12",
+      "rows": 1779
+    },
+    {
+      "ticker": "CSCO",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CSGP",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CSX",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CTAS",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CTRA",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2852
+    },
+    {
+      "ticker": "CTSH",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CTVA",
+      "status": "POST_IPO",
+      "old_first": "2019-05-24",
+      "new_first": "2019-05-24",
+      "rows": 1791
+    },
+    {
+      "ticker": "CVNA",
+      "status": "POST_IPO",
+      "old_first": "2017-04-28",
+      "new_first": "2017-04-28",
+      "rows": 2312
+    },
+    {
+      "ticker": "CVS",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "CVX",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "D",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "DAL",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "DASH",
+      "status": "POST_IPO",
+      "old_first": "2020-12-09",
+      "new_first": "2020-12-09",
+      "rows": 1401
+    },
+    {
+      "ticker": "DD",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "DDOG",
+      "status": "POST_IPO",
+      "old_first": "2019-09-19",
+      "new_first": "2019-09-19",
+      "rows": 1710
+    },
+    {
+      "ticker": "DE",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "DECK",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "DELL",
+      "status": "POST_IPO",
+      "old_first": "2018-12-21",
+      "new_first": "2018-12-21",
+      "rows": 1896
+    },
+    {
+      "ticker": "DG",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "DGX",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "DHI",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "DHR",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "DIS",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "DLR",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "DLTR",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "DOC",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2895
+    },
+    {
+      "ticker": "DOV",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "DOW",
+      "status": "POST_IPO",
+      "old_first": "2019-03-20",
+      "new_first": "2019-03-20",
+      "rows": 1837
+    },
+    {
+      "ticker": "DPZ",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "DRI",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "DTE",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "DUK",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "DVA",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "DVN",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "DXCM",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "EA",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "EBAY",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ECL",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ED",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "EFX",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "EG",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "EIX",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "EL",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ELV",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "EME",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "EMR",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "EOG",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "EPAM",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "EQIX",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "EQR",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "EQT",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ERIE",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ES",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ESS",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ETN",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ETR",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "EVRG",
+      "status": "POST_IPO",
+      "old_first": "2018-06-04",
+      "new_first": "2018-06-04",
+      "rows": 2036
+    },
+    {
+      "ticker": "EW",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "EXC",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "EXE",
+      "status": "POST_IPO",
+      "old_first": "2021-02-10",
+      "new_first": "2021-02-10",
+      "rows": 1359
+    },
+    {
+      "ticker": "EXPD",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "EXPE",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "EXR",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "F",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "FANG",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "FAST",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "FCX",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "FDS",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "FDX",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "FE",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "FFIV",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "FICO",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "FIS",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "FISV",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "FITB",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "FIX",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "FOXA",
+      "status": "POST_IPO",
+      "old_first": "2019-03-12",
+      "new_first": "2019-03-12",
+      "rows": 1843
+    },
+    {
+      "ticker": "FRT",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "FSLR",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "FTNT",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "FTV",
+      "status": "POST_IPO",
+      "old_first": "2016-07-01",
+      "new_first": "2016-07-01",
+      "rows": 2519
+    },
+    {
+      "ticker": "GD",
+      "status": "BACKFILL",
+      "old_first": "2014-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "GDDY",
+      "status": "POST_IPO",
+      "old_first": "2015-04-01",
+      "new_first": "2015-04-01",
+      "rows": 2835
+    },
+    {
+      "ticker": "GE",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "GEHC",
+      "status": "POST_IPO",
+      "old_first": "2022-12-16",
+      "new_first": "2023-01-04",
+      "rows": 881
+    },
+    {
+      "ticker": "GEN",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "GEV",
+      "status": "POST_IPO",
+      "old_first": "2024-04-02",
+      "new_first": "2024-03-27",
+      "rows": 573
+    },
+    {
+      "ticker": "GILD",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "GIS",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "GL",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "GLW",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "GM",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "GNRC",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "GOOGL",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "GPC",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "GPN",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "GRMN",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "GS",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "GWW",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "HAL",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "HAS",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "HBAN",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "HCA",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "HD",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "HIG",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "HII",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "HLT",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "HOLX",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2831
+    },
+    {
+      "ticker": "HON",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "HOOD",
+      "status": "POST_IPO",
+      "old_first": "2021-07-29",
+      "new_first": "2021-07-29",
+      "rows": 1242
+    },
+    {
+      "ticker": "HPE",
+      "status": "POST_IPO",
+      "old_first": "2020-07-27",
+      "new_first": "2015-10-19",
+      "rows": 2696
+    },
+    {
+      "ticker": "HPQ",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "HRL",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "HSIC",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "HST",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "HSY",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "HUBB",
+      "status": "POST_IPO",
+      "old_first": "2020-07-27",
+      "new_first": "2015-12-24",
+      "rows": 2649
+    },
+    {
+      "ticker": "HUM",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "HWM",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "IBKR",
+      "status": "BACKFILL",
+      "old_first": "2018-10-03",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "IBM",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ICE",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "IDXX",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "IEX",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "IFF",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "INCY",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "INTC",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "INTU",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "INVH",
+      "status": "POST_IPO",
+      "old_first": "2020-07-27",
+      "new_first": "2017-02-01",
+      "rows": 2372
+    },
+    {
+      "ticker": "IP",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "IQV",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "IR",
+      "status": "POST_IPO",
+      "old_first": "2020-07-27",
+      "new_first": "2017-05-12",
+      "rows": 2302
+    },
+    {
+      "ticker": "IRM",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ISRG",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "IT",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ITW",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "IVZ",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "J",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "JBHT",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "JBL",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "JCI",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "JKHY",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "JNJ",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "JPM",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "KDP",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "KEY",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "KEYS",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "KHC",
+      "status": "POST_IPO",
+      "old_first": "2017-03-27",
+      "new_first": "2015-07-06",
+      "rows": 2770
+    },
+    {
+      "ticker": "KIM",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "KKR",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "KLAC",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "KMB",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "KMI",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "KO",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "KR",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "KVUE",
+      "status": "POST_IPO",
+      "old_first": "2023-05-04",
+      "new_first": "2023-05-04",
+      "rows": 798
+    },
+    {
+      "ticker": "L",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "LDOS",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "LEN",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "LH",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "LHX",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "LII",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "LIN",
+      "status": "POST_IPO",
+      "old_first": "2018-10-01",
+      "new_first": "2018-10-01",
+      "rows": 1953
+    },
+    {
+      "ticker": "LITE",
+      "status": "POST_IPO",
+      "old_first": "2020-07-27",
+      "new_first": "2015-08-04",
+      "rows": 2749
+    },
+    {
+      "ticker": "LLY",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "LMT",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "LNT",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "LOW",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "LRCX",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "LULU",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "LUV",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "LVS",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "LYB",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "LYV",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MA",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MAA",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MAR",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MAS",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MCD",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MCHP",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MCK",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MCO",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MDLZ",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MDT",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MET",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "META",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MGM",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MKC",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MLM",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MMM",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MNST",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MO",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MOS",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MPC",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MPWR",
+      "status": "BACKFILL",
+      "old_first": "2019-01-03",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MRK",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MRNA",
+      "status": "POST_IPO",
+      "old_first": "2020-07-27",
+      "new_first": "2018-12-07",
+      "rows": 1906
+    },
+    {
+      "ticker": "MRSH",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MS",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MSCI",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MSFT",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MSI",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MTB",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MTD",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "MU",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "NCLH",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "NDAQ",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "NDSN",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "NEE",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "NEM",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "NFLX",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "NI",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "NKE",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "NOC",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "NOW",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "NRG",
+      "status": "BACKFILL",
+      "old_first": "2018-03-07",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "NSC",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "NTAP",
+      "status": "BACKFILL",
+      "old_first": "2019-01-10",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "NTRS",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "NUE",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "NVDA",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "NVR",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "NWSA",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "NXPI",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "O",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ODFL",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "OKE",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "OMC",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ON",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ORCL",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ORLY",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "OTIS",
+      "status": "POST_IPO",
+      "old_first": "2020-07-27",
+      "new_first": "2020-03-19",
+      "rows": 1585
+    },
+    {
+      "ticker": "OXY",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PANW",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PAYX",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PCAR",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PCG",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PEG",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PEP",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PFE",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PFG",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PG",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PGR",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PH",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PHM",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PKG",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PLD",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PLTR",
+      "status": "POST_IPO",
+      "old_first": "2020-09-30",
+      "new_first": "2020-09-30",
+      "rows": 1450
+    },
+    {
+      "ticker": "PM",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PNC",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PNR",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PNW",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PODD",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "POOL",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PPG",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PPL",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PRU",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PSA",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PSKY",
+      "status": "POST_IPO",
+      "old_first": "2025-08-07",
+      "new_first": "2025-08-06",
+      "rows": 233
+    },
+    {
+      "ticker": "PSX",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PTC",
+      "status": "BACKFILL",
+      "old_first": "2019-02-05",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PWR",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "PYPL",
+      "status": "POST_IPO",
+      "old_first": "2020-07-27",
+      "new_first": "2015-07-20",
+      "rows": 2760
+    },
+    {
+      "ticker": "Q",
+      "status": "POST_IPO",
+      "old_first": "2025-11-03",
+      "new_first": "2025-11-03",
+      "rows": 171
+    },
+    {
+      "ticker": "QCOM",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "RCL",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "REG",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "REGN",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "RF",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "RJF",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "RL",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "RMD",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ROK",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ROL",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ROP",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ROST",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "RSG",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "RTX",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "RVTY",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "SATS",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2884
+    },
+    {
+      "ticker": "SBAC",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "SBUX",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "SCHW",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "SHW",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "SJM",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "SLB",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "SMCI",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "SNA",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "SNDK",
+      "status": "POST_IPO",
+      "old_first": "2025-02-13",
+      "new_first": "2025-02-24",
+      "rows": 346
+    },
+    {
+      "ticker": "SNPS",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "SO",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "SOLV",
+      "status": "POST_IPO",
+      "old_first": "2024-04-01",
+      "new_first": "2024-03-26",
+      "rows": 574
+    },
+    {
+      "ticker": "SPG",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "SPGI",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "SRE",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "STE",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "STLD",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "STT",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "STX",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "STZ",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "SW",
+      "status": "POST_IPO",
+      "old_first": "2020-07-27",
+      "new_first": "2024-07-08",
+      "rows": 504
+    },
+    {
+      "ticker": "SWK",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "SWKS",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "SYF",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "SYK",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "SYY",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "T",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TAP",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TDG",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TDY",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TECH",
+      "status": "BACKFILL",
+      "old_first": "2019-09-10",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TEL",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TER",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TFC",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TGT",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TJX",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TKO",
+      "status": "POST_IPO",
+      "old_first": "2020-07-27",
+      "new_first": "2023-09-12",
+      "rows": 709
+    },
+    {
+      "ticker": "TMO",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TMUS",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TPL",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TPR",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TRGP",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TRMB",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TROW",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TRV",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TSCO",
+      "status": "BACKFILL",
+      "old_first": "2019-06-20",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TSLA",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TSN",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TT",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TTD",
+      "status": "POST_IPO",
+      "old_first": "2020-07-27",
+      "new_first": "2016-09-21",
+      "rows": 2463
+    },
+    {
+      "ticker": "TTWO",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TXN",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TXT",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "TYL",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "UAL",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "UBER",
+      "status": "POST_IPO",
+      "old_first": "2020-07-27",
+      "new_first": "2019-05-10",
+      "rows": 1801
+    },
+    {
+      "ticker": "UDR",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "UHS",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "ULTA",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "UNH",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "UNP",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "UPS",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "URI",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "USB",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "V",
+      "status": "BACKFILL",
+      "old_first": "2022-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "VICI",
+      "status": "POST_IPO",
+      "old_first": "2020-07-27",
+      "new_first": "2017-10-17",
+      "rows": 2193
+    },
+    {
+      "ticker": "VLO",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "VLTO",
+      "status": "POST_IPO",
+      "old_first": "2023-10-02",
+      "new_first": "2023-10-02",
+      "rows": 695
+    },
+    {
+      "ticker": "VMC",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "VRSK",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "VRSN",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "VRT",
+      "status": "POST_IPO",
+      "old_first": "2020-07-27",
+      "new_first": "2018-07-30",
+      "rows": 1997
+    },
+    {
+      "ticker": "VRTX",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "VST",
+      "status": "POST_IPO",
+      "old_first": "2020-07-27",
+      "new_first": "2016-10-04",
+      "rows": 2453
+    },
+    {
+      "ticker": "VTR",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "VTRS",
+      "status": "POST_IPO",
+      "old_first": "2020-11-12",
+      "new_first": "2020-11-16",
+      "rows": 1417
+    },
+    {
+      "ticker": "VZ",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "WAB",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "WAT",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "WBD",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2894
+    },
+    {
+      "ticker": "WDAY",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "WDC",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "WEC",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "WELL",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "WFC",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "WM",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "WMB",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "WMT",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "WRB",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "WSM",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "WST",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "WTW",
+      "status": "POST_IPO",
+      "old_first": "2020-07-27",
+      "new_first": "2016-01-05",
+      "rows": 2643
+    },
+    {
+      "ticker": "WY",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "WYNN",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "XEL",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "XOM",
+      "status": "BACKFILL",
+      "old_first": "2013-03-25",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "XYL",
+      "status": "BACKFILL",
+      "old_first": "2020-07-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    },
+    {
+      "ticker": "XYZ",
+      "status": "POST_IPO",
+      "old_first": "2020-07-27",
+      "new_first": "2015-11-19",
+      "rows": 2673
+    },
+    {
+      "ticker": "YUM",
+      "status": "BACKFILL",
+      "old_first": "2017-03-27",
+      "new_first": "2015-01-02",
+      "rows": 2896
+    }
+  ]
+}

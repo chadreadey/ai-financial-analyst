@@ -34,32 +34,33 @@ _REVENUE_CONCEPTS = [
     "SalesRevenueNet",
 ]
 _INCOME_CONCEPTS = [
-    ("gross_profit",     "GrossProfit"),
+    ("gross_profit", "GrossProfit"),
     ("operating_income", "OperatingIncomeLoss"),
-    ("net_income",       "NetIncomeLoss"),
-    ("eps_diluted",      "EarningsPerShareDiluted"),
-    ("rd_expense",       "ResearchAndDevelopmentExpense"),
-    ("sga_expense",      "SellingGeneralAndAdministrativeExpense"),
+    ("net_income", "NetIncomeLoss"),
+    ("eps_diluted", "EarningsPerShareDiluted"),
+    ("rd_expense", "ResearchAndDevelopmentExpense"),
+    ("sga_expense", "SellingGeneralAndAdministrativeExpense"),
 ]
 _BALANCE_CONCEPTS = [
-    ("total_assets",     "Assets"),
-    ("total_liabilities","Liabilities"),
-    ("equity",           "StockholdersEquity"),
-    ("cash",             "CashAndCashEquivalentsAtCarryingValue"),
-    ("long_term_debt",   "LongTermDebt"),
-    ("short_term_debt",  "ShortTermBorrowings"),
+    ("total_assets", "Assets"),
+    ("total_liabilities", "Liabilities"),
+    ("equity", "StockholdersEquity"),
+    ("cash", "CashAndCashEquivalentsAtCarryingValue"),
+    ("long_term_debt", "LongTermDebt"),
+    ("short_term_debt", "ShortTermBorrowings"),
 ]
 _CASHFLOW_CONCEPTS = [
-    ("operating_cf",     "NetCashProvidedByUsedInOperatingActivities"),
-    ("investing_cf",     "NetCashProvidedByUsedInInvestingActivities"),
-    ("capex",            "PaymentsToAcquirePropertyPlantAndEquipment"),
-    ("depreciation",     "DepreciationDepletionAndAmortization"),
+    ("operating_cf", "NetCashProvidedByUsedInOperatingActivities"),
+    ("investing_cf", "NetCashProvidedByUsedInInvestingActivities"),
+    ("capex", "PaymentsToAcquirePropertyPlantAndEquipment"),
+    ("depreciation", "DepreciationDepletionAndAmortization"),
 ]
 
 _QUARTERLY_FORMS = {"10-Q", "6-K"}
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────
+
 
 def _safe(v) -> Optional[float]:
     try:
@@ -86,7 +87,7 @@ def _growth(curr: Optional[float], prior: Optional[float]) -> str:
     if curr is None or prior is None or prior == 0:
         return "n/a"
     g = (curr - prior) / abs(prior)
-    return f"{'+'if g>=0 else ''}{g*100:.1f}%"
+    return f"{'+' if g >= 0 else ''}{g * 100:.1f}%"
 
 
 def _quarter_label(end_date) -> str:
@@ -122,6 +123,7 @@ def _resolve_revenue_quarterly(parser) -> pd.DataFrame:
 
 
 # ── build records from a parsed ticker ───────────────────────────────────────
+
 
 def build_xbrl_quarterly_records(
     ticker: str,
@@ -163,22 +165,22 @@ def build_xbrl_quarterly_records(
         ql = _quarter_label(end_ts)
         period_str = end_ts.strftime("%Y-%m-%d")
 
-        rev   = maps["revenue"].get(end_ts)
-        gp    = maps.get("gross_profit", {}).get(end_ts)
-        oi    = maps.get("operating_income", {}).get(end_ts)
-        ni    = maps.get("net_income", {}).get(end_ts)
-        eps   = maps.get("eps_diluted", {}).get(end_ts)
-        rd    = maps.get("rd_expense", {}).get(end_ts)
-        sga   = maps.get("sga_expense", {}).get(end_ts)
-        assets= maps.get("total_assets", {}).get(end_ts)
-        liab  = maps.get("total_liabilities", {}).get(end_ts)
-        eq    = maps.get("equity", {}).get(end_ts)
-        cash  = maps.get("cash", {}).get(end_ts)
-        ltd   = maps.get("long_term_debt", {}).get(end_ts)
-        std   = maps.get("short_term_debt", {}).get(end_ts)
-        ocf   = maps.get("operating_cf", {}).get(end_ts)
+        rev = maps["revenue"].get(end_ts)
+        gp = maps.get("gross_profit", {}).get(end_ts)
+        oi = maps.get("operating_income", {}).get(end_ts)
+        ni = maps.get("net_income", {}).get(end_ts)
+        eps = maps.get("eps_diluted", {}).get(end_ts)
+        rd = maps.get("rd_expense", {}).get(end_ts)
+        sga = maps.get("sga_expense", {}).get(end_ts)
+        assets = maps.get("total_assets", {}).get(end_ts)
+        liab = maps.get("total_liabilities", {}).get(end_ts)
+        eq = maps.get("equity", {}).get(end_ts)
+        cash = maps.get("cash", {}).get(end_ts)
+        ltd = maps.get("long_term_debt", {}).get(end_ts)
+        std = maps.get("short_term_debt", {}).get(end_ts)
+        ocf = maps.get("operating_cf", {}).get(end_ts)
         capex = maps.get("capex", {}).get(end_ts)
-        depr  = maps.get("depreciation", {}).get(end_ts)
+        depr = maps.get("depreciation", {}).get(end_ts)
 
         # CapEx is a payment (positive in XBRL cash outflow) — store as negative
         if capex is not None and capex > 0:
@@ -195,12 +197,19 @@ def build_xbrl_quarterly_records(
         # YoY comparisons (4 quarters back)
         prior_end = periods[i - 4] if i >= 4 else None
         prior_rev = maps["revenue"].get(prior_end) if prior_end else None
-        prior_ni  = maps.get("net_income", {}).get(prior_end) if prior_end else None
+        prior_ni = maps.get("net_income", {}).get(prior_end) if prior_end else None
         prior_ocf = maps.get("operating_cf", {}).get(prior_end) if prior_end else None
 
         currency = getattr(parser, "reporting_currency", "USD")
-        curr_sym = {"TWD": "NT$", "EUR": "€", "GBP": "£", "JPY": "¥",
-                    "CNY": "¥", "KRW": "₩", "DKK": "DKK "}.get(currency, "$")
+        curr_sym = {
+            "TWD": "NT$",
+            "EUR": "€",
+            "GBP": "£",
+            "JPY": "¥",
+            "CNY": "¥",
+            "KRW": "₩",
+            "DKK": "DKK ",
+        }.get(currency, "$")
         curr_note = f" (values in {currency})" if currency != "USD" else ""
 
         lines = [
@@ -235,8 +244,12 @@ def build_xbrl_quarterly_records(
             "quarter_label": ql,
         }
         for fld, val in [
-            ("revenue", rev), ("gross_profit", gp), ("operating_income", oi),
-            ("net_income", ni), ("operating_cash_flow", ocf), ("free_cash_flow", fcf),
+            ("revenue", rev),
+            ("gross_profit", gp),
+            ("operating_income", oi),
+            ("net_income", ni),
+            ("operating_cash_flow", ocf),
+            ("free_cash_flow", fcf),
             ("gross_margin", round(gm, 4) if gm is not None else None),
             ("operating_margin", round(om, 4) if om is not None else None),
             ("net_margin", round(nm, 4) if nm is not None else None),
@@ -250,6 +263,7 @@ def build_xbrl_quarterly_records(
 
 
 # ── per-ticker upsert ─────────────────────────────────────────────────────────
+
 
 def upsert_ticker_xbrl_financials(
     ticker: str,
@@ -312,8 +326,10 @@ def upsert_ticker_xbrl_financials(
             except Exception as exc:
                 msg = str(exc)
                 if "429" in msg or "RESOURCE_EXHAUSTED" in msg or "Too Many Requests" in msg:
-                    wait = 2 ** attempt * 15  # 15s, 30s, 60s, 120s, 240s
-                    logger.warning("[%s] Rate limited (attempt %d) — waiting %ds", sym, attempt + 1, wait)
+                    wait = 2**attempt * 15  # 15s, 30s, 60s, 120s, 240s
+                    logger.warning(
+                        "[%s] Rate limited (attempt %d) — waiting %ds", sym, attempt + 1, wait
+                    )
                     time.sleep(wait)
                 else:
                     logger.error("[%s] Upsert failed at offset %d: %s", sym, i, exc)
@@ -328,6 +344,7 @@ def upsert_ticker_xbrl_financials(
 
 
 # ── bulk upsert ───────────────────────────────────────────────────────────────
+
 
 def fetch_existing_tickers(index, namespace: str) -> Set[str]:
     """
@@ -355,6 +372,7 @@ def fetch_existing_tickers(index, namespace: str) -> Set[str]:
 def load_seeded_tickers_file(path: str) -> Set[str]:
     """Load the set of already-seeded tickers from a local text file (one per line)."""
     import os
+
     if not os.path.exists(path):
         return set()
     with open(path) as f:

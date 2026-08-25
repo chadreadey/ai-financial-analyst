@@ -1,0 +1,494 @@
+{
+  "1M": {
+    "analyst_dispersion": {
+      "n": 120,
+      "mean_ic": -0.00172,
+      "naive_t": -0.129,
+      "hac_t": -0.148,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": 0.008,
+      "mbb_p": 0.8902,
+      "old_verdict": "DROP",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "erm": {
+      "n": 120,
+      "mean_ic": 0.01435,
+      "naive_t": 1.453,
+      "hac_t": 1.59,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": -0.063,
+      "mbb_p": 0.1105,
+      "old_verdict": "MARGINAL",
+      "new_verdict": "MARGINAL"
+    },
+    "hml_bm": {
+      "n": 120,
+      "mean_ic": -0.00591,
+      "naive_t": -0.456,
+      "hac_t": -0.425,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": 0.071,
+      "mbb_p": 0.6595,
+      "old_verdict": "DROP",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "insider_mspr": {
+      "n": 120,
+      "mean_ic": -0.00852,
+      "naive_t": -1.115,
+      "hac_t": -1.189,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": -0.134,
+      "mbb_p": 0.2293,
+      "old_verdict": "MARGINAL_WRONG_SIGN",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "institutional_flow": {
+      "n": 120,
+      "mean_ic": 0.00099,
+      "naive_t": 0.063,
+      "hac_t": 0.059,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": 0.185,
+      "mbb_p": 0.9505,
+      "old_verdict": "DROP",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "obv_trend": {
+      "n": 120,
+      "mean_ic": -0.00811,
+      "naive_t": -0.655,
+      "hac_t": -0.635,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": 0.026,
+      "mbb_p": 0.524,
+      "old_verdict": "DROP",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "piotroski": {
+      "n": 120,
+      "mean_ic": 0.00028,
+      "naive_t": 0.039,
+      "hac_t": 0.041,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": -0.014,
+      "mbb_p": 0.965,
+      "old_verdict": "DROP",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "price_momentum": {
+      "n": 118,
+      "mean_ic": 0.00325,
+      "naive_t": 0.17,
+      "hac_t": 0.209,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": -0.108,
+      "mbb_p": 0.8482,
+      "old_verdict": "DROP",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "qmj": {
+      "n": 120,
+      "mean_ic": 0.02449,
+      "naive_t": 2.805,
+      "hac_t": 2.636,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": 0.028,
+      "mbb_p": 0.0075,
+      "old_verdict": "KEEP",
+      "new_verdict": "SIGNIFICANT"
+    },
+    "quality_score": {
+      "n": 120,
+      "mean_ic": 0.01908,
+      "naive_t": 1.955,
+      "hac_t": 1.875,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": 0.113,
+      "mbb_p": 0.058,
+      "old_verdict": "MARGINAL",
+      "new_verdict": "MARGINAL"
+    },
+    "sue": {
+      "n": 120,
+      "mean_ic": 0.01793,
+      "naive_t": 2.04,
+      "hac_t": 2.002,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": -0.014,
+      "mbb_p": 0.036,
+      "old_verdict": "KEEP",
+      "new_verdict": "SIGNIFICANT"
+    }
+  },
+  "3M": {
+    "analyst_dispersion": {
+      "n": 120,
+      "mean_ic": -0.0088,
+      "naive_t": -0.702,
+      "hac_t": -0.459,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": 0.616,
+      "mbb_p": 0.6607,
+      "old_verdict": "DROP",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "erm": {
+      "n": 120,
+      "mean_ic": 0.02086,
+      "naive_t": 2.266,
+      "hac_t": 1.53,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": 0.602,
+      "mbb_p": 0.1275,
+      "old_verdict": "KEEP",
+      "new_verdict": "MARGINAL"
+    },
+    "hml_bm": {
+      "n": 120,
+      "mean_ic": -0.0107,
+      "naive_t": -0.781,
+      "hac_t": -0.481,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": 0.705,
+      "mbb_p": 0.6348,
+      "old_verdict": "DROP",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "insider_mspr": {
+      "n": 120,
+      "mean_ic": -0.01499,
+      "naive_t": -1.891,
+      "hac_t": -1.247,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": 0.534,
+      "mbb_p": 0.2258,
+      "old_verdict": "MARGINAL_WRONG_SIGN",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "institutional_flow": {
+      "n": 120,
+      "mean_ic": 0.00163,
+      "naive_t": 0.104,
+      "hac_t": 0.068,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": 0.601,
+      "mbb_p": 0.9545,
+      "old_verdict": "DROP",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "obv_trend": {
+      "n": 120,
+      "mean_ic": -0.00962,
+      "naive_t": -0.849,
+      "hac_t": -0.899,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": 0.025,
+      "mbb_p": 0.3503,
+      "old_verdict": "DROP",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "piotroski": {
+      "n": 120,
+      "mean_ic": -0.01332,
+      "naive_t": -1.826,
+      "hac_t": -1.23,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": 0.556,
+      "mbb_p": 0.2367,
+      "old_verdict": "MARGINAL_WRONG_SIGN",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "price_momentum": {
+      "n": 118,
+      "mean_ic": -9e-05,
+      "naive_t": -0.005,
+      "hac_t": -0.003,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": 0.617,
+      "mbb_p": 0.9975,
+      "old_verdict": "DROP",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "qmj": {
+      "n": 120,
+      "mean_ic": 0.02027,
+      "naive_t": 2.116,
+      "hac_t": 1.252,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": 0.721,
+      "mbb_p": 0.2422,
+      "old_verdict": "KEEP",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "quality_score": {
+      "n": 120,
+      "mean_ic": 0.01936,
+      "naive_t": 1.7,
+      "hac_t": 1.039,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": 0.718,
+      "mbb_p": 0.3155,
+      "old_verdict": "MARGINAL",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "sue": {
+      "n": 120,
+      "mean_ic": 0.01327,
+      "naive_t": 1.452,
+      "hac_t": 0.837,
+      "hac_lag": 4,
+      "ic_lag1_autocorr": 0.727,
+      "mbb_p": 0.4185,
+      "old_verdict": "MARGINAL",
+      "new_verdict": "NO_SIGNAL"
+    }
+  },
+  "6M": {
+    "analyst_dispersion": {
+      "n": 120,
+      "mean_ic": -0.01807,
+      "naive_t": -1.38,
+      "hac_t": -0.685,
+      "hac_lag": 5,
+      "ic_lag1_autocorr": 0.818,
+      "mbb_p": 0.561,
+      "old_verdict": "MARGINAL_WRONG_SIGN",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "erm": {
+      "n": 120,
+      "mean_ic": 0.02631,
+      "naive_t": 2.531,
+      "hac_t": 1.388,
+      "hac_lag": 5,
+      "ic_lag1_autocorr": 0.772,
+      "mbb_p": 0.155,
+      "old_verdict": "KEEP",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "hml_bm": {
+      "n": 120,
+      "mean_ic": -0.0147,
+      "naive_t": -1.01,
+      "hac_t": -0.508,
+      "hac_lag": 5,
+      "ic_lag1_autocorr": 0.843,
+      "mbb_p": 0.6372,
+      "old_verdict": "MARGINAL_WRONG_SIGN",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "insider_mspr": {
+      "n": 120,
+      "mean_ic": -0.01659,
+      "naive_t": -1.905,
+      "hac_t": -0.987,
+      "hac_lag": 5,
+      "ic_lag1_autocorr": 0.777,
+      "mbb_p": 0.3862,
+      "old_verdict": "MARGINAL_WRONG_SIGN",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "institutional_flow": {
+      "n": 120,
+      "mean_ic": 0.00951,
+      "naive_t": 0.67,
+      "hac_t": 0.352,
+      "hac_lag": 5,
+      "ic_lag1_autocorr": 0.756,
+      "mbb_p": 0.7732,
+      "old_verdict": "DROP",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "obv_trend": {
+      "n": 120,
+      "mean_ic": 0.00318,
+      "naive_t": 0.285,
+      "hac_t": 0.342,
+      "hac_lag": 5,
+      "ic_lag1_autocorr": -0.055,
+      "mbb_p": 0.6973,
+      "old_verdict": "DROP",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "piotroski": {
+      "n": 120,
+      "mean_ic": -0.02148,
+      "naive_t": -2.855,
+      "hac_t": -1.495,
+      "hac_lag": 5,
+      "ic_lag1_autocorr": 0.77,
+      "mbb_p": 0.205,
+      "old_verdict": "KEEP_WRONG_SIGN",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "price_momentum": {
+      "n": 118,
+      "mean_ic": 0.00226,
+      "naive_t": 0.129,
+      "hac_t": 0.067,
+      "hac_lag": 5,
+      "ic_lag1_autocorr": 0.816,
+      "mbb_p": 0.958,
+      "old_verdict": "DROP",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "qmj": {
+      "n": 120,
+      "mean_ic": 0.01829,
+      "naive_t": 1.798,
+      "hac_t": 0.954,
+      "hac_lag": 5,
+      "ic_lag1_autocorr": 0.818,
+      "mbb_p": 0.2868,
+      "old_verdict": "MARGINAL",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "quality_score": {
+      "n": 120,
+      "mean_ic": 0.01303,
+      "naive_t": 1.124,
+      "hac_t": 0.57,
+      "hac_lag": 5,
+      "ic_lag1_autocorr": 0.858,
+      "mbb_p": 0.5763,
+      "old_verdict": "MARGINAL",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "sue": {
+      "n": 120,
+      "mean_ic": 0.0069,
+      "naive_t": 0.668,
+      "hac_t": 0.339,
+      "hac_lag": 5,
+      "ic_lag1_autocorr": 0.835,
+      "mbb_p": 0.764,
+      "old_verdict": "DROP",
+      "new_verdict": "NO_SIGNAL"
+    }
+  },
+  "12M": {
+    "analyst_dispersion": {
+      "n": 120,
+      "mean_ic": -0.01701,
+      "naive_t": -1.188,
+      "hac_t": -0.474,
+      "hac_lag": 11,
+      "ic_lag1_autocorr": 0.905,
+      "mbb_p": 0.6352,
+      "old_verdict": "MARGINAL_WRONG_SIGN",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "erm": {
+      "n": 120,
+      "mean_ic": 0.01177,
+      "naive_t": 1.113,
+      "hac_t": 0.672,
+      "hac_lag": 11,
+      "ic_lag1_autocorr": 0.78,
+      "mbb_p": 0.4487,
+      "old_verdict": "MARGINAL",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "hml_bm": {
+      "n": 120,
+      "mean_ic": -0.00926,
+      "naive_t": -0.62,
+      "hac_t": -0.229,
+      "hac_lag": 11,
+      "ic_lag1_autocorr": 0.909,
+      "mbb_p": 0.8482,
+      "old_verdict": "DROP",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "insider_mspr": {
+      "n": 120,
+      "mean_ic": -0.02788,
+      "naive_t": -2.966,
+      "hac_t": -1.187,
+      "hac_lag": 11,
+      "ic_lag1_autocorr": 0.83,
+      "mbb_p": 0.286,
+      "old_verdict": "KEEP_WRONG_SIGN",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "institutional_flow": {
+      "n": 120,
+      "mean_ic": -0.00512,
+      "naive_t": -0.344,
+      "hac_t": -0.134,
+      "hac_lag": 11,
+      "ic_lag1_autocorr": 0.806,
+      "mbb_p": 0.9235,
+      "old_verdict": "DROP",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "obv_trend": {
+      "n": 120,
+      "mean_ic": -0.00096,
+      "naive_t": -0.095,
+      "hac_t": -0.106,
+      "hac_lag": 11,
+      "ic_lag1_autocorr": -0.064,
+      "mbb_p": 0.931,
+      "old_verdict": "DROP",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "piotroski": {
+      "n": 120,
+      "mean_ic": -0.03362,
+      "naive_t": -5.282,
+      "hac_t": -2.141,
+      "hac_lag": 11,
+      "ic_lag1_autocorr": 0.802,
+      "mbb_p": 0.0993,
+      "old_verdict": "KEEP_WRONG_SIGN",
+      "new_verdict": "MARGINAL_WRONG_SIGN"
+    },
+    "price_momentum": {
+      "n": 118,
+      "mean_ic": -0.01145,
+      "naive_t": -0.702,
+      "hac_t": -0.285,
+      "hac_lag": 11,
+      "ic_lag1_autocorr": 0.851,
+      "mbb_p": 0.77,
+      "old_verdict": "DROP",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "qmj": {
+      "n": 120,
+      "mean_ic": 0.01883,
+      "naive_t": 2.596,
+      "hac_t": 1.188,
+      "hac_lag": 11,
+      "ic_lag1_autocorr": 0.798,
+      "mbb_p": 0.1995,
+      "old_verdict": "KEEP",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "quality_score": {
+      "n": 120,
+      "mean_ic": 0.01681,
+      "naive_t": 1.507,
+      "hac_t": 0.558,
+      "hac_lag": 11,
+      "ic_lag1_autocorr": 0.903,
+      "mbb_p": 0.6542,
+      "old_verdict": "MARGINAL",
+      "new_verdict": "NO_SIGNAL"
+    },
+    "sue": {
+      "n": 120,
+      "mean_ic": 0.00497,
+      "naive_t": 0.559,
+      "hac_t": 0.215,
+      "hac_lag": 11,
+      "ic_lag1_autocorr": 0.866,
+      "mbb_p": 0.8558,
+      "old_verdict": "DROP",
+      "new_verdict": "NO_SIGNAL"
+    }
+  }
+}

@@ -1,10 +1,10 @@
 """Tests for compute_macro_momentum in quant/kalshi_signal.py."""
+
 import unittest
 from unittest.mock import MagicMock, patch
 
 
 class TestMacroMomentum(unittest.TestCase):
-
     def _make_client(self, current_markets, prior_markets):
         """Return a mock KalshiClient whose get_markets alternates current/prior."""
         client = MagicMock()

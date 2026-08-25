@@ -89,7 +89,9 @@ def run_refresh_cycle(
                 _seed_ticker(ticker, db)
         except Exception:
             logger.error(
-                "refresh cycle: error updating %s", ticker, exc_info=True,
+                "refresh cycle: error updating %s",
+                ticker,
+                exc_info=True,
             )
             results[ticker] = UpdateResult(
                 ticker=ticker,
@@ -101,6 +103,7 @@ def run_refresh_cycle(
     changed = sum(1 for r in results.values() if r.had_changes)
     logger.info(
         "refresh cycle complete: %d/%d tickers had changes",
-        changed, len(results),
+        changed,
+        len(results),
     )
     return results

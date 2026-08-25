@@ -27,18 +27,20 @@ async def get_recommendation_history(ticker: str):
         for r in rows:
             entry = r["entry_price_at_run"] if "entry_price_at_run" in r.keys() else None
             target = r["price_target"] if "price_target" in r.keys() else None
-            records.append({
-                "run_at": r["run_at"],
-                "verdict": r["verdict"],
-                "conviction": r["conviction"] or "",
-                "composite_score": r["composite_score"],
-                "entry_price": entry,
-                "target_price": target,
-                "time_horizon": r["time_horizon"] if "time_horizon" in r.keys() else None,
-                "outcome": None,
-                "outcome_price": None,
-                "outcome_date": None,
-            })
+            records.append(
+                {
+                    "run_at": r["run_at"],
+                    "verdict": r["verdict"],
+                    "conviction": r["conviction"] or "",
+                    "composite_score": r["composite_score"],
+                    "entry_price": entry,
+                    "target_price": target,
+                    "time_horizon": r["time_horizon"] if "time_horizon" in r.keys() else None,
+                    "outcome": None,
+                    "outcome_price": None,
+                    "outcome_date": None,
+                }
+            )
         return {"records": records}
     except sqlite3.OperationalError:
         return {"records": []}

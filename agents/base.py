@@ -59,10 +59,7 @@ class BaseAgent:
         if data.recent_filings:
             parts.append("\n── Recent SEC Filings ──")
             for f in data.recent_filings[:5]:
-                parts.append(
-                    f"  {f.form} filed {f.filingDate} "
-                    f"(accession: {f.accessionNumber})"
-                )
+                parts.append(f"  {f.form} filed {f.filingDate} (accession: {f.accessionNumber})")
 
         self.append_enrichment_sections(parts, data)
         return "\n".join(parts)

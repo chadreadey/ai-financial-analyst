@@ -52,10 +52,16 @@ Use actual rates and market data. Be specific about transmission mechanisms."""
             parts.append("\n── Macro-Relevant Metrics ──")
             m = data.metrics
             for key in [
-                "revenue", "revenue_growth_yoy", "revenue_cagr_3y",
-                "operating_margin", "net_margin",
-                "long_term_debt", "cash", "debt_to_equity",
-                "operating_cash_flow", "free_cash_flow",
+                "revenue",
+                "revenue_growth_yoy",
+                "revenue_cagr_3y",
+                "operating_margin",
+                "net_margin",
+                "long_term_debt",
+                "cash",
+                "debt_to_equity",
+                "operating_cash_flow",
+                "free_cash_flow",
             ]:
                 if key in m and m[key] is not None:
                     parts.append(f"  {key}: {m[key]}")

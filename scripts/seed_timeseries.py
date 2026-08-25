@@ -52,6 +52,7 @@ def _load_module(name: str, rel_path: str):
 
 def _get_pinecone_index(api_key: str, index_name: str):
     from pinecone import Pinecone
+
     pc = Pinecone(api_key=api_key)
     return pc.Index(index_name)
 
@@ -59,6 +60,7 @@ def _get_pinecone_index(api_key: str, index_name: str):
 def _fetch_sp500_tickers() -> list[str]:
     logger.info("Fetching S&P 500 ticker list from Wikipedia...")
     import pandas as pd
+
     req = urllib.request.Request(
         "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies",
         headers={"User-Agent": "Mozilla/5.0"},
@@ -165,9 +167,7 @@ def main() -> None:
             tickers = [t.upper() for t in (args.tickers or [])]
 
         if not tickers:
-            logger.warning(
-                "No --tickers or --sp500 provided; skipping financial vectors."
-            )
+            logger.warning("No --tickers or --sp500 provided; skipping financial vectors.")
         else:
             xbrl_mod = _load_module("xbrl_vectors", "warehouse/xbrl_vectors.py")
 
@@ -196,7 +196,9 @@ def main() -> None:
             total_records = sum(summary.values())
             logger.info(
                 "Financial: %d tickers seeded (%d records), %d skipped",
-                seeded_count, total_records, skipped_count,
+                seeded_count,
+                total_records,
+                skipped_count,
             )
 
     # ── macro vectors (FRED) ─────────────────────────────────────────────────

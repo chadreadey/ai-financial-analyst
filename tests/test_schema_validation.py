@@ -19,6 +19,7 @@ from finnhub_client import _REQUIRED_NEWS_FIELDS, _validate_news_item
 
 # ── Tiingo EOD Bar ──────────────────────────────────────────────────────
 
+
 class TestValidateEodBar:
     def _good_bar(self) -> dict:
         return {
@@ -78,9 +79,17 @@ class TestValidateEodBar:
 
 # ── Alpaca Bar ──────────────────────────────────────────────────────────
 
+
 class TestValidateAlpacaBar:
     def _good_bar(self) -> dict:
-        return {"t": "2024-01-15T05:00:00Z", "o": 149.0, "h": 152.0, "l": 148.0, "c": 150.0, "v": 1000000}
+        return {
+            "t": "2024-01-15T05:00:00Z",
+            "o": 149.0,
+            "h": 152.0,
+            "l": 148.0,
+            "c": 150.0,
+            "v": 1000000,
+        }
 
     def test_good_bar_no_warning(self, caplog):
         bar = self._good_bar()
@@ -109,6 +118,7 @@ class TestValidateAlpacaBar:
 
 
 # ── FMP Income Statement ────────────────────────────────────────────────
+
 
 class TestValidateFmpIncome:
     def _good_record(self) -> dict:
@@ -147,6 +157,7 @@ class TestValidateFmpIncome:
 
 # ── FMP Balance Sheet ───────────────────────────────────────────────────
 
+
 class TestValidateFmpBalance:
     def _good_record(self) -> dict:
         return {
@@ -177,11 +188,14 @@ class TestValidateFmpBalance:
 
 # ── FMP Analyst Estimates ───────────────────────────────────────────────
 
+
 class TestValidateFmpEstimates:
     def test_good_record_no_warning(self, caplog):
         rec = {"date": "2025-01-01", "epsAvg": 6.70, "revenueAvg": 400000000000}
         with caplog.at_level(logging.WARNING, logger="fmp_client"):
-            result = _validate_fmp_record(rec, _REQUIRED_ESTIMATE_FIELDS, "analyst_estimates", "AAPL")
+            result = _validate_fmp_record(
+                rec, _REQUIRED_ESTIMATE_FIELDS, "analyst_estimates", "AAPL"
+            )
         assert result is rec
         assert "missing fields" not in caplog.text
 
@@ -193,6 +207,7 @@ class TestValidateFmpEstimates:
 
 
 # ── Finnhub News ────────────────────────────────────────────────────────
+
 
 class TestValidateNewsItem:
     def _good_item(self) -> dict:

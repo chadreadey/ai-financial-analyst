@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 try:
     from edgar import set_identity
+
     set_identity(settings.resolved_edgar_identity)
 except (ImportError, AttributeError):
     pass
@@ -188,9 +189,7 @@ class SECClient:
 
     # ── filing document text ──────────────────────────────────────
 
-    def get_filing_text(
-        self, ticker: str, accession_number: str, document: str
-    ) -> str:
+    def get_filing_text(self, ticker: str, accession_number: str, document: str) -> str:
         """
         Download the text of a specific filing document.
         Useful for pulling 10-K/10-Q narrative sections.
@@ -202,10 +201,7 @@ class SECClient:
         if cached is not None:
             return cached
 
-        url = (
-            f"https://www.sec.gov/Archives/edgar/data/"
-            f"{info['cik']}/{accession_clean}/{document}"
-        )
+        url = f"https://www.sec.gov/Archives/edgar/data/{info['cik']}/{accession_clean}/{document}"
         text = self._get_text(url)
 
         self.cache.set("documents", cache_key, text, ttl=86400 * 7)
@@ -228,6 +224,7 @@ class SECClient:
 
         try:
             from edgar import Company
+
             company = Company(ticker.upper())
             if company.not_found:
                 return None
@@ -277,9 +274,7 @@ class SECClient:
         """
         if form_types is None:
             form_types = ["10-K", "10-Q", "8-K"]
-        filings = self.get_recent_filings(
-            ticker, form_types=form_types, limit=filings_limit
-        )
+        filings = self.get_recent_filings(ticker, form_types=form_types, limit=filings_limit)
         company_facts = self.get_company_facts(ticker)
         return filings, company_facts
 

@@ -5,6 +5,7 @@ All endpoints are read-only. Responses cached to disk keyed by
 series + date so backtests and repeated intraday calls don't hit
 the network.
 """
+
 from __future__ import annotations
 
 import json

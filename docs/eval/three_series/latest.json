@@ -1,0 +1,55 @@
+{
+  "generated_at": "2026-07-22T04:20:17",
+  "config": {
+    "n_positions": 10,
+    "max_per_sector": 4
+  },
+  "series": {
+    "SPY": {
+      "sharpe": 0.74,
+      "sortino": 0.9,
+      "annual_return_pct": 13.39,
+      "max_drawdown_pct": 33.7,
+      "total_return_pct": 140.81,
+      "n_days": 1758,
+      "start": "2018-02-02",
+      "end": "2025-01-30"
+    },
+    "Quant-only": {
+      "sharpe": 1.15,
+      "sortino": 1.57,
+      "annual_return_pct": 29.61,
+      "max_drawdown_pct": 35.41,
+      "total_return_pct": 513.57,
+      "n_days": 1759,
+      "start": "2018-02-01",
+      "end": "2025-01-30"
+    },
+    "AI-augmented": {
+      "sharpe": 1.15,
+      "sortino": 1.57,
+      "annual_return_pct": 29.61,
+      "max_drawdown_pct": 35.41,
+      "total_return_pct": 513.57,
+      "n_days": 1759,
+      "start": "2018-02-01",
+      "end": "2025-01-30"
+    }
+  },
+  "attribution": {
+    "ai_vs_quant": {
+      "sharpe_delta": 0.0,
+      "sortino_delta": 0.0,
+      "annual_return_delta_pp": 0.0,
+      "max_dd_delta_pp": 0.0
+    },
+    "quant_vs_spy": {
+      "sharpe_delta": 0.41,
+      "annual_return_delta_pp": 16.22
+    },
+    "ai_vs_spy": {
+      "sharpe_delta": 0.41,
+      "annual_return_delta_pp": 16.22
+    }
+  }
+}

@@ -196,7 +196,9 @@ def compute_fundamental_scores(
     results = {}
     for ticker in tickers:
         qual_score, qual_meta = compute_quality_score(ticker, data_source, as_of_date=as_of_date)
-        rev_score, rev_meta = compute_earnings_revision_score(ticker, data_source, as_of_date=as_of_date)
+        rev_score, rev_meta = compute_earnings_revision_score(
+            ticker, data_source, as_of_date=as_of_date
+        )
 
         valid_scores = []
         if "error" not in qual_meta:
@@ -220,7 +222,9 @@ class _CacheBackedFMP:
         self._client = client
         self._cache = cache
 
-    def get_income_statement_quarterly(self, ticker: str, limit: int = 8, as_of_date=None) -> list[dict]:
+    def get_income_statement_quarterly(
+        self, ticker: str, limit: int = 8, as_of_date=None
+    ) -> list[dict]:
         # as_of_date ignored — FMP cache is a static snapshot (no point-in-time)
         if self._cache:
             data = self._cache.get_income_quarterly(ticker)
@@ -230,7 +234,9 @@ class _CacheBackedFMP:
             return self._client.get_income_statement_quarterly(ticker, limit=limit)
         return []
 
-    def get_balance_sheet_quarterly(self, ticker: str, limit: int = 4, as_of_date=None) -> list[dict]:
+    def get_balance_sheet_quarterly(
+        self, ticker: str, limit: int = 4, as_of_date=None
+    ) -> list[dict]:
         # as_of_date ignored — FMP cache is a static snapshot (no point-in-time)
         if self._cache:
             data = self._cache.get_balance_quarterly(ticker)
@@ -345,9 +351,13 @@ def load_cached_fundamentals(ticker: str, fmp_cache=None) -> dict:
             prior_cash = prior.get("cashAndCashEquivalents", 0) or 0
             changes = {}
             if prior_equity > 0:
-                changes["equity_change_pct"] = round((equity - prior_equity) / abs(prior_equity) * 100, 1)
+                changes["equity_change_pct"] = round(
+                    (equity - prior_equity) / abs(prior_equity) * 100, 1
+                )
             if prior_debt > 0:
-                changes["debt_change_pct"] = round((total_debt - prior_debt) / abs(prior_debt) * 100, 1)
+                changes["debt_change_pct"] = round(
+                    (total_debt - prior_debt) / abs(prior_debt) * 100, 1
+                )
             if prior_cash > 0:
                 changes["cash_change_pct"] = round((cash - prior_cash) / abs(prior_cash) * 100, 1)
             if changes:

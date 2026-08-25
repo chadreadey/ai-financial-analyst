@@ -26,6 +26,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from quant.backtest import BacktestConfig, run_cpcv
@@ -35,10 +36,12 @@ from quant.universe import get_universe
 
 # ── SPY benchmark for alpha computation ──────────────────────────────
 
+
 def load_spy_group_returns(start_date, end_date, n_groups):
     spy = pd.read_csv(
         Path(__file__).resolve().parent.parent / ".price_cache/SPY.csv",
-        parse_dates=["date"], index_col="date",
+        parse_dates=["date"],
+        index_col="date",
     ).sort_index()
     spy_range = spy[spy.index >= start_date]
     trading_dates = pd.DatetimeIndex(sorted(spy_range.index))
@@ -47,9 +50,7 @@ def load_spy_group_returns(start_date, end_date, n_groups):
     for s, e in groups:
         g = spy[(spy.index >= s) & (spy.index <= e)]
         if len(g) > 1:
-            group_returns.append(
-                (float(g.iloc[-1]["close"]) / float(g.iloc[0]["close"]) - 1) * 100
-            )
+            group_returns.append((float(g.iloc[-1]["close"]) / float(g.iloc[0]["close"]) - 1) * 100)
         else:
             group_returns.append(0)
     return group_returns
@@ -80,6 +81,7 @@ def compute_alpha_from_cpcv(cpcv_dict, group_spy_returns):
 
 # ── Base config (gold standard) ─────────────────────────────────────
 
+
 def make_base_config(tickers):
     return BacktestConfig(
         tickers=tickers,
@@ -106,6 +108,7 @@ def progress(msg):
 
 # ── Hypothesis 1: Regime filter aggressiveness ───────────────────────
 
+
 def sweep_regime(tickers, group_spy):
     print("\n" + "=" * 80)
     print("  HYPOTHESIS 1: Regime filter aggressiveness")
@@ -125,6 +128,7 @@ def sweep_regime(tickers, group_spy):
 
 
 # ── Hypothesis 2: Long threshold too conservative ────────────────────
+
 
 def sweep_threshold(tickers, group_spy):
     print("\n" + "=" * 80)
@@ -146,6 +150,7 @@ def sweep_threshold(tickers, group_spy):
 
 # ── Hypothesis 3: Universe concentration ─────────────────────────────
 
+
 def sweep_universe(group_spy):
     print("\n" + "=" * 80)
     print("  HYPOTHESIS 3: Universe concentration")
@@ -160,7 +165,8 @@ def sweep_universe(group_spy):
         config = make_base_config(uni_tickers)
         t0 = time.time()
         cpcv = run_cpcv(
-            config, n_groups=N_GROUPS,
+            config,
+            n_groups=N_GROUPS,
             max_combinations=MAX_COMBOS or None,
             progress_cb=progress,
         )
@@ -186,6 +192,7 @@ def sweep_universe(group_spy):
 
 # ── Hypothesis 4: Rebalance frequency ────────────────────────────────
 
+
 def sweep_rebalance(tickers, group_spy):
     print("\n" + "=" * 80)
     print("  HYPOTHESIS 4: Rebalance frequency")
@@ -202,6 +209,7 @@ def sweep_rebalance(tickers, group_spy):
 
 # ── Sweep runner ─────────────────────────────────────────────────────
 
+
 def _run_sweep(name, configs, tickers, group_spy):
     results = []
     for label, overrides in configs:
@@ -212,7 +220,8 @@ def _run_sweep(name, configs, tickers, group_spy):
 
         t0 = time.time()
         cpcv = run_cpcv(
-            config, n_groups=N_GROUPS,
+            config,
+            n_groups=N_GROUPS,
             max_combinations=MAX_COMBOS or None,
             progress_cb=progress,
         )
@@ -237,37 +246,50 @@ def _run_sweep(name, configs, tickers, group_spy):
 
 
 def _print_row(row):
-    print(f"    Return={row['mean_return']:+.1f}%  Alpha={row['mean_alpha']:+.1f}%  "
-          f"Med.Alpha={row['median_alpha']:+.1f}%  α>0={row['pct_pos_alpha']:.0f}%  "
-          f"Sharpe={row['median_sharpe']:.2f}  PBO={row['pbo']:.1f}%  "
-          f"SR>0={row['pct_pos_sharpe']:.0f}%  ({row['elapsed']:.0f}s)")
+    print(
+        f"    Return={row['mean_return']:+.1f}%  Alpha={row['mean_alpha']:+.1f}%  "
+        f"Med.Alpha={row['median_alpha']:+.1f}%  α>0={row['pct_pos_alpha']:.0f}%  "
+        f"Sharpe={row['median_sharpe']:.2f}  PBO={row['pbo']:.1f}%  "
+        f"SR>0={row['pct_pos_sharpe']:.0f}%  ({row['elapsed']:.0f}s)"
+    )
 
 
 def print_comparison_table(all_results):
     print("\n" + "=" * 110)
     print("  SUMMARY: Alpha vs Sharpe vs PBO across all experiments")
     print("=" * 110)
-    header = (f"{'Config':<25s} {'Return':>8s} {'Alpha':>8s} {'Med.α':>8s} "
-              f"{'α>0%':>6s} {'Sharpe':>7s} {'PBO':>6s} {'SR>0%':>6s}")
+    header = (
+        f"{'Config':<25s} {'Return':>8s} {'Alpha':>8s} {'Med.α':>8s} "
+        f"{'α>0%':>6s} {'Sharpe':>7s} {'PBO':>6s} {'SR>0%':>6s}"
+    )
     print(f"  {header}")
     print(f"  {'-' * 105}")
     for section_name, rows in all_results:
         print(f"\n  [{section_name}]")
         for r in rows:
-            line = (f"  {r['name']:<25s} {r['mean_return']:>+7.1f}% {r['mean_alpha']:>+7.1f}% "
-                    f"{r['median_alpha']:>+7.1f}% {r['pct_pos_alpha']:>5.0f}% "
-                    f"{r['median_sharpe']:>6.2f} {r['pbo']:>5.1f}% {r['pct_pos_sharpe']:>5.0f}%")
+            line = (
+                f"  {r['name']:<25s} {r['mean_return']:>+7.1f}% {r['mean_alpha']:>+7.1f}% "
+                f"{r['median_alpha']:>+7.1f}% {r['pct_pos_alpha']:>5.0f}% "
+                f"{r['median_sharpe']:>6.2f} {r['pbo']:>5.1f}% {r['pct_pos_sharpe']:>5.0f}%"
+            )
             print(line)
     print()
 
 
 def main():
     parser = argparse.ArgumentParser(description="CPCV Alpha Decomposition Sweep")
-    parser.add_argument("--hypothesis", default="all",
-                        choices=["regime", "threshold", "universe", "rebalance", "all"],
-                        help="Which hypothesis to test (default: all)")
-    parser.add_argument("--max-combos", type=int, default=50,
-                        help="Max CPCV combinations per test (default: 50; 0=all 252)")
+    parser.add_argument(
+        "--hypothesis",
+        default="all",
+        choices=["regime", "threshold", "universe", "rebalance", "all"],
+        help="Which hypothesis to test (default: all)",
+    )
+    parser.add_argument(
+        "--max-combos",
+        type=int,
+        default=50,
+        help="Max CPCV combinations per test (default: 50; 0=all 252)",
+    )
     args = parser.parse_args()
 
     global MAX_COMBOS

@@ -1,4 +1,5 @@
 """Tests for portfolio router (candidates endpoint)."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -12,6 +13,7 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def client():
     from backend.main import app
+
     return TestClient(app)
 
 
@@ -19,6 +21,7 @@ def client():
 def temp_warehouse(tmp_path, monkeypatch):
     db_path = tmp_path / "warehouse.db"
     from config import settings as config_settings
+
     monkeypatch.setattr(config_settings, "warehouse_db_path", str(db_path))
     return db_path
 
@@ -46,8 +49,14 @@ def _seed_paper_position(db_path, ticker: str):
     conn.close()
 
 
-def _seed_cached_ranking(db_path, ticker: str, score: float, direction: str = "BUY",
-                         actionable: bool = True, age_seconds: float = 60):
+def _seed_cached_ranking(
+    db_path,
+    ticker: str,
+    score: float,
+    direction: str = "BUY",
+    actionable: bool = True,
+    age_seconds: float = 60,
+):
     conn = sqlite3.connect(str(db_path))
     conn.execute(
         """

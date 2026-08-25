@@ -39,10 +39,12 @@ async def _event_generator(job: JobState) -> AsyncGenerator[str, None]:
 
     if job.status == "complete" and job.result is not None:
         import json
+
         payload = {"step": "complete", "result": job.result.model_dump()}
         yield f"data: {json.dumps(payload)}\n\n"
     elif job.status == "error":
         import json
+
         payload = {"step": "error", "error": job.error or "Unknown error"}
         yield f"data: {json.dumps(payload)}\n\n"
 

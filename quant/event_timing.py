@@ -40,7 +40,7 @@ def _load_ibes_actuals(ticker: str, wrds_store) -> list[dict]:
         # Map our ticker to IBES ticker via the link table
         link = conn.execute(
             "SELECT ibes_ticker FROM ticker_link WHERE ticker = ? AND ibes_ticker IS NOT NULL LIMIT 1",
-            (ticker.upper(),)
+            (ticker.upper(),),
         ).fetchone()
         if link is None:
             _actuals_cache[ticker] = []
@@ -48,12 +48,15 @@ def _load_ibes_actuals(ticker: str, wrds_store) -> list[dict]:
             return []
 
         ibes_ticker = link["ibes_ticker"]
-        rows = conn.execute("""
+        rows = conn.execute(
+            """
             SELECT ticker, pends, anndats, value as eps_actual
             FROM ibes_actuals
             WHERE ticker = ?
             ORDER BY pends DESC
-        """, (ibes_ticker,)).fetchall()
+        """,
+            (ibes_ticker,),
+        ).fetchall()
         conn.close()
 
         result = [dict(r) for r in rows]
@@ -76,7 +79,7 @@ def _load_ibes_consensus_at_date(ticker: str, as_of_date: str, wrds_store) -> fl
         conn = wrds_store._conn()
         link = conn.execute(
             "SELECT ibes_ticker FROM ticker_link WHERE ticker = ? AND ibes_ticker IS NOT NULL LIMIT 1",
-            (ticker.upper(),)
+            (ticker.upper(),),
         ).fetchone()
         if link is None:
             _consensus_cache[cache_key] = []
@@ -84,11 +87,14 @@ def _load_ibes_consensus_at_date(ticker: str, as_of_date: str, wrds_store) -> fl
             return None
 
         ibes_ticker = link["ibes_ticker"]
-        row = conn.execute("""
+        row = conn.execute(
+            """
             SELECT meanest FROM ibes_consensus
             WHERE ticker = ? AND statpers <= ? AND fpi = '1'
             ORDER BY statpers DESC LIMIT 1
-        """, (ibes_ticker, as_of_date)).fetchone()
+        """,
+            (ibes_ticker, as_of_date),
+        ).fetchone()
         conn.close()
 
         if row and row["meanest"] is not None:

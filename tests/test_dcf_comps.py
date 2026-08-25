@@ -16,6 +16,7 @@ def _make_data(**kwargs) -> AnalysisData:
 # Test 1: comps block present when pe_ratio and ev_to_ebitda are in metrics
 # ---------------------------------------------------------------------------
 
+
 def test_comps_block_present_with_pe():
     data = _make_data(metrics={"pe_ratio": 25.0, "ev_to_ebitda": 18.0})
     agent = DCFAgent.__new__(DCFAgent)
@@ -29,6 +30,7 @@ def test_comps_block_present_with_pe():
 # ---------------------------------------------------------------------------
 # Test 2: no crash and valid output when metrics is empty
 # ---------------------------------------------------------------------------
+
 
 def test_comps_block_absent_without_metrics():
     data = _make_data(metrics={})
@@ -45,6 +47,7 @@ def test_comps_block_absent_without_metrics():
 # ---------------------------------------------------------------------------
 # Test 3: system prompt contains MULTIPLES CALIBRATION step
 # ---------------------------------------------------------------------------
+
 
 def test_system_prompt_has_multiples_step():
     assert "MULTIPLES CALIBRATION" in DCFAgent.system_prompt, (

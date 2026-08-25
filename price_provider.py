@@ -28,11 +28,14 @@ def _validate_alpaca_bar(bar: dict, symbol: str) -> dict:
     """Log warning if required Alpaca bar fields are missing. Returns bar unchanged."""
     missing = [k for k in _REQUIRED_ALPACA_BAR_FIELDS if k not in bar]
     if missing:
-        logger.warning("schema: alpaca_bar response for %s missing fields: %s", symbol, ", ".join(missing))
+        logger.warning(
+            "schema: alpaca_bar response for %s missing fields: %s", symbol, ", ".join(missing)
+        )
     return bar
 
 
 # ── Provider Protocol ─────────────────────────────────────────────────
+
 
 class PriceProvider(Protocol):
     """Common interface for price data providers."""
@@ -56,6 +59,7 @@ class PriceProvider(Protocol):
 
 # ── Alpaca Client ─────────────────────────────────────────────────────
 
+
 class AlpacaClient:
     """
     Alpaca Markets REST client for historical price data.
@@ -74,10 +78,12 @@ class AlpacaClient:
         feed: str = "iex",
     ) -> None:
         self._session = requests.Session()
-        self._session.headers.update({
-            "APCA-API-KEY-ID": api_key,
-            "APCA-API-SECRET-KEY": secret_key,
-        })
+        self._session.headers.update(
+            {
+                "APCA-API-KEY-ID": api_key,
+                "APCA-API-SECRET-KEY": secret_key,
+            }
+        )
         self._feed = feed
 
     def get_quote(self, symbol: str) -> dict:
@@ -152,6 +158,7 @@ class AlpacaClient:
                 )
                 if resp.status_code == 429:
                     import time
+
                     time.sleep(1)
                     continue
                 resp.raise_for_status()
@@ -164,20 +171,22 @@ class AlpacaClient:
             for bar in (_validate_alpaca_bar(b, symbol) for b in bars):
                 # Normalize timestamp: Alpaca returns "2024-01-18T05:00:00Z"
                 ts = bar.get("t", "")
-                all_bars.append({
-                    "date": ts,
-                    "open": bar.get("o", 0),
-                    "high": bar.get("h", 0),
-                    "low": bar.get("l", 0),
-                    "close": bar.get("c", 0),
-                    # With adjustment=all, these are already adjusted
-                    "adjOpen": bar.get("o", 0),
-                    "adjHigh": bar.get("h", 0),
-                    "adjLow": bar.get("l", 0),
-                    "adjClose": bar.get("c", 0),
-                    "volume": bar.get("v", 0),
-                    "adjVolume": bar.get("v", 0),
-                })
+                all_bars.append(
+                    {
+                        "date": ts,
+                        "open": bar.get("o", 0),
+                        "high": bar.get("h", 0),
+                        "low": bar.get("l", 0),
+                        "close": bar.get("c", 0),
+                        # With adjustment=all, these are already adjusted
+                        "adjOpen": bar.get("o", 0),
+                        "adjHigh": bar.get("h", 0),
+                        "adjLow": bar.get("l", 0),
+                        "adjClose": bar.get("c", 0),
+                        "volume": bar.get("v", 0),
+                        "adjVolume": bar.get("v", 0),
+                    }
+                )
 
             page_token = data.get("next_page_token")
             if not page_token:
@@ -187,6 +196,7 @@ class AlpacaClient:
 
 
 # ── Alpaca Cache ──────────────────────────────────────────────────────
+
 
 class AlpacaCache:
     """Per-run thread-safe cache wrapping AlpacaClient. Same pattern as TiingoCache."""
@@ -241,6 +251,7 @@ class AlpacaCache:
 
 # ── Provider Factory ──────────────────────────────────────────────────
 
+
 def get_price_provider(provider: Optional[str] = None) -> PriceProvider:
     """
     Build a cached price provider from env vars.
@@ -272,9 +283,8 @@ def get_price_provider(provider: Optional[str] = None) -> PriceProvider:
     else:  # tiingo (default)
         api_key = os.getenv("TIINGO_API_KEY", "").strip()
         if not api_key:
-            raise EnvironmentError(
-                "TIINGO_API_KEY must be set when PRICE_PROVIDER=tiingo"
-            )
+            raise EnvironmentError("TIINGO_API_KEY must be set when PRICE_PROVIDER=tiingo")
         from tiingo_client import TiingoClient, TiingoCache
+
         client = TiingoClient(api_key)
         return TiingoCache(client)

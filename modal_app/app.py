@@ -6,6 +6,7 @@ Deploy mode (`git clone @MODAL_GIT_SHA` + env pin) is deferred to Session 1b.
 One app hosts all CPCV + smoke + future sweep functions; per-function
 resource overrides live in their respective modules.
 """
+
 from __future__ import annotations
 
 import os
@@ -39,20 +40,15 @@ def _build_image() -> modal.Image:
     if MODE == "deploy":
         git_sha = os.environ.get("MODAL_GIT_SHA", "").strip()
         if not git_sha:
-            raise RuntimeError(
-                "MODAL_MODE=deploy requires MODAL_GIT_SHA (40-char commit hash)."
-            )
+            raise RuntimeError("MODAL_MODE=deploy requires MODAL_GIT_SHA (40-char commit hash).")
         repo_url = os.environ.get(
             "MODAL_REPO_URL",
             "https://github.com/chadreadey/ai-financial-analyst.git",
         )
-        return (
-            base.run_commands(
-                f"git clone {repo_url} /root/app",
-                f"git -C /root/app checkout {git_sha}",
-            )
-            .env({"MODAL_GIT_SHA": git_sha, "PYTHONPATH": "/root/app"})
-        )
+        return base.run_commands(
+            f"git clone {repo_url} /root/app",
+            f"git -C /root/app checkout {git_sha}",
+        ).env({"MODAL_GIT_SHA": git_sha, "PYTHONPATH": "/root/app"})
 
     raise ValueError(f"Unknown MODAL_MODE={MODE!r}; expected 'dev' or 'deploy'.")
 

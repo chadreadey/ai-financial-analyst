@@ -20,6 +20,7 @@ from quant.metrics import (
 
 # ── Fixtures ─────────────────────────────────────────────────────────────
 
+
 @pytest.fixture()
 def daily_returns() -> pd.Series:
     """Realistic daily return series (~20% annual vol, slight positive drift)."""
@@ -35,6 +36,7 @@ def equity_curve() -> pd.Series:
 
 
 # ── compute_sharpe ───────────────────────────────────────────────────────
+
 
 class TestComputeSharpe:
     def test_basic(self, daily_returns):
@@ -89,6 +91,7 @@ class TestComputeSharpe:
 
 # ── compute_sortino ──────────────────────────────────────────────────────
 
+
 class TestComputeSortino:
     def test_basic(self, daily_returns):
         result = compute_sortino(daily_returns)
@@ -113,6 +116,7 @@ class TestComputeSortino:
 
 
 # ── compute_max_drawdown ─────────────────────────────────────────────────
+
 
 class TestComputeMaxDrawdown:
     def test_monotonically_increasing(self):
@@ -145,6 +149,7 @@ class TestComputeMaxDrawdown:
 
 # ── compute_calmar ───────────────────────────────────────────────────────
 
+
 class TestComputeCalmar:
     def test_basic(self):
         assert compute_calmar(20.0, 10.0) == 2.0
@@ -161,6 +166,7 @@ class TestComputeCalmar:
 
 
 # ── compute_annual_return ────────────────────────────────────────────────
+
 
 class TestComputeAnnualReturn:
     def test_known_value(self):
@@ -183,6 +189,7 @@ class TestComputeAnnualReturn:
 
 
 # ── compute_alpha ────────────────────────────────────────────────────────
+
 
 class TestComputeAlpha:
     def test_positive_alpha(self):

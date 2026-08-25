@@ -5,6 +5,7 @@ Wraps the alpaca-py SDK to submit market orders, fetch account info,
 and sync positions back to the SQLite paper_positions table.
 All calls target Alpaca's paper trading environment.
 """
+
 from __future__ import annotations
 
 import logging

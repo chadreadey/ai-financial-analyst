@@ -82,9 +82,7 @@ def test_regression_scores_wrapper_returns_dict():
     }
 
     reb_date = datetime.date(2024, 6, 30)
-    result = compute_price_regression_scores(
-        universe_data, reb_date, window=60, r2_threshold=0.6
-    )
+    result = compute_price_regression_scores(universe_data, reb_date, window=60, r2_threshold=0.6)
 
     assert isinstance(result, dict)
     assert set(result.keys()) == {"AAPL", "MSFT"}
@@ -107,9 +105,7 @@ def test_regression_scores_wrapper_handles_raw_dataframe():
     universe_data = {"AAPL": df_up}
 
     reb_date = datetime.date(2024, 6, 30)
-    result = compute_price_regression_scores(
-        universe_data, reb_date, window=60, r2_threshold=0.6
-    )
+    result = compute_price_regression_scores(universe_data, reb_date, window=60, r2_threshold=0.6)
 
     assert isinstance(result, dict)
     assert "AAPL" in result

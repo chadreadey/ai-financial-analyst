@@ -126,6 +126,7 @@ def compute_erm_score(
             if current_date_str and est_date:
                 try:
                     from datetime import datetime
+
                     d_current = datetime.strptime(str(current_date_str)[:10], "%Y-%m-%d")
                     d_prior = datetime.strptime(str(est_date)[:10], "%Y-%m-%d")
                     gap_days = (d_current - d_prior).days

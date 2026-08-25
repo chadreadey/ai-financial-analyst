@@ -34,16 +34,21 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from dotenv import load_dotenv
+
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from quant.backtest import (
-    BacktestConfig, BacktestResult,
-    run_backtest, load_universe_data,
+    BacktestConfig,
+    BacktestResult,
+    run_backtest,
+    load_universe_data,
 )
 from quant.universe import LIQUID_10, LIQUID_20, LIQUID_50, BENCHMARK, get_universe
 from quant.lstm.model import (
-    ReturnForecaster, LSTMConfig,
-    build_features, build_target,
+    ReturnForecaster,
+    LSTMConfig,
+    build_features,
+    build_target,
 )
 
 logger = logging.getLogger(__name__)
@@ -119,11 +124,11 @@ def run_test_on_tickers(test_tickers, forecaster, config, universe_data):
 
 def test_cross_universe(train_universe, test_tickers, label, config):
     """Train on one universe, test on different stocks."""
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"  {label}")
     print(f"  Train: {len(train_universe)} stocks | Test: {len(test_tickers)} unseen stocks")
     print(f"  Test tickers: {test_tickers}")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
 
     api_key = os.getenv("TIINGO_API_KEY", "").strip()
 
@@ -157,9 +162,11 @@ def test_cross_universe(train_universe, test_tickers, label, config):
         print("  LSTM training failed!")
         return {"label": label, "error": "training_failed"}
 
-    print(f"  Training: {train_metrics.get('epochs')} epochs, "
-          f"val_loss={train_metrics.get('val_loss')}, "
-          f"device={train_metrics.get('device')}")
+    print(
+        f"  Training: {train_metrics.get('epochs')} epochs, "
+        f"val_loss={train_metrics.get('val_loss')}, "
+        f"device={train_metrics.get('device')}"
+    )
 
     # --- Test on UNSEEN tickers ---
     progress(f"Testing on {len(test_tickers)} unseen stocks...")
@@ -167,7 +174,7 @@ def test_cross_universe(train_universe, test_tickers, label, config):
 
     # --- Print comparison ---
     print(f"\n  {'Metric':<20s} {'Quant-Only':>12s} {'+ LSTM':>12s} {'Delta':>12s}")
-    print(f"  {'-'*58}")
+    print(f"  {'-' * 58}")
 
     result = {"label": label, "train_stocks": len(train_universe), "test_stocks": len(test_tickers)}
 
@@ -215,9 +222,12 @@ def main():
     parser.add_argument("--hidden-size", type=int, default=64)
     parser.add_argument("--lookback", type=int, default=60)
     parser.add_argument("--max-epochs", type=int, default=100)
-    parser.add_argument("--test", default="all",
-                        choices=["all", "cross_universe", "sector"],
-                        help="Which tests to run")
+    parser.add_argument(
+        "--test",
+        default="all",
+        choices=["all", "cross_universe", "sector"],
+        help="Which tests to run",
+    )
     parser.add_argument("--output", default="")
     parser.add_argument("--verbose", "-v", action="store_true")
     args = parser.parse_args()
@@ -245,7 +255,8 @@ def main():
     if args.test in ("all", "cross_universe"):
         unseen_from_20 = sorted(set(LIQUID_20) - set(LIQUID_10))
         r = test_cross_universe(
-            LIQUID_10, unseen_from_20,
+            LIQUID_10,
+            unseen_from_20,
             "CROSS-UNIVERSE: Train liquid_10 → Test unseen liquid_20",
             config,
         )
@@ -255,7 +266,8 @@ def main():
     if args.test in ("all", "cross_universe"):
         unseen_from_50 = sorted(set(LIQUID_50) - set(LIQUID_20))
         r = test_cross_universe(
-            LIQUID_20, unseen_from_50,
+            LIQUID_20,
+            unseen_from_50,
             "CROSS-UNIVERSE: Train liquid_20 → Test unseen liquid_50",
             config,
         )
@@ -270,13 +282,16 @@ def main():
         for sector_name, sector_stocks in SECTORS.items():
             # Only test with stocks that are in our universes
             available_test = [s for s in sector_stocks if s in LIQUID_50]
-            available_train = [s for s in all_sector_stocks if s not in sector_stocks and s in LIQUID_50]
+            available_train = [
+                s for s in all_sector_stocks if s not in sector_stocks and s in LIQUID_50
+            ]
 
             if len(available_test) < 2 or len(available_train) < 5:
                 continue
 
             r = test_cross_universe(
-                available_train, available_test,
+                available_train,
+                available_test,
                 f"SECTOR HOLDOUT: Train without {sector_name} → Test {sector_name}",
                 config,
             )
@@ -284,11 +299,11 @@ def main():
 
     # --- Summary ---
     elapsed = time.time() - t0
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print(f"  GENERALIZATION SUMMARY")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"\n  {'Test':<50s} {'Sharpe Delta':>12s} {'Verdict':>15s}")
-    print(f"  {'-'*79}")
+    print(f"  {'-' * 79}")
 
     pass_count = 0
     for r in all_results:
@@ -314,7 +329,9 @@ def main():
 
     print(f"\n  Total time: {elapsed:.1f}s")
 
-    output_path = args.output or f"lstm_generalization_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    output_path = (
+        args.output or f"lstm_generalization_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    )
     with open(output_path, "w") as f:
         json.dump(all_results, f, indent=2, default=str)
     print(f"  Results saved to: {output_path}")

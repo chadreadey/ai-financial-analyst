@@ -232,6 +232,26 @@ python scripts/signal_stress_test.py
 python scripts/cpcv_alpha_sweep.py
 ```
 
+### Backtest bias disclosure
+
+Two known biases affect the historical replay numbers in this repo and are
+**not corrected** — treat replay results as upper bounds, not measurements:
+
+1. **Survivorship / selection bias.** Candidate lists under `runs/candidates/`
+   were built from the current WRDS PIT universe, so early rebalances select
+   from a menu that already includes stocks that survived and won (APP, SMCI,
+   AXON, ...). Point-in-time index constituents are not applied.
+2. **LLM look-ahead contamination.** The LLM-mode replay
+   (`modal_app/functions/ai_replay.py`) asks a model whose training data
+   covers the replay period to pick among historical candidates. No prompt
+   guardrail can remove knowledge baked into the model weights, so a
+   historical replay systematically overstates AI value.
+
+The honest measurement of AI value over the quant baseline is **forward
+shadow mode**: LLM picks recorded at rebalance time from now on, scored
+against the quant-only series as real time passes. Post-training-cutoff
+replay months are the only trustworthy historical window.
+
 ---
 
 ## Agents

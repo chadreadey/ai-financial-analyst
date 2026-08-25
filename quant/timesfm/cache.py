@@ -23,6 +23,7 @@ def get_redis_client():
 
     try:
         import redis
+
         client = redis.Redis.from_url(url, decode_responses=True)
         client.ping()
         _redis_client = client

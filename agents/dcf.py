@@ -92,11 +92,18 @@ Be rigorous but concise. Use actual numbers from the provided financials."""
             parts.append("\n── Key Metrics ──")
             m = data.metrics
             for key in [
-                "free_cash_flow", "operating_cash_flow", "capex",
-                "long_term_debt", "cash", "stockholders_equity",
-                "shares_outstanding", "revenue_growth_yoy",
-                "revenue_cagr_3y", "revenue_cagr_5y",
-                "net_income_cagr_3y", "net_income_cagr_5y",
+                "free_cash_flow",
+                "operating_cash_flow",
+                "capex",
+                "long_term_debt",
+                "cash",
+                "stockholders_equity",
+                "shares_outstanding",
+                "revenue_growth_yoy",
+                "revenue_cagr_3y",
+                "revenue_cagr_5y",
+                "net_income_cagr_3y",
+                "net_income_cagr_5y",
                 "operating_leverage_5y",
             ]:
                 if key in m and m[key] is not None:
@@ -151,6 +158,7 @@ Be rigorous but concise. Use actual numbers from the provided financials."""
         peer_text = (data.enrichment_sections or {}).get("peer_comparison", "")
         if peer_text:
             import re
+
             # Extract median PE and EV/EBITDA if present in the peer table text
             for pattern, label in [
                 (r"[Mm]edian.*?P/?E[^0-9]*([0-9]+\.?[0-9]*)", "Peer Median P/E"),
@@ -207,10 +215,10 @@ Be rigorous but concise. Use actual numbers from the provided financials."""
                     debt_ratio=min(debt_ratio, 0.9),
                 )
                 base_block += (
-                    f"\n  Pre-computed WACC Estimate: {wacc_val*100:.2f}%"
-                    f"\n    (debt_ratio={debt_ratio:.2f}, beta=1.0 default, Rf={risk_free*100:.2f}%)"
-                    f"\n    Cost of Equity: {components['cost_of_equity']*100:.2f}%"
-                    f"\n    Cost of Debt (after-tax): {components['cost_of_debt_aftertax']*100:.2f}%"
+                    f"\n  Pre-computed WACC Estimate: {wacc_val * 100:.2f}%"
+                    f"\n    (debt_ratio={debt_ratio:.2f}, beta=1.0 default, Rf={risk_free * 100:.2f}%)"
+                    f"\n    Cost of Equity: {components['cost_of_equity'] * 100:.2f}%"
+                    f"\n    Cost of Debt (after-tax): {components['cost_of_debt_aftertax'] * 100:.2f}%"
                     f"\n  NOTE: Use this WACC as your baseline. Adjust beta only if you have"
                     f" strong evidence the company's systematic risk differs materially from 1.0."
                 )

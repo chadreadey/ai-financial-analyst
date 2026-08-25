@@ -11,12 +11,7 @@ from orchestrator import Orchestrator, _extract_structured_block
 
 class TestExtractStructuredBlock:
     def test_valid_json_block(self):
-        text = (
-            "This is the analysis.\n\n"
-            "```json\n"
-            '{"verdict": "BUY", "conviction": "HIGH"}\n'
-            "```"
-        )
+        text = 'This is the analysis.\n\n```json\n{"verdict": "BUY", "conviction": "HIGH"}\n```'
         parsed, prose = _extract_structured_block(text)
         assert parsed is not None
         assert parsed["verdict"] == "BUY"
@@ -31,12 +26,7 @@ class TestExtractStructuredBlock:
         assert prose == text
 
     def test_malformed_json(self):
-        text = (
-            "Analysis text.\n\n"
-            "```json\n"
-            '{not valid json}\n'
-            "```"
-        )
+        text = "Analysis text.\n\n```json\n{not valid json}\n```"
         parsed, prose = _extract_structured_block(text)
         assert parsed is None
         assert prose == text
@@ -100,8 +90,9 @@ def test_prepare_data_overlaps_enrichment_with_sec_fetch(monkeypatch):
     mock_parser.get_historical_revenue.return_value = []
     mock_parser.get_historical_net_income.return_value = []
 
-    with patch("orchestrator.build_enrichment_context", side_effect=fake_enrich), patch(
-        "orchestrator.XBRLParser", return_value=mock_parser
+    with (
+        patch("orchestrator.build_enrichment_context", side_effect=fake_enrich),
+        patch("orchestrator.XBRLParser", return_value=mock_parser),
     ):
         orch = Orchestrator(sec_client=sec)
         orch.prepare_data("xom")

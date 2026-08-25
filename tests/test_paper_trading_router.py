@@ -1,4 +1,5 @@
 """Tests for paper trading router new endpoints."""
+
 from __future__ import annotations
 
 import sqlite3
@@ -12,6 +13,7 @@ from fastapi.testclient import TestClient
 @pytest.fixture
 def client():
     from backend.main import app
+
     return TestClient(app)
 
 
@@ -20,6 +22,7 @@ def temp_warehouse(tmp_path, monkeypatch):
     """Point the paper-trading router at an isolated warehouse DB and seed it."""
     db_path = tmp_path / "warehouse.db"
     from config import settings as config_settings
+
     monkeypatch.setattr(config_settings, "warehouse_db_path", str(db_path))
     return db_path
 
@@ -79,7 +82,15 @@ def _seed_analysis_history(
         "INSERT OR REPLACE INTO analysis_history "
         "(analysis_id, ticker, run_at, verdict, conviction, composite_score, price_target) "
         "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (f"hist-{ticker}-{days_ago}", ticker, run_at, verdict, conviction, composite_score, price_target),
+        (
+            f"hist-{ticker}-{days_ago}",
+            ticker,
+            run_at,
+            verdict,
+            conviction,
+            composite_score,
+            price_target,
+        ),
     )
     conn.commit()
     conn.close()
@@ -189,7 +200,9 @@ def test_positions_with_verdicts_joins_latest_history(mock_price, client, temp_w
     assert pos["ticker"] == "NVDA"
     assert pos["entry_price"] == 400.0
     assert pos["current_price"] == 512.30
-    assert pos["unrealized_pnl_pct"] == pytest.approx(28.075, abs=0.05)  # (512.30 - 400) / 400 * 100
+    assert pos["unrealized_pnl_pct"] == pytest.approx(
+        28.075, abs=0.05
+    )  # (512.30 - 400) / 400 * 100
     assert pos["entry_verdict"] == "BUY"
     assert pos["latest_verdict"] is not None
     assert pos["latest_verdict"]["verdict"] == "STRONG BUY"

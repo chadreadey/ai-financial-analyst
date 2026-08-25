@@ -25,18 +25,23 @@ def extract_signals(
     else:
         trend_direction = "neutral"
 
-    raw_momentum = (point_forecast[-1] - point_forecast[0]) / point_forecast[0] if point_forecast[0] != 0 else 0.0
+    raw_momentum = (
+        (point_forecast[-1] - point_forecast[0]) / point_forecast[0]
+        if point_forecast[0] != 0
+        else 0.0
+    )
     momentum_score = max(-1.0, min(1.0, raw_momentum))
 
     volatility_proxy = (p90[-1] - p10[-1]) / p50[-1] if p50[-1] != 0 else 0.0
 
-    downside_risk_pct = (p10[-1] - current_value) / current_value * 100 if current_value != 0 else 0.0
+    downside_risk_pct = (
+        (p10[-1] - current_value) / current_value * 100 if current_value != 0 else 0.0
+    )
 
     upside_target = p90[-1]
 
     confidence_band = [
-        {"step": i + 1, "p10": p10[i], "p50": p50[i], "p90": p90[i]}
-        for i in range(n)
+        {"step": i + 1, "p10": p10[i], "p50": p50[i], "p90": p90[i]} for i in range(n)
     ]
 
     return {

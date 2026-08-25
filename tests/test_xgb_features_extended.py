@@ -1,6 +1,7 @@
 """
 Tests for extended XGBoost feature columns: price_regression and arima_forecast.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -38,8 +39,17 @@ def test_build_feature_matrix_has_new_cols():
         )
 
     tickers = [
-        "AAPL", "MSFT", "GOOG", "AMZN", "META",
-        "NVDA", "TSLA", "JPM", "BAC", "GS", "WMT",
+        "AAPL",
+        "MSFT",
+        "GOOG",
+        "AMZN",
+        "META",
+        "NVDA",
+        "TSLA",
+        "JPM",
+        "BAC",
+        "GS",
+        "WMT",
     ]
     universe_data = {t: make_df() for t in tickers}
     # Use a single rebalance date (after 60 rows are available, with 1 future row)

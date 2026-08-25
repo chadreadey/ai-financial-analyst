@@ -1,0 +1,40 @@
+{
+  "variant": "L-1.5",
+  "gross_exposure": 1.5,
+  "financing_spread_bps": -50.0,
+  "status": "complete",
+  "error": null,
+  "elapsed_seconds": 249.5,
+  "n_tickers": 200,
+  "start": "2015-01-01",
+  "end": "2024-12-31",
+  "guardrails_config": {
+    "max_drawdown_pct": 0.25,
+    "stressed_day_loss_pct": 0.15,
+    "stress_shock_pct": 0.08,
+    "financing_cost_cap_frac_of_excess_return": 0.3
+  },
+  "metrics": {
+    "total_return_pct": 151.27,
+    "annual_return_pct": 12.5,
+    "sharpe": 1.29,
+    "sortino": 1.77,
+    "calmar": 0.67,
+    "max_drawdown_pct": 18.74,
+    "win_rate_pct": 43.8,
+    "total_trades": 1742,
+    "avg_holding_days": 22.4,
+    "benchmark_return_pct": 239.88,
+    "alpha_pct": -88.61
+  },
+  "financing_dollars_paid": 7196.05,
+  "financing_drag_bps": 119.46,
+  "guardrail_passed": true,
+  "guardrail_breaches": [],
+  "guardrail_stats": {
+    "observed_max_drawdown": 0.18738049756806185,
+    "stressed_day_loss": 0.12,
+    "financing_as_frac_of_excess_return": 0.11126343856123037
+  },
+  "n_windows": 16
+}
