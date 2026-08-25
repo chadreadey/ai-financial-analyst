@@ -112,6 +112,18 @@ from backend.routers import analysis, reports, config as config_router
 from backend.routers import portfolio, news, industry
 from backend.routers import watchlist, market_data, recommendations
 from backend.routers import backtest, paper_trading, backtest_modal
+from backend.routers import diagnostics
+
+# Point the stochastic assumption logger at the configured JSONL sink so any
+# instrumented statistical routine streams its assumption checks to disk.
+try:
+    from quant.assumption_audit import configure_default_log
+    configure_default_log(
+        enabled=settings.assumption_audit_enabled,
+        jsonl_path=settings.assumption_audit_log_path,
+    )
+except Exception as exc:  # pragma: no cover - never block startup on this
+    logger.warning("assumption audit log not configured: %s", exc)
 
 app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"])
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
@@ -125,6 +137,7 @@ app.include_router(recommendations.router, prefix="/api/recommendations", tags=[
 app.include_router(backtest.router, prefix="/api/backtest", tags=["backtest"])
 app.include_router(backtest_modal.router, prefix="/api/backtest", tags=["backtest-modal"])
 app.include_router(paper_trading.router, prefix="/api/paper-trading", tags=["paper-trading"])
+app.include_router(diagnostics.router, prefix="/api/diagnostics", tags=["diagnostics"])
 
 
 @app.get("/api/health")

@@ -37,6 +37,8 @@ phase0_*.json
 # Modal CPCV run summaries (written by scripts/run_modal_cpcv.py)
 # also: Phase 1/2 candidate + AI-pick artifacts (regenerable)
 runs/
+# Assumption logger runtime sink (quant/assumption_audit.py)
+logs/
 
 # Trained-model binaries and large training frames (regenerable)
 models/*.pkl
