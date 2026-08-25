@@ -24,7 +24,7 @@ import asyncio
 from pathlib import Path
 from typing import Optional, Sequence
 
-from evals.dataset import AgentCase, SynthesisCase, load_agent_cases, load_synthesis_cases
+from evals.dataset import load_agent_cases, load_synthesis_cases
 from evals.replay import Cassette, open_cassette, request_key
 from evals.runner import RunConfig, run_agent_suite, run_synthesis_suite
 from llm import LLMProvider

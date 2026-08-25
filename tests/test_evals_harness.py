@@ -12,12 +12,7 @@ import pytest
 
 from evals import contracts
 from evals.checks import CheckResult, Sample, extract_pattern_vector, extract_structured
-from evals.dataset import (
-    AgentCase,
-    SynthesisCase,
-    load_agent_cases,
-    load_synthesis_cases,
-)
+from evals.dataset import SynthesisCase, load_agent_cases, load_synthesis_cases
 from evals.replay import (
     CASSETTE_VERSION,
     Cassette,
