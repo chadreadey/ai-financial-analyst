@@ -60,6 +60,7 @@ import math
 import os
 import threading
 import time
+import contextvars
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from enum import Enum
@@ -130,7 +131,13 @@ class AssumptionLog:
         self._max_records = max_records
         self._jsonl_path = jsonl_path
         self._enabled = enabled
-        self._ctx_stack: list[dict[str, Any]] = []
+        # contextvars (not a shared list) so concurrent asyncio tasks and
+        # threads each see their own context stack -- a shared stack would
+        # cross-contaminate record attribution under the async orchestrator
+        # or Modal fan-out.
+        self._ctx_stack: contextvars.ContextVar[tuple[dict[str, Any], ...]] = (
+            contextvars.ContextVar(f"assumption_ctx_{id(self)}", default=())
+        )
         self._lock = threading.RLock()
 
     # -- configuration ------------------------------------------------------
@@ -158,17 +165,15 @@ class AssumptionLog:
     def context(self, **ctx: Any):
         """Attach key/value context (module, ticker, as_of date, run_id ...)
         to every record logged inside the ``with`` block. Nestable."""
-        with self._lock:
-            self._ctx_stack.append(ctx)
+        token = self._ctx_stack.set(self._ctx_stack.get() + (ctx,))
         try:
             yield self
         finally:
-            with self._lock:
-                self._ctx_stack.pop()
+            self._ctx_stack.reset(token)
 
     def _current_context(self) -> dict[str, Any]:
         merged: dict[str, Any] = {}
-        for layer in self._ctx_stack:
+        for layer in self._ctx_stack.get():
             merged.update(layer)
         return merged
 
