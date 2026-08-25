@@ -89,8 +89,12 @@ class EvalReport:
 
     @property
     def mean_latency_ms(self) -> Optional[float]:
+        """Mean wall time per call, or ``None`` in replay mode where it is noise."""
         values = [s.latency_ms for s in self.samples if s.latency_ms]
-        return statistics.fmean(values) if values else None
+        if not values:
+            return None
+        mean = statistics.fmean(values)
+        return mean if mean >= 1.0 else None
 
     def failures(self) -> List[tuple[str, str, str]]:
         """``(case_id, check_name, detail)`` for every error-severity failure."""

@@ -78,13 +78,21 @@ async def _capture_prompt(case, suite: str) -> tuple[str, str]:
     return provider.system, provider.user
 
 
-async def seed_suite(suite: str, cases: Optional[Sequence] = None) -> tuple[int, int]:
-    """Seed every case in ``suite`` that has an authored fixture."""
+async def seed_suite(suite: str, cases: Optional[Sequence] = None) -> tuple[int, int, int]:
+    """
+    Seed every case in ``suite`` that has an authored fixture.
+
+    Returns ``(seeded, skipped, pruned)``. When seeding the full case list this
+    also drops superseded recordings, so the committed cassette holds exactly
+    one entry per fixture rather than accumulating every prompt revision.
+    """
+    prune = cases is None
     if cases is None:
         cases = load_synthesis_cases() if suite == "synthesis" else load_agent_cases()
     cassette: Cassette = open_cassette(suite)
 
-    seeded = skipped = 0
+    written: list[str] = []
+    skipped = 0
     for case in cases:
         body = load_fixture(case.id)
         if body is None:
@@ -93,9 +101,11 @@ async def seed_suite(suite: str, cases: Optional[Sequence] = None) -> tuple[int,
         system, user = await _capture_prompt(case, suite)
         key = request_key(SEED_PROVIDER, SEED_MODEL, system, user)
         cassette.put(key, model=SEED_MODEL, system=system, user=user, response=body)
-        seeded += 1
+        written.append(key)
+
+    pruned = cassette.retain(written) if prune else 0
     cassette.save()
-    return seeded, skipped
+    return len(written), skipped, pruned
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -107,8 +117,11 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     suites = ("synthesis", "agents") if args.suite == "all" else (args.suite,)
     for suite in suites:
-        seeded, skipped = asyncio.run(seed_suite(suite))
-        print(f"  {suite}: seeded {seeded} fixture(s), skipped {skipped} case(s)")
+        seeded, skipped, pruned = asyncio.run(seed_suite(suite))
+        print(
+            f"  {suite}: seeded {seeded} fixture(s), skipped {skipped} case(s), "
+            f"pruned {pruned} superseded recording(s)"
+        )
     return 0
 
 

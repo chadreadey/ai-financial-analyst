@@ -27,7 +27,7 @@ import hashlib
 import json
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Iterable, Optional
 
 from llm import LLMProvider
 
@@ -78,6 +78,21 @@ class Cassette:
             "response": response,
         }
         self._dirty = True
+
+    def retain(self, keys: Iterable[str]) -> int:
+        """
+        Drop every record outside ``keys``; returns the number removed.
+
+        Keys are content-addressed, so a prompt edit leaves the superseded
+        recording behind as dead weight that also masks a stale cassette from
+        the count checks in ``tests/test_evals_harness.py``.
+        """
+        keep = set(keys)
+        stale = [k for k in self.records if k not in keep]
+        for key in stale:
+            del self.records[key]
+        self._dirty = self._dirty or bool(stale)
+        return len(stale)
 
     def save(self) -> None:
         if not self._dirty:

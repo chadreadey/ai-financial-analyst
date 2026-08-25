@@ -252,16 +252,29 @@ def test_recording_modes_require_a_live_provider(tmp_path):
         CassetteProvider(cassette, mode="record")
 
 
-def test_checked_in_cassettes_cover_every_case():
-    """Guards against a case landing without its recording, which fails CI late."""
+def test_checked_in_cassettes_hold_exactly_one_record_per_case():
+    """
+    Catches both halves of cassette rot: a case with no recording, and a
+    superseded recording left behind by a prompt edit.
+    """
     for suite, cases in (
         ("synthesis", load_synthesis_cases()),
         ("agents", load_agent_cases()),
     ):
         cassette = open_cassette(suite)
-        assert len(cassette.records) >= len(cases), (
-            f"{suite}: {len(cassette.records)} recordings for {len(cases)} cases"
+        assert len(cassette.records) == len(cases), (
+            f"{suite}: {len(cassette.records)} recordings for {len(cases)} cases; "
+            "re-run `python -m evals.seed` or `python -m evals record`"
         )
+
+
+def test_retain_prunes_superseded_records(tmp_path):
+    cassette = Cassette(tmp_path / "c.json")
+    for key in ("keep", "drop-1", "drop-2"):
+        cassette.put(key, model="m", system="s", user="u", response="r")
+
+    assert cassette.retain(["keep"]) == 2
+    assert set(cassette.records) == {"keep"}
 
 
 def test_cassettes_were_recorded_for_the_replay_provider():

@@ -11,10 +11,11 @@ failure rather than passing unnoticed because the harness took a shortcut.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, List, Optional, Sequence
+from typing import Any, Callable, Iterator, List, Optional, Sequence
 
 from agents import (
     CompetitiveAgent,
@@ -24,6 +25,7 @@ from agents import (
     PatternAgent,
     RiskAgent,
 )
+from config import settings
 from evals.checks import Sample, grade_agent, grade_synthesis
 from evals.dataset import AgentCase, SynthesisCase
 from evals.replay import Cassette, CassetteProvider
@@ -41,6 +43,45 @@ AGENT_REGISTRY: dict[str, type] = {
     "pattern": PatternAgent,
     "macro": MacroAgent,
 }
+
+#: Settings that change the rendered prompt, pinned to their ``config.py``
+#: defaults for the duration of a run.
+#:
+#: Without this the cassette key depends on whoever's ``.env`` is loaded and the
+#: suite is unreproducible across machines. ``enable_quantstats`` is the sharp
+#: one: with it on, ``PatternAgent.build_context`` fetches two years of daily
+#: bars from yfinance at prompt-assembly time and embeds the resulting Sharpe,
+#: drawdown and VaR figures, so the pattern prompt changes every trading day and
+#: needs a network connection. Turning it off is what makes that agent
+#: gradeable at all. See docs/EVALS.md §6.
+FROZEN_SETTINGS: dict[str, Any] = {
+    "enable_quantstats": False,
+    "enable_prompt_caching": True,
+    "max_agent_context_chars": 12000,
+    "max_agent_output_tokens": 1200,
+    "max_context_dcf_chars": 0,
+    "max_context_risk_chars": 0,
+    "max_context_earnings_chars": 0,
+    "max_context_competitive_chars": 15000,
+    "max_context_pattern_chars": 0,
+    "max_context_macro_chars": 0,
+    "synthesis_report_max_chars": 4500,
+    "synthesis_input_max_chars": 22000,
+    "max_synthesis_output_tokens": 1500,
+}
+
+
+@contextlib.contextmanager
+def frozen_settings() -> Iterator[None]:
+    """Pin the prompt-affecting settings so cassette keys stay stable."""
+    original = {key: getattr(settings, key) for key in FROZEN_SETTINGS}
+    for key, value in FROZEN_SETTINGS.items():
+        setattr(settings, key, value)
+    try:
+        yield
+    finally:
+        for key, value in original.items():
+            setattr(settings, key, value)
 
 
 @dataclass
@@ -109,8 +150,9 @@ async def run_synthesis_suite(
 
         return run
 
-    factories = [make(c) for c in selected for _ in range(config.repeats)]
-    samples = await _bounded(factories, config.concurrency)
+    with frozen_settings():
+        factories = [make(c) for c in selected for _ in range(config.repeats)]
+        samples = await _bounded(factories, config.concurrency)
     return _build_report(config, provider, samples)
 
 
@@ -135,8 +177,9 @@ async def run_agent_suite(
 
         return run
 
-    factories = [make(c) for c in selected for _ in range(config.repeats)]
-    samples = await _bounded(factories, config.concurrency)
+    with frozen_settings():
+        factories = [make(c) for c in selected for _ in range(config.repeats)]
+        samples = await _bounded(factories, config.concurrency)
     return _build_report(config, provider, samples)
 
 

@@ -131,8 +131,17 @@ class Sample:
         return [r for r in self.results if not r.passed and r.severity == "error"]
 
 
-def _passed(name: str, detail: str = "", metric: Optional[float] = None) -> CheckResult:
-    return CheckResult(name=name, passed=True, detail=detail, metric=metric)
+def _passed(
+    name: str,
+    detail: str = "",
+    metric: Optional[float] = None,
+    severity: Severity = "error",
+) -> CheckResult:
+    # Severity travels with passing results too, so a check that only ever
+    # passes still reports the right gating category.
+    return CheckResult(
+        name=name, passed=True, detail=detail, severity=severity, metric=metric
+    )
 
 
 def _failed(
@@ -588,7 +597,7 @@ def check_brief_sections_present(
         return _failed(
             "brief_sections_present", f"missing sections: {missing}", severity="warn"
         )
-    return _passed("brief_sections_present")
+    return _passed("brief_sections_present", severity="warn")
 
 
 @synthesis_check
@@ -610,7 +619,7 @@ def check_no_hedging_language(
             severity="warn",
             metric=float(len(found)),
         )
-    return _passed("no_hedging_language", metric=0.0)
+    return _passed("no_hedging_language", metric=0.0, severity="warn")
 
 
 @synthesis_check
@@ -695,7 +704,7 @@ def check_signal_score_terminal(case: AgentCase, sample: Sample) -> Optional[Che
             f"last line is {lines[-1][:80]!r}, not the SIGNAL_SCORE line",
             severity="warn",
         )
-    return _passed("signal_score_terminal")
+    return _passed("signal_score_terminal", severity="warn")
 
 
 @agent_check

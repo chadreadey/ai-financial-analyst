@@ -819,6 +819,15 @@ class Orchestrator:
         )
 
         structured, synthesis = _extract_structured_block(raw_synthesis)
+        if structured is None:
+            # Everything below — verdict, price target, history persistence,
+            # paper trading — is skipped when this happens, so it needs to be
+            # visible rather than an empty structured_verdict downstream.
+            logger.warning(
+                "Synthesis did not emit parseable structured JSON for %s; "
+                "returning prose only with no verdict",
+                data.ticker,
+            )
 
         if structured:
             # Force entry_price to actual current market price — never trust the LLM for this

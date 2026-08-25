@@ -1,0 +1,18 @@
+# Test and eval dependencies. Installs the full runtime set plus the packages
+# the test suite imports directly.
+#
+#   pip install -r requirements-dev.txt
+#   pytest
+#   python -m evals run --suite all
+
+-r requirements.txt
+
+pytest>=8.0
+pytest-asyncio>=0.23
+
+# tests/test_kalshi_client.py stubs HTTP with this
+responses>=0.25.0
+
+# APScheduler resolves the local timezone through zoneinfo, which needs a tz
+# database on slim Linux images (tests/test_paper_scheduler.py)
+tzdata>=2024.1
