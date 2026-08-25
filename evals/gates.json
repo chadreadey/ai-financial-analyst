@@ -1,0 +1,11 @@
+{
+  "_comment": "Merge criteria per suite. Error-severity checks not listed in min_check_pass_rate must pass on every case. Loosen a threshold only with a note explaining which failure mode you are accepting and why.",
+  "synthesis": {
+    "min_case_pass_rate": 1.0,
+    "min_check_pass_rate": {}
+  },
+  "agents": {
+    "min_case_pass_rate": 1.0,
+    "min_check_pass_rate": {}
+  }
+}
