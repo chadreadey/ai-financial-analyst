@@ -35,6 +35,17 @@ class LLMProvider(ABC):
         """Generate text for a system + user prompt pair."""
 
 
+# Models that reject sampling params (temperature/top_p/top_k return 400).
+_NO_SAMPLING_MODEL_PREFIXES = (
+    "claude-opus-5",
+    "claude-opus-4-8",
+    "claude-opus-4-7",
+    "claude-sonnet-5",
+    "claude-fable-5",
+    "claude-mythos-5",
+)
+
+
 class AnthropicProvider(LLMProvider):
     """Anthropic Claude provider."""
 
@@ -60,14 +71,20 @@ class AnthropicProvider(LLMProvider):
             if self._prompt_caching
             else system
         )
+        resolved_model = model or self.default_model
+        kwargs = {}
+        if not resolved_model.startswith(_NO_SAMPLING_MODEL_PREFIXES):
+            kwargs["temperature"] = 0.0
         message = await self._client.messages.create(
-            model=model or self.default_model,
+            model=resolved_model,
             max_tokens=max_tokens,
-            temperature=0.0,
             system=system_param,
             messages=[{"role": "user", "content": user}],
+            **kwargs,
         )
-        return message.content[0].text
+        if message.stop_reason == "refusal":
+            raise RuntimeError(f"Model {resolved_model} refused the request")
+        return next(b.text for b in message.content if b.type == "text")
 
 
 class OpenAIProvider(LLMProvider):

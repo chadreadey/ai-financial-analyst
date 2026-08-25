@@ -577,7 +577,15 @@ def compute_ic_walkforward(
             )
         )
 
-    return results
+    raw_series = {
+        sig: {
+            "dates": [str(d.date()) for d in stats_per_signal[sig]["dates"]],
+            "ics": [float(x) for x in stats_per_signal[sig]["ics"]],
+        }
+        for sig in ALL_SIGNAL_NAMES
+        if stats_per_signal[sig]["ics"]
+    }
+    return results, raw_series
 
 
 # ── Top-level runner ────────────────────────────────────────────────────
@@ -686,17 +694,19 @@ def run(
 
     # ── IC per horizon ─────────────────────────────────────────────
     full_results = {}
+    ic_series = {}
     for label, hd in HORIZONS.items():
         # align panels to fwd lists (same length, same dates)
         fwd_list = fwd_per_horizon[label]
         # Some rebalance dates may have produced empty fwd series — that's OK
-        stats_list = compute_ic_walkforward(
+        stats_list, raw_series = compute_ic_walkforward(
             panel_per_date,
             fwd_list,
             label,
             hd,
         )
         full_results[label] = [s.to_dict() for s in stats_list]
+        ic_series[label] = raw_series
         print(f"[ic-{label}] computed for {len(stats_list)} signals")
 
     # ── Coverage diagnostics ───────────────────────────────────────
@@ -736,6 +746,7 @@ def run(
         },
         "coverage": coverage,
         "ic": full_results,
+        "ic_series": ic_series,
     }
 
     # ── Persist results ───────────────────────────────────────────
