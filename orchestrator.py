@@ -716,6 +716,7 @@ class Orchestrator:
         self,
         ticker: str,
         progress_callback: Optional[Callable[[str, Optional[int]], None]] = None,
+        auto_paper_trade: Optional[bool] = None,
     ) -> AnalysisResult:
         """
         Execute the full two-phase analysis pipeline for a ticker.
@@ -953,8 +954,16 @@ class Orchestrator:
                 if progress_callback:
                     progress_callback("History save complete", 97)
 
-                # Auto-paper-trade: enter position if conviction meets threshold
-                if settings.auto_paper_trade:
+                # Auto-paper-trade: enter position if conviction meets threshold.
+                # Callers (e.g. the rebalance scheduler) can force this off via
+                # auto_paper_trade=False so they remain the *single* order
+                # submitter — otherwise both this path and the caller submit,
+                # doubling position size (see audit F-001).
+                _should_auto_trade = (
+                    settings.auto_paper_trade if auto_paper_trade is None
+                    else auto_paper_trade
+                )
+                if _should_auto_trade:
                     _auto_paper_trade(data.ticker, structured)
 
             except Exception as exc:

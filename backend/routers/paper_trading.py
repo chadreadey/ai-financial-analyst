@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import math
 import os
@@ -414,11 +415,21 @@ async def get_alpaca_orders():
 
 @router.post("/rebalance")
 async def trigger_rebalance(body: dict = None):
-    """Trigger a manual rebalance. Optionally pass {"tickers": ["AAPL", "MSFT"]}."""
+    """Trigger a manual rebalance. Optionally pass {"tickers": ["AAPL", "MSFT"]}.
+
+    Runs the (blocking, network- and LLM-heavy) rebalance off the event loop
+    with a wall-clock bound so a slow/hung rebalance cannot wedge the API
+    worker or run forever (audit F-016 / F-020).
+    """
+    tickers = (body or {}).get("tickers")
     try:
-        tickers = (body or {}).get("tickers")
-        result = run_rebalance(target_tickers=tickers)
-        return result
+        return await asyncio.wait_for(
+            asyncio.to_thread(run_rebalance, tickers),
+            timeout=float(settings.rebalance_total_timeout_seconds),
+        )
+    except asyncio.TimeoutError:
+        logger.error("Manual rebalance timed out after %ss", settings.rebalance_total_timeout_seconds)
+        return {"status": "error", "error": "rebalance timed out"}
     except Exception as exc:
         logger.error("Rebalance failed: %s", exc, exc_info=True)
         return {"status": "error", "error": str(exc)}
