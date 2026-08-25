@@ -118,6 +118,7 @@ from backend.routers import diagnostics
 # instrumented statistical routine streams its assumption checks to disk.
 try:
     from quant.assumption_audit import configure_default_log
+
     configure_default_log(
         enabled=settings.assumption_audit_enabled,
         jsonl_path=settings.assumption_audit_log_path,

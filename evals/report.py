@@ -115,9 +115,7 @@ class EvalReport:
             "cassette_hits": self.cassette_hits,
             "cassette_misses": self.cassette_misses,
             "checks": [s.to_dict() for s in self.check_stats],
-            "failures": [
-                {"case_id": c, "check": n, "detail": d} for c, n, d in self.failures()
-            ],
+            "failures": [{"case_id": c, "check": n, "detail": d} for c, n, d in self.failures()],
         }
 
     def to_markdown(self) -> str:
@@ -130,7 +128,11 @@ class EvalReport:
         ]
         if self.mean_latency_ms:
             lines.append(f"- mean latency: {self.mean_latency_ms:.0f} ms")
-        lines += ["", "| check | severity | pass | fail | rate | mean metric |", "|---|---|---|---|---|---|"]
+        lines += [
+            "",
+            "| check | severity | pass | fail | rate | mean metric |",
+            "|---|---|---|---|---|---|",
+        ]
         for stat in self.check_stats:
             rate = f"{stat.pass_rate:.0%}" if stat.pass_rate is not None else "n/a"
             metric = f"{stat.mean_metric:.4g}" if stat.mean_metric is not None else ""
@@ -200,25 +202,19 @@ class Gate:
         return (not violations), violations
 
 
-def compare_to_baseline(
-    report: EvalReport, baseline: dict, tolerance: float = 0.0
-) -> List[str]:
+def compare_to_baseline(report: EvalReport, baseline: dict, tolerance: float = 0.0) -> List[str]:
     """Return human-readable regressions relative to a stored baseline report."""
     regressions: List[str] = []
     base_rate = baseline.get("case_pass_rate")
     if base_rate is not None and report.case_pass_rate < base_rate - tolerance:
-        regressions.append(
-            f"case pass rate fell {base_rate:.1%} -> {report.case_pass_rate:.1%}"
-        )
+        regressions.append(f"case pass rate fell {base_rate:.1%} -> {report.case_pass_rate:.1%}")
     base_checks = {c["name"]: c for c in baseline.get("checks", [])}
     for stat in report.check_stats:
         prior = base_checks.get(stat.name)
         if not prior or prior.get("pass_rate") is None or stat.pass_rate is None:
             continue
         if stat.pass_rate < prior["pass_rate"] - tolerance:
-            regressions.append(
-                f"{stat.name} fell {prior['pass_rate']:.1%} -> {stat.pass_rate:.1%}"
-            )
+            regressions.append(f"{stat.name} fell {prior['pass_rate']:.1%} -> {stat.pass_rate:.1%}")
     return regressions
 
 

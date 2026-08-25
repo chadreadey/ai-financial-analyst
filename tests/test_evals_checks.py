@@ -44,9 +44,7 @@ def _result(sample, name):
     for result in sample.results:
         if result.name == name:
             return result
-    raise AssertionError(
-        f"check {name!r} did not run; ran {[r.name for r in sample.results]}"
-    )
+    raise AssertionError(f"check {name!r} did not run; ran {[r.name for r in sample.results]}")
 
 
 def _assert_only_failure(sample, name):
@@ -409,9 +407,7 @@ def test_fabricated_consensus_revision_is_caught(agent_cases):
 
 
 def test_forbidden_value_is_caught(agent_cases):
-    case = agent_cases["agt-dcf-standard"].model_copy(
-        update={"forbidden_values": ["$999.99"]}
-    )
+    case = agent_cases["agt-dcf-standard"].model_copy(update={"forbidden_values": ["$999.99"]})
     sample = checks.grade_agent(case, load_fixture(case.id) + "\nTarget: $999.99\n")
     assert not _result(sample, "no_forbidden_values").passed
 
@@ -512,9 +508,7 @@ def test_a_raising_grader_does_not_abort_the_run(synthesis_cases, monkeypatch):
         raise ZeroDivisionError("boom")
 
     exploding.__name__ = "exploding_check"
-    monkeypatch.setattr(
-        checks, "SYNTHESIS_CHECKS", [*checks.SYNTHESIS_CHECKS, exploding]
-    )
+    monkeypatch.setattr(checks, "SYNTHESIS_CHECKS", [*checks.SYNTHESIS_CHECKS, exploding])
     sample = checks.grade_synthesis(case, load_fixture(case.id))
 
     result = _result(sample, "exploding_check")

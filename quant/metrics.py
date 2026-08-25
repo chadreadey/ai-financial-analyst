@@ -154,7 +154,7 @@ def sharpe_standard_error(
     """
     if n is None or n < 2 or not math.isfinite(periodic_sharpe):
         return None
-    se = math.sqrt((1.0 + 0.5 * periodic_sharpe ** 2) / n)
+    se = math.sqrt((1.0 + 0.5 * periodic_sharpe**2) / n)
     return se * max(1.0, autocorr_inflation)
 
 
@@ -251,7 +251,7 @@ def compute_downside_deviation(
         return None
     mar_period = mar_annual / annual_factor if mar_annual else 0.0
     shortfall = np.minimum(arr - mar_period, 0.0)
-    dd = math.sqrt(float(np.mean(shortfall ** 2)))
+    dd = math.sqrt(float(np.mean(shortfall**2)))
     return dd
 
 

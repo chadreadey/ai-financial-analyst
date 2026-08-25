@@ -163,9 +163,7 @@ class CassetteProvider(LLMProvider):
             system=system, user=user, model=selected, max_tokens=max_tokens
         )
         async with self._lock:
-            self.cassette.put(
-                key, model=selected, system=system, user=user, response=response
-            )
+            self.cassette.put(key, model=selected, system=system, user=user, response=response)
         return response
 
 

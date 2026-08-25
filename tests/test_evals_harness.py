@@ -114,9 +114,7 @@ def test_duplicate_case_ids_are_rejected(tmp_path):
 
 def test_malformed_jsonl_reports_the_line_number(tmp_path):
     path = tmp_path / "broken.jsonl"
-    valid = json.dumps(
-        {"id": "ok", "ticker": "X", "company_name": "X Corp", "agent_reports": []}
-    )
+    valid = json.dumps({"id": "ok", "ticker": "X", "company_name": "X Corp", "agent_reports": []})
     path.write_text(f"{valid}\nnot json\n", encoding="utf-8")
     with pytest.raises(ValueError, match=r"broken\.jsonl:2 is not valid JSON"):
         load_synthesis_cases(path)
@@ -341,9 +339,7 @@ def _ok(name, severity="error", metric=None):
 
 
 def _bad(name, severity="error", metric=None):
-    return CheckResult(
-        name=name, passed=False, detail="broke", severity=severity, metric=metric
-    )
+    return CheckResult(name=name, passed=False, detail="broke", severity=severity, metric=metric)
 
 
 def test_case_pass_rate_counts_only_error_failures():
@@ -376,9 +372,7 @@ def test_check_stats_aggregate_pass_rate_and_metric():
 
 
 def test_gate_blocks_on_case_pass_rate():
-    report = EvalReport(
-        suite="s", mode="replay", model="m", samples=[_sample("a", _bad("x"))]
-    )
+    report = EvalReport(suite="s", mode="replay", model="m", samples=[_sample("a", _bad("x"))])
     ok, violations = Gate(min_case_pass_rate=1.0).evaluate(report)
     assert not ok
     assert any("case pass rate" in v for v in violations)
@@ -432,9 +426,7 @@ def test_baseline_comparison_respects_tolerance():
 
 
 def test_report_renders_json_and_markdown():
-    report = EvalReport(
-        suite="s", mode="replay", model="m", samples=[_sample("a", _bad("x"))]
-    )
+    report = EvalReport(suite="s", mode="replay", model="m", samples=[_sample("a", _bad("x"))])
     payload = report.to_dict()
     assert payload["failures"][0]["check"] == "x"
     assert json.dumps(payload)
@@ -483,7 +475,7 @@ class TestProductionExtractionRobustness:
         )
 
     def test_smart_quotes_are_not_recovered(self):
-        parsed, _ = extract_structured(self._block('{\u201cverdict\u201d: \u201cBUY\u201d}'))
+        parsed, _ = extract_structured(self._block("{\u201cverdict\u201d: \u201cBUY\u201d}"))
         assert parsed is None
 
     def test_truncated_output_yields_no_verdict(self):

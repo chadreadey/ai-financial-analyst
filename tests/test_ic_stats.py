@@ -116,15 +116,24 @@ class TestICSummary:
 # ── table + report ───────────────────────────────────────────────────────
 def test_overlap_adjusted_ic_table_and_report():
     dates = pd.date_range("2015-01-31", periods=120, freq="ME")
-    df = pd.DataFrame({
-        "autocorr_sig": _ar1(120, rho=0.55, sigma=0.10, mean=0.02, seed=8),
-        "clean_sig": np.random.default_rng(9).standard_normal(120) * 0.05 + 0.05,
-        "noise": np.random.default_rng(10).standard_normal(120) * 0.10,
-    }, index=dates)
+    df = pd.DataFrame(
+        {
+            "autocorr_sig": _ar1(120, rho=0.55, sigma=0.10, mean=0.02, seed=8),
+            "clean_sig": np.random.default_rng(9).standard_normal(120) * 0.05 + 0.05,
+            "noise": np.random.default_rng(10).standard_normal(120) * 0.10,
+        },
+        index=dates,
+    )
     out = overlap_adjusted_ic_table(df, horizon_days=126, step_days=21)
     assert set(out.index) == {"autocorr_sig", "clean_sig", "noise"}
-    for col in ("t_naive", "t_hac", "verdict_naive", "verdict_hac",
-                "inflation_factor", "survives_correction"):
+    for col in (
+        "t_naive",
+        "t_hac",
+        "verdict_naive",
+        "verdict_hac",
+        "inflation_factor",
+        "survives_correction",
+    ):
         assert col in out.columns
     report = format_ic_report(out)
     assert "OVERLAP-CORRECTED IC SIGNIFICANCE" in report

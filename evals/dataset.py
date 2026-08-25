@@ -63,9 +63,7 @@ class SynthesisCase(BaseModel):
         are prose-only the model has to invent those scores, so its weighted sum
         is unknowable in advance and only the internal-consistency checks apply.
         """
-        return len(self.signal_scores()) == len(
-            {r.signal for r in self.agent_reports if r.signal}
-        )
+        return len(self.signal_scores()) == len({r.signal for r in self.agent_reports if r.signal})
 
     def expected_decision(self) -> ExpectedDecision:
         return ExpectedDecision.from_signals(self.signal_scores())

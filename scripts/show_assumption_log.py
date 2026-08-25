@@ -43,6 +43,7 @@ def resolve_log_path(explicit: Optional[str]) -> Optional[str]:
         return env
     try:
         from config import settings
+
         p = getattr(settings, "assumption_audit_log_path", None)
         if p and os.path.exists(p):
             return p
@@ -53,7 +54,8 @@ def resolve_log_path(explicit: Optional[str]) -> Optional[str]:
     # Last resort: newest assumption_log.jsonl anywhere under docs/audit.
     candidates = sorted(
         glob.glob("docs/audit/**/assumption_log.jsonl", recursive=True),
-        key=os.path.getmtime, reverse=True,
+        key=os.path.getmtime,
+        reverse=True,
     )
     return candidates[0] if candidates else None
 
@@ -80,16 +82,22 @@ def _ctx_str(rec: dict) -> str:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     ap.add_argument("--path", default=None, help="Explicit JSONL path.")
-    ap.add_argument("--status", default=None,
-                    choices=["pass", "violated", "skipped_insufficient_information",
-                             "skipped", "error"],
-                    help="Filter by status ('skipped' matches the skipped status).")
-    ap.add_argument("--severity", default=None,
-                    choices=["low", "medium", "high", "critical"],
-                    help="Show records at this severity or higher.")
+    ap.add_argument(
+        "--status",
+        default=None,
+        choices=["pass", "violated", "skipped_insufficient_information", "skipped", "error"],
+        help="Filter by status ('skipped' matches the skipped status).",
+    )
+    ap.add_argument(
+        "--severity",
+        default=None,
+        choices=["low", "medium", "high", "critical"],
+        help="Show records at this severity or higher.",
+    )
     ap.add_argument("--assumption", default=None, help="Filter by assumption id substring.")
     ap.add_argument("--target", default=None, help="Filter by target substring.")
     ap.add_argument("--tail", type=int, default=0, help="Only the last N (post-filter) records.")
@@ -98,10 +106,12 @@ def main() -> int:
 
     path = resolve_log_path(args.path)
     if not path:
-        print("No assumption log found. Generate one with:\n"
-              "  python3 scripts/run_statistical_rigor_audit.py\n"
-              "or point --path / ASSUMPTION_AUDIT_JSONL at a JSONL file.",
-              file=sys.stderr)
+        print(
+            "No assumption log found. Generate one with:\n"
+            "  python3 scripts/run_statistical_rigor_audit.py\n"
+            "or point --path / ASSUMPTION_AUDIT_JSONL at a JSONL file.",
+            file=sys.stderr,
+        )
         return 2
     if not os.path.exists(path):
         print(f"Log file does not exist: {path}", file=sys.stderr)
@@ -130,7 +140,7 @@ def main() -> int:
 
     filtered = [r for r in recs if keep(r)]
     if args.tail and args.tail > 0:
-        filtered = filtered[-args.tail:]
+        filtered = filtered[-args.tail :]
 
     if args.json:
         print(json.dumps(filtered, indent=2))
@@ -149,8 +159,10 @@ def main() -> int:
     print("=" * 72)
     print(f"  file      : {path}")
     print(f"  records   : {len(filtered)} shown ({len(recs)} total)")
-    print(f"  pass={counts['pass']}  VIOLATED={counts['violated']}  "
-          f"skipped={counts['skipped']}  error={counts['error']}")
+    print(
+        f"  pass={counts['pass']}  VIOLATED={counts['violated']}  "
+        f"skipped={counts['skipped']}  error={counts['error']}"
+    )
 
     viols = [r for r in filtered if r.get("status") == "violated"]
     if viols:
@@ -159,9 +171,11 @@ def main() -> int:
         for r in viols:
             ctx = _ctx_str(r)
             ctx = f"  [{ctx}]" if ctx else ""
-            print(f"  [{r.get('severity','?').upper():>8}] "
-                  f"{r.get('assumption','?')}:{r.get('target','?')}{ctx}")
-            print(f"             {r.get('message','')}")
+            print(
+                f"  [{r.get('severity', '?').upper():>8}] "
+                f"{r.get('assumption', '?')}:{r.get('target', '?')}{ctx}"
+            )
+            print(f"             {r.get('message', '')}")
 
     skipped = [r for r in filtered if str(r.get("status", "")).startswith("skipped")]
     if skipped and not args.status:
@@ -174,7 +188,7 @@ def main() -> int:
                 uniq.append(r)
         print(f"\n  Information gaps ({len(skipped)} skipped, {len(uniq)} distinct):")
         for r in uniq[:40]:
-            print(f"    - {r.get('assumption','?')}: {r.get('message','')}")
+            print(f"    - {r.get('assumption', '?')}: {r.get('message', '')}")
 
     print("=" * 72)
     return 0

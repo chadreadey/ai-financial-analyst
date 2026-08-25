@@ -1030,8 +1030,7 @@ class Orchestrator:
                 # submitter — otherwise both this path and the caller submit,
                 # doubling position size (see audit F-001).
                 _should_auto_trade = (
-                    settings.auto_paper_trade if auto_paper_trade is None
-                    else auto_paper_trade
+                    settings.auto_paper_trade if auto_paper_trade is None else auto_paper_trade
                 )
                 if _should_auto_trade:
                     _auto_paper_trade(data.ticker, structured)

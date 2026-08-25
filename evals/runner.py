@@ -102,9 +102,7 @@ def _select(cases: Sequence[Any], case_filter: Optional[str]) -> list:
     return [c for c in cases if case_filter in c.id or case_filter in getattr(c, "tags", [])]
 
 
-async def _bounded(
-    coros: Sequence[Callable[[], Any]], concurrency: int
-) -> list:
+async def _bounded(coros: Sequence[Callable[[], Any]], concurrency: int) -> list:
     semaphore = asyncio.Semaphore(max(1, concurrency))
 
     async def guarded(factory):
@@ -138,13 +136,10 @@ async def run_synthesis_suite(
     def make(case: SynthesisCase) -> Callable[[], Any]:
         async def run() -> Sample:
             reports = [
-                AgentReport(agent_name=r.agent_name, analysis=r.text)
-                for r in case.agent_reports
+                AgentReport(agent_name=r.agent_name, analysis=r.text) for r in case.agent_reports
             ]
             output, error, latency = await _timed(
-                lambda: orchestrator.run_phase2(
-                    case.ticker, case.company_name, reports
-                )
+                lambda: orchestrator.run_phase2(case.ticker, case.company_name, reports)
             )
             return grade_synthesis(case, output, latency_ms=latency, error=error)
 
@@ -167,9 +162,7 @@ async def run_agent_suite(
         async def run() -> Sample:
             agent_cls = AGENT_REGISTRY.get(case.agent)
             if agent_cls is None:
-                return grade_agent(
-                    case, "", error=f"unknown agent {case.agent!r}", latency_ms=0.0
-                )
+                return grade_agent(case, "", error=f"unknown agent {case.agent!r}", latency_ms=0.0)
             agent = agent_cls(provider=provider, model=config.model)
             data = AnalysisData.model_validate(case.analysis_data)
             output, error, latency = await _timed(lambda: agent.analyze(data))
@@ -183,9 +176,7 @@ async def run_agent_suite(
     return _build_report(config, provider, samples)
 
 
-def _build_report(
-    config: RunConfig, provider: LLMProvider, samples: List[Sample]
-) -> EvalReport:
+def _build_report(config: RunConfig, provider: LLMProvider, samples: List[Sample]) -> EvalReport:
     hits = getattr(provider, "hits", 0)
     misses = getattr(provider, "misses", 0)
     model = config.model or getattr(provider, "default_model", "unknown")

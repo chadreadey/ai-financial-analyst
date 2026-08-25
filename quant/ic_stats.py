@@ -163,9 +163,9 @@ class ICSummary:
     # Diagnostics.
     lag1_autocorr: Optional[float]
     n_effective: float
-    inflation_factor: float           # t_naive / t_hac (how overstated)
-    overlap_ratio: Optional[float]    # horizon / step, when known
-    survives_correction: bool         # was SIGNIFICANT, still SIGNIFICANT?
+    inflation_factor: float  # t_naive / t_hac (how overstated)
+    overlap_ratio: Optional[float]  # horizon / step, when known
+    survives_correction: bool  # was SIGNIFICANT, still SIGNIFICANT?
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -195,11 +195,20 @@ def ic_summary(
 
     if n == 0:
         return ICSummary(
-            signal=signal, n=0, mean_ic=float("nan"), std_ic=float("nan"),
-            pct_positive=float("nan"), t_naive=float("nan"),
-            verdict_naive="INSUFFICIENT", lag=0, t_hac=float("nan"),
-            verdict_hac="INSUFFICIENT", lag1_autocorr=None,
-            n_effective=0.0, inflation_factor=1.0, overlap_ratio=overlap,
+            signal=signal,
+            n=0,
+            mean_ic=float("nan"),
+            std_ic=float("nan"),
+            pct_positive=float("nan"),
+            t_naive=float("nan"),
+            verdict_naive="INSUFFICIENT",
+            lag=0,
+            t_hac=float("nan"),
+            verdict_hac="INSUFFICIENT",
+            lag1_autocorr=None,
+            n_effective=0.0,
+            inflation_factor=1.0,
+            overlap_ratio=overlap,
             survives_correction=False,
         )
 
@@ -225,11 +234,19 @@ def ic_summary(
     survives = (v_naive == "SIGNIFICANT") and (v_hac == "SIGNIFICANT")
 
     return ICSummary(
-        signal=signal, n=n, mean_ic=round(mean_ic, 6), std_ic=round(std_ic, 6),
-        pct_positive=round(pct_pos, 1), t_naive=round(t_naive, 3),
-        verdict_naive=v_naive, lag=lag, t_hac=round(t_hac, 3), verdict_hac=v_hac,
+        signal=signal,
+        n=n,
+        mean_ic=round(mean_ic, 6),
+        std_ic=round(std_ic, 6),
+        pct_positive=round(pct_pos, 1),
+        t_naive=round(t_naive, 3),
+        verdict_naive=v_naive,
+        lag=lag,
+        t_hac=round(t_hac, 3),
+        verdict_hac=v_hac,
         lag1_autocorr=(round(rho1, 4) if rho1 is not None else None),
-        n_effective=round(n_eff, 1), inflation_factor=round(inflation, 3),
+        n_effective=round(n_eff, 1),
+        inflation_factor=round(inflation, 3),
         overlap_ratio=(round(overlap, 3) if overlap else None),
         survives_correction=survives,
     )
@@ -257,8 +274,11 @@ def overlap_adjusted_ic_table(
     rows = []
     for col in ic_table.columns:
         summ = ic_summary(
-            ic_table[col], signal=str(col),
-            horizon_days=horizon_days, step_days=step_days, min_n=min_n,
+            ic_table[col],
+            signal=str(col),
+            horizon_days=horizon_days,
+            step_days=step_days,
+            min_n=min_n,
         )
         rows.append(summ.to_dict())
     if not rows:
@@ -285,9 +305,11 @@ def format_ic_report(df: pd.DataFrame) -> str:
     ]
     for sig, r in df.iterrows():
         transition = f"{r['verdict_naive']} -> {r['verdict_hac']}"
-        flag = "  <== downgraded" if (
-            r["verdict_naive"] == "SIGNIFICANT" and not r["survives_correction"]
-        ) else ""
+        flag = (
+            "  <== downgraded"
+            if (r["verdict_naive"] == "SIGNIFICANT" and not r["survives_correction"])
+            else ""
+        )
         lines.append(
             f"  {str(sig):<20s}{int(r['n']):>5d}{r['mean_ic']:>9.4f}"
             f"{r['t_naive']:>9.2f}{r['t_hac']:>8.2f}{r['inflation_factor']:>7.2f}"

@@ -15,6 +15,7 @@ Safety model (see docs/audit/2026-07-04-core-platform-audit):
   * NON-REENTRANT: a module lock prevents scheduled and manual rebalances
     from overlapping and interleaving order/close state (audit F-005).
 """
+
 from __future__ import annotations
 
 import logging
@@ -260,7 +261,9 @@ def create_scheduler(start: bool = True) -> BackgroundScheduler:
     scheduler = BackgroundScheduler(timezone="US/Eastern")
     parts = settings.paper_rebalance_cron.split()
     if len(parts) == 5:
-        trigger = CronTrigger(minute=parts[0], hour=parts[1], day=parts[2], month=parts[3], day_of_week=parts[4])
+        trigger = CronTrigger(
+            minute=parts[0], hour=parts[1], day=parts[2], month=parts[3], day_of_week=parts[4]
+        )
     else:
         trigger = CronTrigger(minute=30, hour=9, day=1)
     scheduler.add_job(

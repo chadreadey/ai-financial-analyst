@@ -249,9 +249,7 @@ class ExpectedDecision(BaseModel):
     sizing_guidance: str
 
     @classmethod
-    def from_signals(
-        cls, signals: Mapping[str, Optional[float]]
-    ) -> "ExpectedDecision":
+    def from_signals(cls, signals: Mapping[str, Optional[float]]) -> "ExpectedDecision":
         weighted = weighted_score_for_signals(signals)
         conviction_score = round(abs(weighted), 6)
         verdict = verdict_for_score(weighted)

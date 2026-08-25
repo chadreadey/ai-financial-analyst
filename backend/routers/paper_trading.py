@@ -461,7 +461,9 @@ async def trigger_rebalance(body: dict = None):
             timeout=float(settings.rebalance_total_timeout_seconds),
         )
     except asyncio.TimeoutError:
-        logger.error("Manual rebalance timed out after %ss", settings.rebalance_total_timeout_seconds)
+        logger.error(
+            "Manual rebalance timed out after %ss", settings.rebalance_total_timeout_seconds
+        )
         return {"status": "error", "error": "rebalance timed out"}
     except Exception as exc:
         logger.error("Rebalance failed: %s", exc, exc_info=True)

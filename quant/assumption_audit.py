@@ -82,18 +82,18 @@ class AssumptionStatus(str, Enum):
 class AssumptionSeverity(str, Enum):
     """How much a violation of this assumption should worry you."""
 
-    CRITICAL = "critical"   # invalidates the inference (e.g. look-ahead)
-    HIGH = "high"           # materially biases the number
-    MEDIUM = "medium"       # meaningful but bounded distortion
-    LOW = "low"             # cosmetic / precision-level
+    CRITICAL = "critical"  # invalidates the inference (e.g. look-ahead)
+    HIGH = "high"  # materially biases the number
+    MEDIUM = "medium"  # meaningful but bounded distortion
+    LOW = "low"  # cosmetic / precision-level
 
 
 @dataclass
 class AssumptionRecord:
     """One logged assumption check."""
 
-    assumption: str          # short machine id, e.g. "iid_no_autocorrelation"
-    target: str              # what was checked, e.g. "sharpe_returns"
+    assumption: str  # short machine id, e.g. "iid_no_autocorrelation"
+    target: str  # what was checked, e.g. "sharpe_returns"
     status: AssumptionStatus
     severity: AssumptionSeverity
     message: str
@@ -202,7 +202,7 @@ class AssumptionLog:
             self._records.append(rec)
             if len(self._records) > self._max_records:
                 # Drop oldest to bound memory; keep it simple.
-                self._records = self._records[-self._max_records:]
+                self._records = self._records[-self._max_records :]
             if self._jsonl_path:
                 self._append_jsonl(rec, self._jsonl_path)
         return rec
@@ -234,17 +234,27 @@ class AssumptionLog:
         z-score computed on a handful of points."""
         if n is None:
             return self.record(
-                "min_sample", target, AssumptionStatus.SKIPPED, severity,
+                "min_sample",
+                target,
+                AssumptionStatus.SKIPPED,
+                severity,
                 "sample size unknown — cannot verify adequacy",
                 {"min_n": min_n},
             )
         if n >= min_n:
             return self.record(
-                "min_sample", target, AssumptionStatus.PASS, severity,
-                f"n={n} >= min_n={min_n}", {"n": n, "min_n": min_n},
+                "min_sample",
+                target,
+                AssumptionStatus.PASS,
+                severity,
+                f"n={n} >= min_n={min_n}",
+                {"n": n, "min_n": min_n},
             )
         return self.record(
-            "min_sample", target, AssumptionStatus.VIOLATED, severity,
+            "min_sample",
+            target,
+            AssumptionStatus.VIOLATED,
+            severity,
             f"n={n} < min_n={min_n}: statistic is dominated by sampling noise",
             {"n": n, "min_n": min_n},
         )
@@ -263,17 +273,29 @@ class AssumptionLog:
         v = _as_float(value)
         if v is None:
             return self.record(
-                "value_in_range", target, AssumptionStatus.SKIPPED, severity,
-                "value is missing — cannot verify range", {"lo": lo, "hi": hi},
+                "value_in_range",
+                target,
+                AssumptionStatus.SKIPPED,
+                severity,
+                "value is missing — cannot verify range",
+                {"lo": lo, "hi": hi},
             )
         if lo <= v <= hi:
             return self.record(
-                "value_in_range", target, AssumptionStatus.PASS, severity,
-                f"{v} in [{lo}, {hi}]", {"value": v, "lo": lo, "hi": hi},
+                "value_in_range",
+                target,
+                AssumptionStatus.PASS,
+                severity,
+                f"{v} in [{lo}, {hi}]",
+                {"value": v, "lo": lo, "hi": hi},
             )
         return self.record(
-            "value_in_range", target, AssumptionStatus.VIOLATED, severity,
-            f"{v} outside [{lo}, {hi}]", {"value": v, "lo": lo, "hi": hi},
+            "value_in_range",
+            target,
+            AssumptionStatus.VIOLATED,
+            severity,
+            f"{v} outside [{lo}, {hi}]",
+            {"value": v, "lo": lo, "hi": hi},
         )
 
     def sums_to(
@@ -290,19 +312,28 @@ class AssumptionLog:
         vals = _to_float_list(values)
         if vals is None or not vals:
             return self.record(
-                "sums_to", target, AssumptionStatus.SKIPPED, severity,
+                "sums_to",
+                target,
+                AssumptionStatus.SKIPPED,
+                severity,
                 "no components provided — cannot verify sum",
                 {"expected": expected},
             )
         total = float(sum(vals))
         if abs(total - expected) <= tol:
             return self.record(
-                "sums_to", target, AssumptionStatus.PASS, severity,
+                "sums_to",
+                target,
+                AssumptionStatus.PASS,
+                severity,
                 f"sum={total:.6g} ~= {expected}",
                 {"sum": total, "expected": expected, "n": len(vals)},
             )
         return self.record(
-            "sums_to", target, AssumptionStatus.VIOLATED, severity,
+            "sums_to",
+            target,
+            AssumptionStatus.VIOLATED,
+            severity,
             f"sum={total:.6g} != {expected} (tol={tol})",
             {"sum": total, "expected": expected, "n": len(vals)},
         )
@@ -325,23 +356,39 @@ class AssumptionLog:
         arr = _to_float_list(values)
         if arr is None or not arr:
             return self.record(
-                "no_silent_zeros", target, AssumptionStatus.SKIPPED, severity,
-                "no vector provided — cannot inspect for coerced zeros", {},
+                "no_silent_zeros",
+                target,
+                AssumptionStatus.SKIPPED,
+                severity,
+                "no vector provided — cannot inspect for coerced zeros",
+                {},
             )
         n = len(arr)
         n_zero = sum(1 for v in arr if v == 0.0)
         frac = n_zero / n
-        ev = {"n": n, "n_zero": n_zero, "zero_fraction": round(frac, 4),
-              "max_zero_fraction": max_zero_fraction}
+        ev = {
+            "n": n,
+            "n_zero": n_zero,
+            "zero_fraction": round(frac, 4),
+            "max_zero_fraction": max_zero_fraction,
+        }
         if frac <= max_zero_fraction:
             return self.record(
-                "no_silent_zeros", target, AssumptionStatus.PASS, severity,
-                f"{n_zero}/{n} zeros ({frac:.0%}) within tolerance", ev,
+                "no_silent_zeros",
+                target,
+                AssumptionStatus.PASS,
+                severity,
+                f"{n_zero}/{n} zeros ({frac:.0%}) within tolerance",
+                ev,
             )
         return self.record(
-            "no_silent_zeros", target, AssumptionStatus.VIOLATED, severity,
+            "no_silent_zeros",
+            target,
+            AssumptionStatus.VIOLATED,
+            severity,
             f"{n_zero}/{n} values are exactly 0 ({frac:.0%}) — likely missing "
-            "data coerced to zero rather than genuine neutral signal", ev,
+            "data coerced to zero rather than genuine neutral signal",
+            ev,
         )
 
     def no_lookahead(
@@ -359,19 +406,30 @@ class AssumptionLog:
         ao = _to_timestamp(as_of)
         if dt is None or ao is None:
             return self.record(
-                "no_lookahead", target, AssumptionStatus.SKIPPED, severity,
+                "no_lookahead",
+                target,
+                AssumptionStatus.SKIPPED,
+                severity,
                 "missing data_time or as_of — cannot verify point-in-time",
                 {"data_time": str(data_time), "as_of": str(as_of)},
             )
         ev = {"data_time": str(dt), "as_of": str(ao)}
         if dt <= ao:
             return self.record(
-                "no_lookahead", target, AssumptionStatus.PASS, severity,
-                "datum observable at as_of", ev,
+                "no_lookahead",
+                target,
+                AssumptionStatus.PASS,
+                severity,
+                "datum observable at as_of",
+                ev,
             )
         return self.record(
-            "no_lookahead", target, AssumptionStatus.VIOLATED, severity,
-            "datum timestamped AFTER as_of — look-ahead leak", ev,
+            "no_lookahead",
+            target,
+            AssumptionStatus.VIOLATED,
+            severity,
+            "datum timestamped AFTER as_of — look-ahead leak",
+            ev,
         )
 
     def finite(
@@ -384,24 +442,40 @@ class AssumptionLog:
         """Assumption: value is a finite real number (not NaN / inf)."""
         if value is None:
             return self.record(
-                "finite", target, AssumptionStatus.SKIPPED, severity,
-                "value is None — cannot verify finiteness", {},
+                "finite",
+                target,
+                AssumptionStatus.SKIPPED,
+                severity,
+                "value is None — cannot verify finiteness",
+                {},
             )
         try:
             v = float(value)
         except (TypeError, ValueError):
             return self.record(
-                "finite", target, AssumptionStatus.SKIPPED, severity,
-                "value is non-numeric", {"value": repr(value)},
+                "finite",
+                target,
+                AssumptionStatus.SKIPPED,
+                severity,
+                "value is non-numeric",
+                {"value": repr(value)},
             )
         if math.isfinite(v):
             return self.record(
-                "finite", target, AssumptionStatus.PASS, severity,
-                "finite", {"value": v},
+                "finite",
+                target,
+                AssumptionStatus.PASS,
+                severity,
+                "finite",
+                {"value": v},
             )
         return self.record(
-            "finite", target, AssumptionStatus.VIOLATED, severity,
-            "value is NaN or infinite", {"value": v},
+            "finite",
+            target,
+            AssumptionStatus.VIOLATED,
+            severity,
+            "value is NaN or infinite",
+            {"value": v},
         )
 
     def nonzero_variance(
@@ -416,18 +490,28 @@ class AssumptionLog:
         arr = _to_float_array(data)
         if arr is None or arr.size < 2:
             return self.record(
-                "nonzero_variance", target, AssumptionStatus.SKIPPED, severity,
+                "nonzero_variance",
+                target,
+                AssumptionStatus.SKIPPED,
+                severity,
                 "fewer than 2 finite observations — cannot assess variance",
                 {"n": 0 if arr is None else int(arr.size)},
             )
         std = float(arr.std(ddof=1))
         if std > 1e-12:
             return self.record(
-                "nonzero_variance", target, AssumptionStatus.PASS, severity,
-                f"std={std:.6g}", {"std": std, "n": int(arr.size)},
+                "nonzero_variance",
+                target,
+                AssumptionStatus.PASS,
+                severity,
+                f"std={std:.6g}",
+                {"std": std, "n": int(arr.size)},
             )
         return self.record(
-            "nonzero_variance", target, AssumptionStatus.VIOLATED, severity,
+            "nonzero_variance",
+            target,
+            AssumptionStatus.VIOLATED,
+            severity,
             "sample is (near) constant — downstream z-score/correlation undefined",
             {"std": std, "n": int(arr.size)},
         )
@@ -451,7 +535,10 @@ class AssumptionLog:
         arr = _to_float_array(data)
         if arr is None or arr.size < min_n:
             return self.record(
-                "normality", target, AssumptionStatus.SKIPPED, severity,
+                "normality",
+                target,
+                AssumptionStatus.SKIPPED,
+                severity,
                 f"n={0 if arr is None else int(arr.size)} < min_n={min_n} — "
                 "normality test not reliable",
                 {"n": 0 if arr is None else int(arr.size), "min_n": min_n},
@@ -463,7 +550,8 @@ class AssumptionLog:
             sk, ku = _skew_kurtosis(arr)
             ok = abs(sk) < 1.0 and abs(ku) < 3.0
             return self.record(
-                "normality", target,
+                "normality",
+                target,
                 AssumptionStatus.PASS if ok else AssumptionStatus.VIOLATED,
                 severity,
                 "scipy unavailable — skew/excess-kurtosis heuristic",
@@ -472,23 +560,41 @@ class AssumptionLog:
         try:
             stat, p = _stats.normaltest(arr)
             sk, ku = _skew_kurtosis(arr)
-            ev = {"stat": float(stat), "p_value": float(p), "alpha": alpha,
-                  "skew": sk, "excess_kurtosis": ku, "n": int(arr.size),
-                  "test": "dagostino_pearson"}
+            ev = {
+                "stat": float(stat),
+                "p_value": float(p),
+                "alpha": alpha,
+                "skew": sk,
+                "excess_kurtosis": ku,
+                "n": int(arr.size),
+                "test": "dagostino_pearson",
+            }
             if p >= alpha:
                 return self.record(
-                    "normality", target, AssumptionStatus.PASS, severity,
-                    f"cannot reject normality (p={p:.3g})", ev,
+                    "normality",
+                    target,
+                    AssumptionStatus.PASS,
+                    severity,
+                    f"cannot reject normality (p={p:.3g})",
+                    ev,
                 )
             return self.record(
-                "normality", target, AssumptionStatus.VIOLATED, severity,
+                "normality",
+                target,
+                AssumptionStatus.VIOLATED,
+                severity,
                 f"non-normal (p={p:.3g}, skew={sk:.2f}, exkurt={ku:.2f}); "
-                "mean/std-based inference (z-scores, Sharpe SE) is biased", ev,
+                "mean/std-based inference (z-scores, Sharpe SE) is biased",
+                ev,
             )
         except Exception as exc:  # pragma: no cover - defensive
             return self.record(
-                "normality", target, AssumptionStatus.ERROR, severity,
-                f"normality test raised: {exc}", {},
+                "normality",
+                target,
+                AssumptionStatus.ERROR,
+                severity,
+                f"normality test raised: {exc}",
+                {},
             )
 
     def iid_no_autocorrelation(
@@ -511,7 +617,9 @@ class AssumptionLog:
         arr = _to_float_array(series)
         if arr is None or arr.size < min_n:
             return self.record(
-                "iid_no_autocorrelation", target, AssumptionStatus.SKIPPED,
+                "iid_no_autocorrelation",
+                target,
+                AssumptionStatus.SKIPPED,
                 severity,
                 f"n={0 if arr is None else int(arr.size)} < min_n={min_n} — "
                 "autocorrelation test not reliable",
@@ -521,25 +629,39 @@ class AssumptionLog:
         # Preferred: Ljung-Box joint test.
         try:
             from statsmodels.stats.diagnostic import acorr_ljungbox  # lazy
+
             lb = acorr_ljungbox(arr, lags=[use_lags], return_df=True)
             p = float(lb["lb_pvalue"].iloc[-1])
             stat = float(lb["lb_stat"].iloc[-1])
             ac1 = _lag1_autocorr(arr)
-            ev = {"test": "ljung_box", "lags": use_lags, "lb_stat": stat,
-                  "p_value": p, "alpha": alpha, "lag1_autocorr": ac1,
-                  "n": int(arr.size)}
+            ev = {
+                "test": "ljung_box",
+                "lags": use_lags,
+                "lb_stat": stat,
+                "p_value": p,
+                "alpha": alpha,
+                "lag1_autocorr": ac1,
+                "n": int(arr.size),
+            }
             if p >= alpha:
                 return self.record(
-                    "iid_no_autocorrelation", target, AssumptionStatus.PASS,
-                    severity, f"no significant autocorrelation (p={p:.3g})", ev,
+                    "iid_no_autocorrelation",
+                    target,
+                    AssumptionStatus.PASS,
+                    severity,
+                    f"no significant autocorrelation (p={p:.3g})",
+                    ev,
                 )
             deflation = _autocorr_se_inflation(ac1)
             ev["approx_se_inflation"] = deflation
             return self.record(
-                "iid_no_autocorrelation", target, AssumptionStatus.VIOLATED,
+                "iid_no_autocorrelation",
+                target,
+                AssumptionStatus.VIOLATED,
                 severity,
                 f"serial dependence (Ljung-Box p={p:.3g}, lag1={ac1:.2f}); "
-                f"IID t-stats/Sharpe overstate significance by ~{deflation:.2f}x", ev,
+                f"IID t-stats/Sharpe overstate significance by ~{deflation:.2f}x",
+                ev,
             )
         except Exception:
             pass
@@ -547,24 +669,34 @@ class AssumptionLog:
         ac1 = _lag1_autocorr(arr)
         if ac1 is None:
             return self.record(
-                "iid_no_autocorrelation", target, AssumptionStatus.SKIPPED,
-                severity, "could not compute lag-1 autocorrelation", {},
+                "iid_no_autocorrelation",
+                target,
+                AssumptionStatus.SKIPPED,
+                severity,
+                "could not compute lag-1 autocorrelation",
+                {},
             )
         se = 1.0 / math.sqrt(arr.size)
         z = ac1 / se if se > 0 else 0.0
-        ev = {"test": "lag1_z", "lag1_autocorr": ac1, "z": z,
-              "n": int(arr.size)}
+        ev = {"test": "lag1_z", "lag1_autocorr": ac1, "z": z, "n": int(arr.size)}
         if abs(z) < 1.96:
             return self.record(
-                "iid_no_autocorrelation", target, AssumptionStatus.PASS,
-                severity, f"lag-1 autocorr not significant (z={z:.2f})", ev,
+                "iid_no_autocorrelation",
+                target,
+                AssumptionStatus.PASS,
+                severity,
+                f"lag-1 autocorr not significant (z={z:.2f})",
+                ev,
             )
         ev["approx_se_inflation"] = _autocorr_se_inflation(ac1)
         return self.record(
-            "iid_no_autocorrelation", target, AssumptionStatus.VIOLATED,
+            "iid_no_autocorrelation",
+            target,
+            AssumptionStatus.VIOLATED,
             severity,
             f"lag-1 autocorrelation {ac1:.2f} significant (z={z:.2f}); "
-            "IID assumption behind annualised Sharpe / IC t-stat is violated", ev,
+            "IID assumption behind annualised Sharpe / IC t-stat is violated",
+            ev,
         )
 
     def stationarity(
@@ -585,7 +717,10 @@ class AssumptionLog:
         arr = _to_float_array(series)
         if arr is None or arr.size < min_n:
             return self.record(
-                "stationarity", target, AssumptionStatus.SKIPPED, severity,
+                "stationarity",
+                target,
+                AssumptionStatus.SKIPPED,
+                severity,
                 f"n={0 if arr is None else int(arr.size)} < min_n={min_n} — "
                 "ADF unit-root test not reliable",
                 {"n": 0 if arr is None else int(arr.size), "min_n": min_n},
@@ -594,27 +729,48 @@ class AssumptionLog:
             from statsmodels.tsa.stattools import adfuller  # lazy
         except Exception:
             return self.record(
-                "stationarity", target, AssumptionStatus.SKIPPED, severity,
-                "statsmodels unavailable — cannot run ADF unit-root test", {},
+                "stationarity",
+                target,
+                AssumptionStatus.SKIPPED,
+                severity,
+                "statsmodels unavailable — cannot run ADF unit-root test",
+                {},
             )
         try:
             stat, p, *_ = adfuller(arr, autolag="AIC")
-            ev = {"test": "adf", "adf_stat": float(stat), "p_value": float(p),
-                  "alpha": alpha, "n": int(arr.size)}
+            ev = {
+                "test": "adf",
+                "adf_stat": float(stat),
+                "p_value": float(p),
+                "alpha": alpha,
+                "n": int(arr.size),
+            }
             if p < alpha:
                 return self.record(
-                    "stationarity", target, AssumptionStatus.PASS, severity,
-                    f"reject unit root -> stationary (p={p:.3g})", ev,
+                    "stationarity",
+                    target,
+                    AssumptionStatus.PASS,
+                    severity,
+                    f"reject unit root -> stationary (p={p:.3g})",
+                    ev,
                 )
             return self.record(
-                "stationarity", target, AssumptionStatus.VIOLATED, severity,
+                "stationarity",
+                target,
+                AssumptionStatus.VIOLATED,
+                severity,
                 f"cannot reject unit root (p={p:.3g}); series is likely "
-                "non-stationary — models fit on levels are mis-specified", ev,
+                "non-stationary — models fit on levels are mis-specified",
+                ev,
             )
         except Exception as exc:  # pragma: no cover - defensive
             return self.record(
-                "stationarity", target, AssumptionStatus.ERROR, severity,
-                f"ADF raised: {exc}", {},
+                "stationarity",
+                target,
+                AssumptionStatus.ERROR,
+                severity,
+                f"ADF raised: {exc}",
+                {},
             )
 
     def overlapping_windows(
@@ -633,30 +789,47 @@ class AssumptionLog:
         approximate variance-inflation / effective-sample deflation factor."""
         if step_days is None or horizon_days is None:
             return self.record(
-                "overlapping_windows", target, AssumptionStatus.SKIPPED,
-                severity, "step or horizon unknown — cannot assess overlap",
+                "overlapping_windows",
+                target,
+                AssumptionStatus.SKIPPED,
+                severity,
+                "step or horizon unknown — cannot assess overlap",
                 {"step_days": step_days, "horizon_days": horizon_days},
             )
         if step_days <= 0 or horizon_days <= 0:
             return self.record(
-                "overlapping_windows", target, AssumptionStatus.SKIPPED,
-                severity, "non-positive step/horizon", {},
+                "overlapping_windows",
+                target,
+                AssumptionStatus.SKIPPED,
+                severity,
+                "non-positive step/horizon",
+                {},
             )
         overlap = horizon_days / step_days  # ~ how many samples share a window
-        ev = {"step_days": step_days, "horizon_days": horizon_days,
-              "overlap_ratio": round(overlap, 3),
-              "approx_var_inflation": round(overlap, 3)}
+        ev = {
+            "step_days": step_days,
+            "horizon_days": horizon_days,
+            "overlap_ratio": round(overlap, 3),
+            "approx_var_inflation": round(overlap, 3),
+        }
         if overlap <= 1.0 + 1e-9:
             return self.record(
-                "overlapping_windows", target, AssumptionStatus.PASS, severity,
-                f"step ({step_days}d) >= horizon ({horizon_days}d): "
-                "non-overlapping samples", ev,
+                "overlapping_windows",
+                target,
+                AssumptionStatus.PASS,
+                severity,
+                f"step ({step_days}d) >= horizon ({horizon_days}d): non-overlapping samples",
+                ev,
             )
         return self.record(
-            "overlapping_windows", target, AssumptionStatus.VIOLATED, severity,
+            "overlapping_windows",
+            target,
+            AssumptionStatus.VIOLATED,
+            severity,
             f"horizon {horizon_days}d > step {step_days}d: samples overlap "
             f"~{overlap:.1f}x. IID t-stats inflated ~{math.sqrt(overlap):.2f}x; "
-            "use Newey-West/HAC or non-overlapping sampling", ev,
+            "use Newey-West/HAC or non-overlapping sampling",
+            ev,
         )
 
     def multiple_testing(
@@ -673,7 +846,10 @@ class AssumptionLog:
         t-stat under the null, so a lone t>2 can be judged in context."""
         if n_trials is None or n_trials <= 0:
             return self.record(
-                "multiple_testing", target, AssumptionStatus.SKIPPED, severity,
+                "multiple_testing",
+                target,
+                AssumptionStatus.SKIPPED,
+                severity,
                 "number of trials unknown — cannot contextualise significance",
                 {"alpha": alpha},
             )
@@ -681,16 +857,27 @@ class AssumptionLog:
         sidak = 1.0 - (1.0 - alpha) ** (1.0 / n_trials)
         # Expected maximum |t| under the null across n_trials ~ sqrt(2 ln N).
         exp_max_t = math.sqrt(2.0 * math.log(n_trials)) if n_trials > 1 else 0.0
-        ev = {"n_trials": n_trials, "alpha": alpha,
-              "bonferroni_alpha": bonferroni, "sidak_alpha": sidak,
-              "expected_max_null_t": round(exp_max_t, 3)}
+        ev = {
+            "n_trials": n_trials,
+            "alpha": alpha,
+            "bonferroni_alpha": bonferroni,
+            "sidak_alpha": sidak,
+            "expected_max_null_t": round(exp_max_t, 3),
+        }
         if n_trials == 1:
             return self.record(
-                "multiple_testing", target, AssumptionStatus.PASS, severity,
-                "single trial — no multiple-testing adjustment needed", ev,
+                "multiple_testing",
+                target,
+                AssumptionStatus.PASS,
+                severity,
+                "single trial — no multiple-testing adjustment needed",
+                ev,
             )
         return self.record(
-            "multiple_testing", target, AssumptionStatus.VIOLATED, severity,
+            "multiple_testing",
+            target,
+            AssumptionStatus.VIOLATED,
+            severity,
             f"{n_trials} trials: naive alpha={alpha} should be tightened to "
             f"~{bonferroni:.2g} (Bonferroni); expected best-of-N |t| under the "
             f"null is ~{exp_max_t:.2f}. A single t>2 is not significant here.",
@@ -719,9 +906,9 @@ class AssumptionLog:
         }
         threshold = order[min_severity] if min_severity else -1
         return [
-            r for r in self.records
-            if r.status == AssumptionStatus.VIOLATED
-            and order[r.severity] >= threshold
+            r
+            for r in self.records
+            if r.status == AssumptionStatus.VIOLATED and order[r.severity] >= threshold
         ]
 
     def to_jsonl(self, path: str) -> int:
@@ -745,8 +932,12 @@ class AssumptionLog:
             f"  skipped(no info): {counts[AssumptionStatus.SKIPPED.value]}",
             f"  error         : {counts[AssumptionStatus.ERROR.value]}",
         ]
-        sev_order = [AssumptionSeverity.CRITICAL, AssumptionSeverity.HIGH,
-                     AssumptionSeverity.MEDIUM, AssumptionSeverity.LOW]
+        sev_order = [
+            AssumptionSeverity.CRITICAL,
+            AssumptionSeverity.HIGH,
+            AssumptionSeverity.MEDIUM,
+            AssumptionSeverity.LOW,
+        ]
         viols = self.violations()
         if viols:
             lines.append("")
@@ -803,8 +994,11 @@ def _to_float_array(data: Any):
     except Exception:
         return None
     try:
-        arr = np.asarray(list(data), dtype="float64") if not hasattr(data, "dtype") \
+        arr = (
+            np.asarray(list(data), dtype="float64")
+            if not hasattr(data, "dtype")
             else np.asarray(data, dtype="float64")
+        )
         arr = arr[np.isfinite(arr)]
         return arr
     except Exception:
@@ -814,6 +1008,7 @@ def _to_float_array(data: Any):
 def _skew_kurtosis(arr) -> tuple[float, float]:
     """Sample skew and *excess* kurtosis (0 == normal)."""
     import numpy as np
+
     x = np.asarray(arr, dtype="float64")
     n = x.size
     if n < 3:
@@ -823,20 +1018,21 @@ def _skew_kurtosis(arr) -> tuple[float, float]:
     if s <= 0:
         return 0.0, 0.0
     z = (x - m) / s
-    skew = float(np.mean(z ** 3))
-    exkurt = float(np.mean(z ** 4) - 3.0)
+    skew = float(np.mean(z**3))
+    exkurt = float(np.mean(z**4) - 3.0)
     return skew, exkurt
 
 
 def _lag1_autocorr(arr) -> Optional[float]:
     try:
         import numpy as np
+
         x = np.asarray(arr, dtype="float64")
         if x.size < 3:
             return None
         x0 = x[:-1] - x[:-1].mean()
         x1 = x[1:] - x[1:].mean()
-        denom = math.sqrt(float((x0 ** 2).sum()) * float((x1 ** 2).sum()))
+        denom = math.sqrt(float((x0**2).sum()) * float((x1**2).sum()))
         if denom <= 0:
             return None
         return float((x0 * x1).sum() / denom)
@@ -862,6 +1058,7 @@ def _to_timestamp(x: Any):
         return None
     try:
         import pandas as pd
+
         ts = pd.Timestamp(x)
         if pd.isna(ts):
             return None
@@ -890,6 +1087,7 @@ def _resolve_default_config() -> tuple[bool, Optional[str]]:
     # Layer 1: application settings, if available.
     try:
         from config import settings  # optional
+
         enabled = bool(getattr(settings, "assumption_audit_enabled", True))
         jsonl = getattr(settings, "assumption_audit_log_path", None) or None
     except Exception:

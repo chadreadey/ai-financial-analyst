@@ -139,9 +139,7 @@ def _passed(
 ) -> CheckResult:
     # Severity travels with passing results too, so a check that only ever
     # passes still reports the right gating category.
-    return CheckResult(
-        name=name, passed=True, detail=detail, severity=severity, metric=metric
-    )
+    return CheckResult(name=name, passed=True, detail=detail, severity=severity, metric=metric)
 
 
 def _failed(
@@ -150,9 +148,7 @@ def _failed(
     severity: Severity = "error",
     metric: Optional[float] = None,
 ) -> CheckResult:
-    return CheckResult(
-        name=name, passed=False, detail=detail, severity=severity, metric=metric
-    )
+    return CheckResult(name=name, passed=False, detail=detail, severity=severity, metric=metric)
 
 
 def _as_float(value: Any) -> Optional[float]:
@@ -199,9 +195,7 @@ def check_call_succeeded(case: SynthesisCase, sample: Sample) -> CheckResult:
 
 
 @synthesis_check
-def check_structured_block_present(
-    case: SynthesisCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_structured_block_present(case: SynthesisCase, sample: Sample) -> Optional[CheckResult]:
     if sample.error:
         return None
     if sample.structured is None:
@@ -228,9 +222,7 @@ def check_schema_valid(case: SynthesisCase, sample: Sample) -> Optional[CheckRes
 
 
 @synthesis_check
-def check_signal_weights_canonical(
-    case: SynthesisCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_signal_weights_canonical(case: SynthesisCase, sample: Sample) -> Optional[CheckResult]:
     if not sample.structured:
         return None
     breakdown = sample.structured.get("signal_breakdown")
@@ -252,9 +244,7 @@ def check_signal_weights_canonical(
 
 
 @synthesis_check
-def check_weighted_score_arithmetic(
-    case: SynthesisCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_weighted_score_arithmetic(case: SynthesisCase, sample: Sample) -> Optional[CheckResult]:
     """Recompute the sum from the model's *own* scores and weights."""
     if not sample.structured:
         return None
@@ -299,9 +289,7 @@ def check_verdict_matches_weighted_score(
 
 
 @synthesis_check
-def check_conviction_consistent(
-    case: SynthesisCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_conviction_consistent(case: SynthesisCase, sample: Sample) -> Optional[CheckResult]:
     if not sample.structured:
         return None
     weighted = _as_float(sample.structured.get("weighted_score"))
@@ -312,9 +300,7 @@ def check_conviction_consistent(
 
     problems = []
     if abs(abs(weighted) - score) > ARITHMETIC_TOLERANCE:
-        problems.append(
-            f"conviction_score {score:.4f} != abs(weighted_score) {abs(weighted):.4f}"
-        )
+        problems.append(f"conviction_score {score:.4f} != abs(weighted_score) {abs(weighted):.4f}")
     expected_label = contracts.conviction_for_score(score)
     if label != expected_label:
         problems.append(f"conviction {label!r} should be {expected_label!r}")
@@ -324,9 +310,7 @@ def check_conviction_consistent(
 
 
 @synthesis_check
-def check_sizing_matches_verdict(
-    case: SynthesisCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_sizing_matches_verdict(case: SynthesisCase, sample: Sample) -> Optional[CheckResult]:
     if not sample.structured:
         return None
     verdict = str(sample.structured.get("verdict") or "").upper().strip()
@@ -343,9 +327,7 @@ def check_sizing_matches_verdict(
 
 
 @synthesis_check
-def check_probabilities_sum_to_100(
-    case: SynthesisCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_probabilities_sum_to_100(case: SynthesisCase, sample: Sample) -> Optional[CheckResult]:
     if not sample.structured:
         return None
     bull = _as_float(sample.structured.get("prior_bull_probability"))
@@ -363,9 +345,7 @@ def check_probabilities_sum_to_100(
 
 
 @synthesis_check
-def check_health_scores_complete(
-    case: SynthesisCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_health_scores_complete(case: SynthesisCase, sample: Sample) -> Optional[CheckResult]:
     if not sample.structured:
         return None
     health = sample.structured.get("health_scores")
@@ -389,9 +369,7 @@ def check_health_scores_complete(
 
 
 @synthesis_check
-def check_signal_scores_faithful(
-    case: SynthesisCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_signal_scores_faithful(case: SynthesisCase, sample: Sample) -> Optional[CheckResult]:
     """
     The prompt says to copy a supplied ``SIGNAL_SCORE`` verbatim rather than
     re-derive it from the prose. This is the sharpest instruction-following
@@ -424,9 +402,7 @@ def check_signal_scores_faithful(
 
 
 @synthesis_check
-def check_verdict_matches_expected(
-    case: SynthesisCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_verdict_matches_expected(case: SynthesisCase, sample: Sample) -> Optional[CheckResult]:
     """End-to-end: does the verdict match what the spec implies for this input?"""
     if not sample.structured or not case.has_complete_signal_scores():
         return None
@@ -462,9 +438,7 @@ def check_weighted_score_matches_expected(
 
 
 @synthesis_check
-def check_entry_price_grounded(
-    case: SynthesisCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_entry_price_grounded(case: SynthesisCase, sample: Sample) -> Optional[CheckResult]:
     if not sample.structured or not case.current_price:
         return None
     entry = _as_float(sample.structured.get("entry_price"))
@@ -474,8 +448,7 @@ def check_entry_price_grounded(
     if drift > ENTRY_PRICE_DRIFT_TOLERANCE:
         return _failed(
             "entry_price_grounded",
-            f"entry_price {entry} drifts {drift:.1%} from supplied price "
-            f"{case.current_price}",
+            f"entry_price {entry} drifts {drift:.1%} from supplied price {case.current_price}",
             metric=drift,
         )
     return _passed("entry_price_grounded", metric=drift)
@@ -509,9 +482,7 @@ def check_stop_loss_valid(case: SynthesisCase, sample: Sample) -> Optional[Check
 
 
 @synthesis_check
-def check_price_target_direction(
-    case: SynthesisCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_price_target_direction(case: SynthesisCase, sample: Sample) -> Optional[CheckResult]:
     if not sample.structured:
         return None
     entry = _as_float(sample.structured.get("entry_price")) or case.current_price
@@ -533,9 +504,7 @@ def check_price_target_direction(
 
 
 @synthesis_check
-def check_no_ungrounded_sources(
-    case: SynthesisCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_no_ungrounded_sources(case: SynthesisCase, sample: Sample) -> Optional[CheckResult]:
     """
     Fields with no supporting input must stay null.
 
@@ -586,24 +555,18 @@ def check_json_block_first(case: SynthesisCase, sample: Sample) -> Optional[Chec
 
 
 @synthesis_check
-def check_brief_sections_present(
-    case: SynthesisCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_brief_sections_present(case: SynthesisCase, sample: Sample) -> Optional[CheckResult]:
     if sample.error:
         return None
     body = sample.prose or sample.output
     missing = [s for s in REQUIRED_BRIEF_SECTIONS if s.lower() not in body.lower()]
     if missing:
-        return _failed(
-            "brief_sections_present", f"missing sections: {missing}", severity="warn"
-        )
+        return _failed("brief_sections_present", f"missing sections: {missing}", severity="warn")
     return _passed("brief_sections_present", severity="warn")
 
 
 @synthesis_check
-def check_no_hedging_language(
-    case: SynthesisCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_no_hedging_language(case: SynthesisCase, sample: Sample) -> Optional[CheckResult]:
     if sample.error:
         return None
     body = sample.prose or sample.output
@@ -708,9 +671,7 @@ def check_signal_score_terminal(case: AgentCase, sample: Sample) -> Optional[Che
 
 
 @agent_check
-def check_earnings_structured_present(
-    case: AgentCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_earnings_structured_present(case: AgentCase, sample: Sample) -> Optional[CheckResult]:
     if case.agent != "earnings" or sample.error:
         return None
     if sample.structured is None:
@@ -766,9 +727,7 @@ def check_earnings_score_equals_breakdown_mean(
 
 
 @agent_check
-def check_withheld_fields_are_null(
-    case: AgentCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_withheld_fields_are_null(case: AgentCase, sample: Sample) -> Optional[CheckResult]:
     """
     Fabrication probe.
 
@@ -827,18 +786,14 @@ def check_pattern_vector_present(case: AgentCase, sample: Sample) -> Optional[Ch
 
 
 @agent_check
-def check_pattern_actionable_consistent(
-    case: AgentCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_pattern_actionable_consistent(case: AgentCase, sample: Sample) -> Optional[CheckResult]:
     """``prompts/pattern.md``: ``|composite_score| >= 0.40`` is actionable."""
     if case.agent != "pattern" or not sample.structured:
         return None
     composite = _as_float(sample.structured.get("composite_score"))
     actionable = sample.structured.get("actionable")
     if composite is None or not isinstance(actionable, bool):
-        return _failed(
-            "pattern_actionable_consistent", "composite_score or actionable missing"
-        )
+        return _failed("pattern_actionable_consistent", "composite_score or actionable missing")
     expected = abs(composite) >= contracts.PATTERN_ACTIONABLE_THRESHOLD
     if actionable != expected:
         return _failed(
@@ -849,17 +804,13 @@ def check_pattern_actionable_consistent(
 
 
 @agent_check
-def check_pattern_direction_consistent(
-    case: AgentCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_pattern_direction_consistent(case: AgentCase, sample: Sample) -> Optional[CheckResult]:
     if case.agent != "pattern" or not sample.structured:
         return None
     composite = _as_float(sample.structured.get("composite_score"))
     direction = str(sample.structured.get("composite_direction") or "").upper().strip()
     if composite is None or not direction:
-        return _failed(
-            "pattern_direction_consistent", "composite_score or direction missing"
-        )
+        return _failed("pattern_direction_consistent", "composite_score or direction missing")
     if direction not in contracts.PATTERN_DIRECTIONS:
         return _failed("pattern_direction_consistent", f"unknown direction {direction!r}")
     if composite > 0 and direction == "SELL":
@@ -881,9 +832,7 @@ def _pattern_signal(structured: dict, name: str) -> dict:
 
 
 @agent_check
-def check_pattern_composite_arithmetic(
-    case: AgentCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_pattern_composite_arithmetic(case: AgentCase, sample: Sample) -> Optional[CheckResult]:
     """Recompute the composite from the model's own per-signal scores."""
     if case.agent != "pattern" or not sample.structured:
         return None
@@ -907,9 +856,7 @@ def check_pattern_composite_arithmetic(
 
 
 @agent_check
-def check_pattern_atr_non_directional(
-    case: AgentCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_pattern_atr_non_directional(case: AgentCase, sample: Sample) -> Optional[CheckResult]:
     if case.agent != "pattern" or not sample.structured:
         return None
     score = _as_float(_pattern_signal(sample.structured, "atr_regime").get("score"))
@@ -925,9 +872,7 @@ def check_pattern_atr_non_directional(
 
 
 @agent_check
-def check_pattern_bollinger_formula(
-    case: AgentCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_pattern_bollinger_formula(case: AgentCase, sample: Sample) -> Optional[CheckResult]:
     if case.agent != "pattern" or not sample.structured:
         return None
     entry = _pattern_signal(sample.structured, "bollinger_pctb")
@@ -994,9 +939,7 @@ def check_pattern_sma_gate_flag(case: AgentCase, sample: Sample) -> Optional[Che
 
 
 @agent_check
-def check_red_flag_severities_valid(
-    case: AgentCase, sample: Sample
-) -> Optional[CheckResult]:
+def check_red_flag_severities_valid(case: AgentCase, sample: Sample) -> Optional[CheckResult]:
     if case.agent != "earnings" or not sample.structured:
         return None
     flags = sample.structured.get("red_flags")

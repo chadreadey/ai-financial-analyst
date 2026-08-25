@@ -92,9 +92,7 @@ def test_macro_multiplier_matches_prompt():
 
 @pytest.mark.parametrize("score", _score_sweep())
 def test_orchestrator_verdict_matches_contract(score):
-    assert orchestrator._verdict_from_weighted_score(score) == contracts.verdict_for_score(
-        score
-    )
+    assert orchestrator._verdict_from_weighted_score(score) == contracts.verdict_for_score(score)
 
 
 @pytest.mark.parametrize("score", [abs(s) for s in _score_sweep()])
@@ -111,8 +109,14 @@ def test_sizing_defined_for_every_verdict():
 
 
 def test_weighted_score_is_plain_weighted_sum():
-    signals = {"dcf": 0.5, "risk": 0.4, "earnings": 0.9, "competitive": 0.8,
-               "pattern": 0.8, "macro": 0.5}
+    signals = {
+        "dcf": 0.5,
+        "risk": 0.4,
+        "earnings": 0.9,
+        "competitive": 0.8,
+        "pattern": 0.8,
+        "macro": 0.5,
+    }
     expected = sum(v * contracts.SIGNAL_WEIGHTS[k] for k, v in signals.items())
     assert contracts.weighted_score_for_signals(signals) == pytest.approx(expected)
 
@@ -122,9 +126,7 @@ def test_adverse_macro_scales_the_total():
     benign = contracts.weighted_score_for_signals({**base, "macro": 0.0})
     adverse = contracts.weighted_score_for_signals({**base, "macro": -0.6})
 
-    raw_adverse = sum(
-        v * contracts.SIGNAL_WEIGHTS[k] for k, v in {**base, "macro": -0.6}.items()
-    )
+    raw_adverse = sum(v * contracts.SIGNAL_WEIGHTS[k] for k, v in {**base, "macro": -0.6}.items())
     assert adverse == pytest.approx(raw_adverse * contracts.ADVERSE_MACRO_MULTIPLIER)
     assert adverse < benign
 

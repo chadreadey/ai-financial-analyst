@@ -123,8 +123,7 @@ def _cmd_record(args: argparse.Namespace) -> int:
         report = asyncio.run(_run_suite(suite, config, args.provider))
         _emit(report, args)
         print(
-            f"  recorded {report.cassette_misses} new response(s) into "
-            f"evals/cassettes/{suite}.json"
+            f"  recorded {report.cassette_misses} new response(s) into evals/cassettes/{suite}.json"
         )
     return 0
 

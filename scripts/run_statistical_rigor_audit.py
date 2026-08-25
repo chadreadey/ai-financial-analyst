@@ -93,47 +93,58 @@ def audit_ic_file(log: AssumptionLog, path: str, data: dict) -> None:
                 t_stat = e.get("t_stat")
                 verdict = str(e.get("verdict", "")).lower()
 
-                with log.context(signal=sig, horizon=horizon_label,
-                                 reported_verdict=verdict):
-                    log.min_sample(target, n=n_dates, min_n=36,
-                                   severity=AssumptionSeverity.MEDIUM)
+                with log.context(signal=sig, horizon=horizon_label, reported_verdict=verdict):
+                    log.min_sample(target, n=n_dates, min_n=36, severity=AssumptionSeverity.MEDIUM)
 
                     # The central IC finding: overlapping windows.
                     ov = log.overlapping_windows(
-                        target, step_days=MONTHLY_STEP_DAYS,
+                        target,
+                        step_days=MONTHLY_STEP_DAYS,
                         horizon_days=horizon_days,
                     )
                     # If overlapping, deflate the reported t-stat and re-judge.
-                    if (ov.status == AssumptionStatus.VIOLATED
-                            and t_stat is not None
-                            and horizon_days):
+                    if (
+                        ov.status == AssumptionStatus.VIOLATED
+                        and t_stat is not None
+                        and horizon_days
+                    ):
                         inflation = math.sqrt(horizon_days / MONTHLY_STEP_DAYS)
                         adj_t = float(t_stat) / inflation
                         survives = abs(adj_t) >= 2.0
-                        status = (AssumptionStatus.PASS if survives
-                                  else AssumptionStatus.VIOLATED)
+                        status = AssumptionStatus.PASS if survives else AssumptionStatus.VIOLATED
                         # Only a problem if the artifact *claimed* significance.
                         claimed_sig = verdict in POSITIVE_VERDICTS or abs(float(t_stat)) >= 2.0
                         if claimed_sig and not survives:
                             status = AssumptionStatus.VIOLATED
                         log.record(
-                            "ic_significance_survives_overlap", target, status,
+                            "ic_significance_survives_overlap",
+                            target,
+                            status,
                             AssumptionSeverity.HIGH,
-                            (f"reported t={float(t_stat):.2f} -> overlap-adjusted "
-                             f"t~={adj_t:.2f} (÷{inflation:.2f}); "
-                             + ("still significant" if survives
-                                else "NO LONGER significant at |t|>=2")),
-                            {"reported_t": float(t_stat),
-                             "adjusted_t": round(adj_t, 3),
-                             "inflation_factor": round(inflation, 3),
-                             "reported_verdict": verdict},
+                            (
+                                f"reported t={float(t_stat):.2f} -> overlap-adjusted "
+                                f"t~={adj_t:.2f} (÷{inflation:.2f}); "
+                                + (
+                                    "still significant"
+                                    if survives
+                                    else "NO LONGER significant at |t|>=2"
+                                )
+                            ),
+                            {
+                                "reported_t": float(t_stat),
+                                "adjusted_t": round(adj_t, 3),
+                                "inflation_factor": round(inflation, 3),
+                                "reported_verdict": verdict,
+                            },
                         )
 
                     # We cannot test normality/independence of the IC series
                     # itself: only summary stats were stored. Log that gap.
                     log.record(
-                        "ic_series_available", target,
-                        AssumptionStatus.SKIPPED, AssumptionSeverity.LOW,
+                        "ic_series_available",
+                        target,
+                        AssumptionStatus.SKIPPED,
+                        AssumptionSeverity.LOW,
                         "artifact stored only mean/std/t of IC, not the per-date "
                         "IC series — cannot verify IID/normality of the IC draws",
                         {},
@@ -161,28 +172,39 @@ def audit_run_file(log: AssumptionLog, path: str, data: dict) -> None:
                 alpha = metrics.get("alpha_pct")
                 bench_sharpe = metrics.get("benchmark_sharpe")
 
-                log.finite(f"{name}.sharpe", sharpe,
-                           severity=AssumptionSeverity.LOW)
+                log.finite(f"{name}.sharpe", sharpe, severity=AssumptionSeverity.LOW)
                 # Independent-year sample behind the Sharpe.
-                log.min_sample(f"{name}.sharpe_years", n=len(yearly), min_n=10,
-                               severity=AssumptionSeverity.HIGH)
+                log.min_sample(
+                    f"{name}.sharpe_years",
+                    n=len(yearly),
+                    min_n=10,
+                    severity=AssumptionSeverity.HIGH,
+                )
                 if n_windows is not None:
-                    log.min_sample(f"{name}.wf_windows", n=n_windows, min_n=20,
-                                   severity=AssumptionSeverity.MEDIUM)
-                log.value_in_range(f"{name}.win_rate", win_rate, 0.0, 100.0,
-                                   severity=AssumptionSeverity.LOW)
+                    log.min_sample(
+                        f"{name}.wf_windows",
+                        n=n_windows,
+                        min_n=20,
+                        severity=AssumptionSeverity.MEDIUM,
+                    )
+                log.value_in_range(
+                    f"{name}.win_rate", win_rate, 0.0, 100.0, severity=AssumptionSeverity.LOW
+                )
 
                 # Benchmark Sharpe missing -> information-ratio / relative
                 # significance cannot be assessed.
                 log.record(
-                    "benchmark_comparable", f"{name}.alpha",
-                    (AssumptionStatus.SKIPPED if bench_sharpe is None
-                     else AssumptionStatus.PASS),
+                    "benchmark_comparable",
+                    f"{name}.alpha",
+                    (AssumptionStatus.SKIPPED if bench_sharpe is None else AssumptionStatus.PASS),
                     AssumptionSeverity.MEDIUM,
-                    ("alpha is reported as an arithmetic return spread; "
-                     "benchmark Sharpe is null so no risk-adjusted / regression "
-                     "alpha (beta-neutral) comparison is possible"
-                     if bench_sharpe is None else "benchmark Sharpe present"),
+                    (
+                        "alpha is reported as an arithmetic return spread; "
+                        "benchmark Sharpe is null so no risk-adjusted / regression "
+                        "alpha (beta-neutral) comparison is possible"
+                        if bench_sharpe is None
+                        else "benchmark Sharpe present"
+                    ),
                     {"alpha_pct": alpha, "benchmark_sharpe": bench_sharpe},
                 )
 
@@ -205,7 +227,8 @@ def audit_config_selection(log: AssumptionLog, run_files: list[str]) -> None:
             continue
         with log.context(module="config_selection", audit_dir=os.path.basename(d)):
             log.multiple_testing(
-                "composite_config_selection", n_trials=n_configs,
+                "composite_config_selection",
+                n_trials=n_configs,
                 severity=AssumptionSeverity.HIGH,
             )
 
@@ -258,8 +281,12 @@ def write_markdown_report(log: AssumptionLog, out_dir: str, jsonl_path: str) -> 
     lines.append(f"- error: **{counts['error']}**")
     lines.append(f"\nFull record stream: `{os.path.basename(jsonl_path)}`\n")
 
-    sev_order = [AssumptionSeverity.CRITICAL, AssumptionSeverity.HIGH,
-                 AssumptionSeverity.MEDIUM, AssumptionSeverity.LOW]
+    sev_order = [
+        AssumptionSeverity.CRITICAL,
+        AssumptionSeverity.HIGH,
+        AssumptionSeverity.MEDIUM,
+        AssumptionSeverity.LOW,
+    ]
     viols = log.violations()
     lines.append("## Violations by severity\n")
     if not viols:
@@ -274,8 +301,7 @@ def write_markdown_report(log: AssumptionLog, out_dir: str, jsonl_path: str) -> 
         for v in group:
             ctx = v.context
             ctx_str = ", ".join(
-                f"{k}={ctx[k]}" for k in ("artifact", "run", "signal", "horizon")
-                if k in ctx
+                f"{k}={ctx[k]}" for k in ("artifact", "run", "signal", "horizon") if k in ctx
             )
             msg = v.message.replace("|", "\\|")
             lines.append(f"| `{v.assumption}` | `{v.target}` | {ctx_str} | {msg} |")
@@ -308,12 +334,17 @@ def write_markdown_report(log: AssumptionLog, out_dir: str, jsonl_path: str) -> 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--audit-dir", default="docs/audit",
-                    help="Directory tree of audit artifacts to scan.")
-    ap.add_argument("--out", default="docs/audit/session-4-statistical-rigor",
-                    help="Output directory for the assumption log + report.")
-    ap.add_argument("--no-demo", action="store_true",
-                    help="Skip the live in-pipeline metric demonstration.")
+    ap.add_argument(
+        "--audit-dir", default="docs/audit", help="Directory tree of audit artifacts to scan."
+    )
+    ap.add_argument(
+        "--out",
+        default="docs/audit/session-4-statistical-rigor",
+        help="Output directory for the assumption log + report.",
+    )
+    ap.add_argument(
+        "--no-demo", action="store_true", help="Skip the live in-pipeline metric demonstration."
+    )
     args = ap.parse_args()
 
     os.makedirs(args.out, exist_ok=True)

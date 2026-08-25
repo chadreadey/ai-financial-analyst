@@ -7,6 +7,7 @@ Bundle 0 regression tests cover the audit findings the rewrite closes:
   F-007  verdict substring-trap classification
   F-005  non-reentrant rebalance
 """
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -54,6 +55,7 @@ def test_rebalance_job_runs_analysis_and_submits_orders(
 
 def test_scheduler_starts_without_error():
     from backend.paper_scheduler import create_scheduler
+
     scheduler = create_scheduler(start=False)
     assert scheduler is not None
 
