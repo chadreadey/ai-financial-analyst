@@ -128,6 +128,32 @@ def _extract_earnings_structured(agent_text: str) -> Optional[dict]:
     return None
 
 
+def _verdict_from_weighted_score(weighted_score: float) -> str:
+    """
+    Map a weighted score to a verdict using the Step 3 table in
+    ``prompts/synthesis.md``. Kept in sync with ``evals.contracts`` by
+    ``tests/test_evals_contracts.py``.
+    """
+    if weighted_score >= 0.60:
+        return "STRONG BUY"
+    if weighted_score >= 0.30:
+        return "BUY"
+    if weighted_score <= -0.60:
+        return "STRONG SELL"
+    if weighted_score <= -0.30:
+        return "SELL"
+    return "HOLD"
+
+
+def _conviction_label(conviction_score: float) -> str:
+    """Map ``abs(weighted_score)`` to a conviction label (Step 3)."""
+    if conviction_score >= 0.60:
+        return "HIGH"
+    if conviction_score >= 0.30:
+        return "MEDIUM"
+    return "LOW"
+
+
 SYNTHESIS_PROMPT_FILE = Path("prompts/synthesis.md")
 
 SECTOR_SPECIALIST_MAP: dict[str, str] = {
@@ -831,6 +857,15 @@ class Orchestrator:
         )
 
         structured, synthesis = _extract_structured_block(raw_synthesis)
+        if structured is None:
+            # Everything below — verdict, price target, history persistence,
+            # paper trading — is skipped when this happens, so it needs to be
+            # visible rather than an empty structured_verdict downstream.
+            logger.warning(
+                "Synthesis did not emit parseable structured JSON for %s; "
+                "returning prose only with no verdict",
+                data.ticker,
+            )
 
         if structured:
             # Force entry_price to actual current market price — never trust the LLM for this
@@ -936,16 +971,7 @@ class Orchestrator:
                     structured["conviction_score"] = conviction_score
 
                     # Deterministic verdict from weighted_score thresholds
-                    if weighted_score >= 0.60:
-                        det_verdict = "STRONG BUY"
-                    elif weighted_score >= 0.30:
-                        det_verdict = "BUY"
-                    elif weighted_score <= -0.60:
-                        det_verdict = "STRONG SELL"
-                    elif weighted_score <= -0.30:
-                        det_verdict = "SELL"
-                    else:
-                        det_verdict = "HOLD"
+                    det_verdict = _verdict_from_weighted_score(weighted_score)
                     llm_verdict = structured.get("verdict", "")
                     if llm_verdict != det_verdict:
                         logger.info(
@@ -957,12 +983,7 @@ class Orchestrator:
                     structured["verdict"] = det_verdict
 
                     # Deterministic conviction label
-                    if conviction_score >= 0.60:
-                        structured["conviction"] = "HIGH"
-                    elif conviction_score >= 0.30:
-                        structured["conviction"] = "MEDIUM"
-                    else:
-                        structured["conviction"] = "LOW"
+                    structured["conviction"] = _conviction_label(conviction_score)
                 else:
                     conviction_score = _as_float(structured.get("conviction_score"))
                 bull_prob = _as_float(structured.get("prior_bull_probability"))
@@ -1009,8 +1030,7 @@ class Orchestrator:
                 # submitter — otherwise both this path and the caller submit,
                 # doubling position size (see audit F-001).
                 _should_auto_trade = (
-                    settings.auto_paper_trade if auto_paper_trade is None
-                    else auto_paper_trade
+                    settings.auto_paper_trade if auto_paper_trade is None else auto_paper_trade
                 )
                 if _should_auto_trade:
                     _auto_paper_trade(data.ticker, structured)

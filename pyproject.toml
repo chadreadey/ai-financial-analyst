@@ -31,11 +31,13 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
+    "responses>=0.25.0",  # HTTP mocking used by tests/test_kalshi_client.py
+    "tzdata>=2024.1",
+    "redis>=5.0.0",
     "pre-commit>=4.0",
     "ruff>=0.15",
     "detect-secrets>=1.5",
     "mypy>=1.13",
-    "responses>=0.25",   # HTTP mocking used by tests/test_kalshi_client.py
 ]
 
 [build-system]

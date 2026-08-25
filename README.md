@@ -510,14 +510,38 @@ The FastAPI backend auto-generates interactive API docs at `/docs` (Swagger) and
 ## Tests
 
 ```bash
-pytest                                     # full suite (72+ tests)
+pip install -r requirements-dev.txt
+
+pytest                                     # full suite (870+ tests)
 pytest tests/test_metrics.py -v            # canonical metrics
 pytest tests/test_scoring.py -v            # threshold classification
 pytest tests/test_schema_validation.py -v  # API schema validation
 pytest tests/test_orchestrator.py -v       # pipeline integration
 ```
 
-Tests use `fakeredis`, `pytest-mock`, and `caplog` — no live API dependencies required.
+Tests are offline: external services are stubbed with `unittest.mock`,
+`responses`, and hand-rolled fakes, and LLM calls go through the `FakeProvider`
+fixture in `tests/conftest.py`. No API keys required.
+
+## Agent evals
+
+```bash
+python -m evals run --suite all      # offline; replays recorded responses
+python -m evals record --suite all   # live calls against the configured provider
+```
+
+The eval harness grades agent and synthesis output against the contracts the
+prompts specify — the weighted-score arithmetic and threshold table in
+`prompts/synthesis.md`, the `SIGNAL_SCORE = mean(verdict_breakdown)` rule in
+`prompts/earnings.md`, the composite formulas in `prompts/pattern.md` — plus
+schema validity, fabrication probes, and price/stop sanity. Graders are
+deterministic, so `run` needs no API key and gates CI in seconds.
+
+See [`docs/EVALS.md`](docs/EVALS.md) for the strategy, what to test for, and a
+framework comparison.
+
+Both `pytest` and the eval suites run on every pull request via
+`.github/workflows/ci.yml`.
 
 ---
 

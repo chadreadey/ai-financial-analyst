@@ -189,7 +189,10 @@ class TestOverlap:
         assert r.evidence["overlap_ratio"] == 12.0
 
     def test_skipped_missing(self, log):
-        assert log.overlapping_windows("ic", step_days=None, horizon_days=21).status == AssumptionStatus.SKIPPED
+        assert (
+            log.overlapping_windows("ic", step_days=None, horizon_days=21).status
+            == AssumptionStatus.SKIPPED
+        )
 
 
 # ── multiple_testing ─────────────────────────────────────────────────────
@@ -216,9 +219,9 @@ class TestLogMechanics:
         assert r.context["ticker"] == "NVDA"
 
     def test_counts_and_summary(self, log):
-        log.min_sample("a", n=50, min_n=30)     # pass
-        log.min_sample("b", n=5, min_n=30)      # violated
-        log.min_sample("c", n=None, min_n=30)   # skipped
+        log.min_sample("a", n=50, min_n=30)  # pass
+        log.min_sample("b", n=5, min_n=30)  # violated
+        log.min_sample("c", n=None, min_n=30)  # skipped
         counts = log.counts()
         assert counts["pass"] == 1
         assert counts["violated"] == 1
@@ -227,7 +230,7 @@ class TestLogMechanics:
 
     def test_violations_filter_by_severity(self, log):
         log.no_lookahead("px", "2025-01-01", "2024-01-01")  # CRITICAL violation
-        log.min_sample("b", n=5, min_n=30)                  # HIGH violation
+        log.min_sample("b", n=5, min_n=30)  # HIGH violation
         crit = log.violations(min_severity=AssumptionSeverity.CRITICAL)
         assert len(crit) == 1
         assert crit[0].assumption == "no_lookahead"
@@ -269,8 +272,10 @@ def test_pandas_series_inputs(log):
     """The checkers should accept pandas Series (the pipeline's native type)."""
     s = pd.Series(np.random.default_rng(9).standard_normal(300))
     assert log.iid_no_autocorrelation("s", s).status in (
-        AssumptionStatus.PASS, AssumptionStatus.VIOLATED,
+        AssumptionStatus.PASS,
+        AssumptionStatus.VIOLATED,
     )
     assert log.normality("s", s).status in (
-        AssumptionStatus.PASS, AssumptionStatus.VIOLATED,
+        AssumptionStatus.PASS,
+        AssumptionStatus.VIOLATED,
     )

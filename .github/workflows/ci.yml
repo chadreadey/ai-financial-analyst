@@ -2,16 +2,82 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   PYTHON_VERSION: "3.11"
 
 jobs:
+  tests:
+    name: pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: pytest -q
+
+  evals:
+    name: agent evals (offline)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      # Replays checked-in cassettes, so no API key is needed and no model is
+      # called. A cassette miss here means a prompt or eval case changed
+      # without a matching re-record; see docs/EVALS.md.
+      - name: Run eval suites
+        run: |
+          python -m evals run --suite all \
+            --json-out "eval-results/{suite}.json" \
+            --markdown-out "eval-results/{suite}.md"
+
+      - name: Publish results to the job summary
+        if: always()
+        run: cat eval-results/*.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      - name: Upload eval results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: eval-results/
+          if-no-files-found: warn
+
   lint:
     name: Lint (ruff)
     runs-on: ubuntu-latest
@@ -27,55 +93,6 @@ jobs:
         run: ruff check .
       - name: ruff format --check
         run: ruff format --check .
-
-  imports-sanity:
-    name: Imports sanity (compileall)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: pip-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('pyproject.toml', 'requirements.txt') }}
-      - name: Install lightweight subset (full runtime deps require torch/cvxpy)
-        run: |
-          python -m pip install --upgrade pip
-          pip install "pydantic>=2.0" "pandas>=2.0" "numpy>=1.24" "anthropic>=0.39" "python-dotenv>=1.0"
-      - name: Compile-check top-level modules
-        run: |
-          # Only compile-check modules that don't require heavy runtime deps.
-          # Full compile-check happens in unit-test job with full install.
-          python -m compileall -q models.py config.py utils.py context_budget.py prompt_loader.py || echo "compileall soft-fail"
-
-  unit-test:
-    name: Unit tests (pytest)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VERSION }}
-      - name: Cache pip
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pip
-          key: pip-${{ runner.os }}-py${{ env.PYTHON_VERSION }}-${{ hashFiles('pyproject.toml', 'requirements.txt') }}
-      - name: Install project + runtime deps + dev deps
-        run: |
-          python -m pip install --upgrade pip
-          # requirements.txt has runtime deps not yet mirrored in pyproject.toml
-          # (alpaca-py, APScheduler, redis, modal, etc.). Install both so pytest
-          # can import every module the tests depend on.
-          pip install -r requirements.txt
-          pip install -e ".[dev]"
-      - name: Run pytest
-        run: pytest tests/ --tb=short -m "not integration and not slow"
 
   secret-scan:
     name: Secret scan (detect-secrets)

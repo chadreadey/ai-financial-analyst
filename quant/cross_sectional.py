@@ -82,10 +82,12 @@ def _get_assumption_log():
     the audit module or the app config."""
     try:
         from quant.assumption_audit import get_audit_log
+
         log = get_audit_log()
         return log if log.enabled else None
     except Exception:
         return None
+
 
 SIGNAL_FIELDS = [
     ("obv_trend", "score"),

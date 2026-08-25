@@ -25,6 +25,7 @@ def _log_path() -> Optional[str]:
         return env
     try:
         from config import settings
+
         return getattr(settings, "assumption_audit_log_path", None)
     except Exception:
         return None
@@ -60,6 +61,7 @@ async def get_assumptions(
 
     try:
         from quant.assumption_audit import get_audit_log
+
         log = get_audit_log()
         records = [r.to_dict() for r in log.records]
     except Exception:
