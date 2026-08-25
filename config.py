@@ -126,6 +126,14 @@ class Settings(BaseSettings):
     # ── Logging ────────────────────────────────────────────────────
     log_level: str = "INFO"
 
+    # ── Assumption audit (stochastic assumption logger) ─────────────
+    # When enabled, statistical routines that are instrumented with
+    # quant.assumption_audit record every assumption they rely on (min
+    # sample, IID/no-autocorrelation, silent zeros, look-ahead, ...) to a
+    # JSONL file. Read it with `python scripts/show_assumption_log.py`.
+    assumption_audit_enabled: bool = True
+    assumption_audit_log_path: str = "logs/assumptions.jsonl"
+
     # ── Warehouse ───────────────────────────────────────────────────
     enable_warehouse: bool = False
     warehouse_db_path: str = ".warehouse.db"
@@ -155,6 +163,12 @@ class Settings(BaseSettings):
     # ── Auto paper trading ────────────────────────────────────────────
     auto_paper_trade: bool = True
     auto_paper_trade_min_conviction: float = 0.40
+    # Wall-clock safety bounds for rebalance. A single hung upstream (LLM,
+    # SEC, FRED, Alpaca) must never freeze the rebalance loop or the API
+    # worker indefinitely. Per-ticker analysis and the whole rebalance are
+    # each bounded; on timeout the offending unit is abandoned, not retried.
+    rebalance_ticker_timeout_seconds: int = 900
+    rebalance_total_timeout_seconds: int = 3600
 
     # ── Internal service auth ────────────────────────────────────────────
     internal_api_key: str = Field(
