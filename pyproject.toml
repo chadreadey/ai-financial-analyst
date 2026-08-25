@@ -33,6 +33,7 @@ dev = [
     "pytest-asyncio>=0.23",
     "responses>=0.25.0",
     "tzdata>=2024.1",
+    "redis>=5.0.0",
 ]
 
 [build-system]
