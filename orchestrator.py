@@ -128,6 +128,32 @@ def _extract_earnings_structured(agent_text: str) -> Optional[dict]:
     return None
 
 
+def _verdict_from_weighted_score(weighted_score: float) -> str:
+    """
+    Map a weighted score to a verdict using the Step 3 table in
+    ``prompts/synthesis.md``. Kept in sync with ``evals.contracts`` by
+    ``tests/test_evals_contracts.py``.
+    """
+    if weighted_score >= 0.60:
+        return "STRONG BUY"
+    if weighted_score >= 0.30:
+        return "BUY"
+    if weighted_score <= -0.60:
+        return "STRONG SELL"
+    if weighted_score <= -0.30:
+        return "SELL"
+    return "HOLD"
+
+
+def _conviction_label(conviction_score: float) -> str:
+    """Map ``abs(weighted_score)`` to a conviction label (Step 3)."""
+    if conviction_score >= 0.60:
+        return "HIGH"
+    if conviction_score >= 0.30:
+        return "MEDIUM"
+    return "LOW"
+
+
 SYNTHESIS_PROMPT_FILE = Path("prompts/synthesis.md")
 
 SECTOR_SPECIALIST_MAP: dict[str, str] = {
@@ -888,16 +914,7 @@ class Orchestrator:
                     structured["conviction_score"] = conviction_score
 
                     # Deterministic verdict from weighted_score thresholds
-                    if weighted_score >= 0.60:
-                        det_verdict = "STRONG BUY"
-                    elif weighted_score >= 0.30:
-                        det_verdict = "BUY"
-                    elif weighted_score <= -0.60:
-                        det_verdict = "STRONG SELL"
-                    elif weighted_score <= -0.30:
-                        det_verdict = "SELL"
-                    else:
-                        det_verdict = "HOLD"
+                    det_verdict = _verdict_from_weighted_score(weighted_score)
                     llm_verdict = structured.get("verdict", "")
                     if llm_verdict != det_verdict:
                         logger.info(
@@ -907,12 +924,7 @@ class Orchestrator:
                     structured["verdict"] = det_verdict
 
                     # Deterministic conviction label
-                    if conviction_score >= 0.60:
-                        structured["conviction"] = "HIGH"
-                    elif conviction_score >= 0.30:
-                        structured["conviction"] = "MEDIUM"
-                    else:
-                        structured["conviction"] = "LOW"
+                    structured["conviction"] = _conviction_label(conviction_score)
                 else:
                     conviction_score = _as_float(structured.get("conviction_score"))
                 bull_prob = _as_float(structured.get("prior_bull_probability"))

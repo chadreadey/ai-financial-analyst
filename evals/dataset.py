@@ -12,7 +12,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Iterator, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from evals.contracts import ExpectedDecision, signal_scores_from_reports
 
@@ -92,7 +92,7 @@ class AgentCase(BaseModel):
     expect: Dict[str, Any] = Field(default_factory=dict)
 
 
-def _iter_jsonl(path: Path) -> Iterator[dict]:
+def _iter_jsonl(path: Path) -> Iterator[tuple[int, dict]]:
     if not path.exists():
         raise FileNotFoundError(f"No eval case file at {path}")
     with path.open(encoding="utf-8") as handle:
@@ -101,23 +101,28 @@ def _iter_jsonl(path: Path) -> Iterator[dict]:
             if not line or line.startswith("//"):
                 continue
             try:
-                yield json.loads(line)
+                yield lineno, json.loads(line)
             except json.JSONDecodeError as exc:
                 raise ValueError(f"{path}:{lineno} is not valid JSON: {exc}") from exc
 
 
-def load_synthesis_cases(path: Optional[Path] = None) -> list[SynthesisCase]:
-    source = path or CASES_DIR / "synthesis.jsonl"
-    cases = [SynthesisCase.model_validate(row) for row in _iter_jsonl(source)]
-    _assert_unique_ids(cases, source)
+def _load(path: Path, model: type) -> list:
+    cases = []
+    for lineno, row in _iter_jsonl(path):
+        try:
+            cases.append(model.model_validate(row))
+        except ValidationError as exc:
+            raise ValueError(f"{path}:{lineno} is not a valid case: {exc}") from exc
+    _assert_unique_ids(cases, path)
     return cases
+
+
+def load_synthesis_cases(path: Optional[Path] = None) -> list[SynthesisCase]:
+    return _load(path or CASES_DIR / "synthesis.jsonl", SynthesisCase)
 
 
 def load_agent_cases(path: Optional[Path] = None) -> list[AgentCase]:
-    source = path or CASES_DIR / "agents.jsonl"
-    cases = [AgentCase.model_validate(row) for row in _iter_jsonl(source)]
-    _assert_unique_ids(cases, source)
-    return cases
+    return _load(path or CASES_DIR / "agents.jsonl", AgentCase)
 
 
 def _assert_unique_ids(cases: list, source: Path) -> None:
