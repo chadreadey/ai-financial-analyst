@@ -28,6 +28,8 @@ phase0_*.json
 .xgb_features_*.csv
 # Modal CPCV run summaries (written by scripts/run_modal_cpcv.py)
 runs/
+# Assumption logger runtime sink (quant/assumption_audit.py)
+logs/
 
 # Superpowers / agent workspaces
 .superpowers/
