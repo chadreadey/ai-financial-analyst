@@ -49,7 +49,7 @@ npm run dev                 # http://localhost:5173
 
 Key environment variables (see `.env.example` and the full reference under Research notes):
 
-- `ANTHROPIC_API_KEY` with `LLM_PROVIDER=anthropic` (default model `claude-opus-5-5`)
+- `ANTHROPIC_API_KEY` with `LLM_PROVIDER=anthropic` (default model `claude-sonnet-5-5`)
 - `TIINGO_API_KEY` (or Alpaca keys with `PRICE_PROVIDER=alpaca`), `FMP_API_KEY`, `FINNHUB_API_KEY`, `TAVILY_API_KEY`
 - `INTERNAL_API_KEY` to unlock the `/lab` area and the protected backend routes
 - `CORS_ORIGINS` for a deployed frontend; `VITE_API_URL` on the frontend
@@ -122,7 +122,7 @@ Input: AAPL
 | Backend API | FastAPI + Uvicorn (Python 3.11+) |
 | Analysis engine | asyncio orchestrator, 6 parallel agents |
 | Quant engine | Walk-forward backtesting, CPCV, signal stress testing |
-| LLM | Anthropic Claude (`claude-opus-5-5` default), OpenAI-compatible fallback |
+| LLM | Anthropic Claude (`claude-sonnet-5-5` default), OpenAI-compatible fallback |
 | Market data | Alpaca (primary, switchable) / Tiingo (price history + quotes), FMP (fundamentals + estimates), Finnhub (sentiment + earnings), FRED (macro) |
 | SEC data | SEC EDGAR API + edgartools + XBRL parser |
 | RAG | Pinecone (index: `financial-analyst`) |
@@ -629,7 +629,7 @@ Both `pytest` and the eval suites run on every pull request via
 
 - **Python 3.11+** — FastAPI, Pydantic v2, asyncio, SQLite
 - **Node 22.12+** — Vite 6, React 19, TypeScript, Tailwind CSS v3
-- **LLM** — Anthropic Claude (`claude-opus-5-5` default)
+- **LLM** — Anthropic Claude (`claude-sonnet-5-5` default)
 - **Market data** — Alpaca / Tiingo (switchable), FMP, Finnhub, FRED, Yahoo Finance (fallback)
 - **SEC** — EDGAR API, edgartools, custom XBRL parser
 - **RAG** — Pinecone
