@@ -84,7 +84,7 @@ Input: AAPL
 | Backend API | FastAPI + Uvicorn (Python 3.11+) |
 | Analysis engine | asyncio orchestrator, 6 parallel agents |
 | Quant engine | Walk-forward backtesting, CPCV, signal stress testing |
-| LLM | Anthropic Claude (`claude-sonnet-4-20250514` default), OpenAI-compatible fallback |
+| LLM | Anthropic Claude (`claude-opus-5-5` default), OpenAI-compatible fallback |
 | Market data | Alpaca (primary, switchable) / Tiingo (price history + quotes), FMP (fundamentals + estimates), Finnhub (sentiment + earnings), FRED (macro) |
 | SEC data | SEC EDGAR API + edgartools + XBRL parser |
 | RAG | Pinecone (index: `financial-analyst`) |
@@ -589,7 +589,7 @@ Both `pytest` and the eval suites run on every pull request via
 
 - **Python 3.11+** — FastAPI, Pydantic v2, asyncio, SQLite
 - **Node 18+** — Vite 6, React 19, TypeScript, Tailwind CSS v3
-- **LLM** — Anthropic Claude (`claude-sonnet-4-20250514`)
+- **LLM** — Anthropic Claude (`claude-opus-5-5` default)
 - **Market data** — Alpaca / Tiingo (switchable), FMP, Finnhub, FRED, Yahoo Finance (fallback)
 - **SEC** — EDGAR API, edgartools, custom XBRL parser
 - **RAG** — Pinecone

@@ -50,7 +50,7 @@ class AnthropicProvider(LLMProvider):
     """Anthropic Claude provider."""
 
     name = "anthropic"
-    default_model = "claude-sonnet-4-20250514"
+    default_model = "claude-opus-5-5"
 
     def __init__(self, api_key: Optional[str] = None):
         import os
