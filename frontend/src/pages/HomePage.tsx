@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
+  EXAMPLE_TICKERS,
   fetchShowcaseIndex,
   formatCompanyName,
   resolveTickerRoute,
@@ -14,23 +15,21 @@ export function HomePage() {
   const navigate = useNavigate();
   const [ticker, setTicker] = useState("");
   const [examples, setExamples] = useState<ShowcaseIndexEntry[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchShowcaseIndex()
       .then(setExamples)
-      .catch((e: Error) => setError(e.message));
+      .catch((e: Error) => setError(e.message))
+      .finally(() => setLoading(false));
   }, []);
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ticker.trim()) return;
-    navigate(
-      resolveTickerRoute(
-        ticker,
-        examples.map((x) => x.ticker)
-      )
-    );
+    if (loading || !ticker.trim()) return;
+    const known = error ? EXAMPLE_TICKERS : examples.map((x) => x.ticker);
+    navigate(resolveTickerRoute(ticker, known));
   };
 
   return (
@@ -49,7 +48,8 @@ export function HomePage() {
           />
           <button
             type="submit"
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
+            disabled={loading}
+            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
             Analyze
           </button>
@@ -60,6 +60,7 @@ export function HomePage() {
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Example briefs
         </h2>
+        {loading && <p className="text-sm text-muted-foreground">Loading examples...</p>}
         {error && <p className="text-sm text-muted-foreground">{error}</p>}
         <div className="grid gap-3 sm:grid-cols-2">
           {examples.map((x) => (
