@@ -86,10 +86,10 @@ Input: AAPL
        v asyncio.gather()   (analyst styles are prompt personas only; see Agents)
  +------------------------------------------------------------+
  |  DCF Analyst        |  Risk Analyst    |  Earnings          |
- |  (Morgan Stanley)   |  (Bridgewater)   |  (JPMorgan)        |
+ |  (valuation)        |  (balance sheet) |  (EPS, margins)    |
  +------------------------------------------------------------+
  |  Competitive Analyst |  Pattern Analyst |  Macro Strategist  |
- |  (Bain & Co.)       |  (Renaissance)   |  (Goldman Sachs)   |
+ |  (moat, sector)     |  (OBV, regime)   |  (rates, cycle)    |
  +------------------------------------------------------------+
        |
        v
@@ -163,12 +163,12 @@ ai-financial-analyst/
 |       +-- pages/             # AnalysisPage, WatchlistPage, StockDeepDivePage, NewsPage, IndustryPage, BacktestPage, PaperTradingPage
 +-- agents/                    # Six analyst agents
 |   +-- base.py                # BaseAgent: build_context(), append_enrichment_sections()
-|   +-- dcf.py                 # DCF Analyst (Morgan Stanley style)
-|   +-- risk.py                # Risk Analyst (Bridgewater style)
-|   +-- earnings.py            # Earnings Analyst (JPMorgan style)
-|   +-- competitive.py         # Competitive Analyst (Bain style)
-|   +-- pattern.py             # Pattern Analyst (Renaissance style) — OBV + fundamentals primary
-|   +-- macro.py               # Macro Strategist (Goldman Sachs style)
+|   +-- dcf.py                 # DCF Analyst
+|   +-- risk.py                # Risk Analyst
+|   +-- earnings.py            # Earnings Analyst
+|   +-- competitive.py         # Competitive Analyst
+|   +-- pattern.py             # Pattern Analyst — OBV + fundamentals primary
+|   +-- macro.py               # Macro Strategist
 |   +-- sector.py              # Sector specialist briefings
 +-- quant/                     # Quantitative pipeline
 |   +-- signals.py             # SignalVector: 6 technical signals + composite scoring
