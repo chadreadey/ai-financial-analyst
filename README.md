@@ -1,20 +1,37 @@
 # AI Financial Analyst
 
-A production-grade multi-agent equity research platform with a validated quantitative backtesting engine. Enter a ticker and get a full investment brief produced by six specialist AI analysts running in parallel — each modeled after a top-tier firm's methodology — synthesized into a single verdict with health scores, price target, and conviction rating.
+> **Status: being rebuilt.** The app and its evaluation are mid-revamp. The
+> live deployment is not current, and the numbers below come from the last
+> full backtest (August 2026), which has known biases that are not corrected.
 
-The platform combines LLM-based qualitative analysis with a rigorous quant signal pipeline (CPCV-validated, Sharpe 1.04 baseline) and multi-provider market data layer.
+A multi-agent equity research system with a quantitative backtesting engine.
+You enter a ticker. Six LLM analyst agents run in parallel over SEC filings,
+market data, and quant signals, and a synthesis agent combines their reports
+into one verdict with health scores, a price target, and a conviction rating.
 
-**Live deployment:**
-- Frontend: Vercel
-- Backend API: Railway
+**Headline result:** in a 2018–2025 backtest with 10 positions, the
+quantitative screen alone had a Sharpe ratio of **1.15**, against **0.74**
+for SPY. Adding the LLM agents on top **lowered** it to **1.01**. So far the
+agents have not added value over the quant screen they sit on.
+
+| Series | Sharpe | Sortino | Ann. return | Max drawdown |
+|---|---:|---:|---:|---:|
+| SPY | 0.74 | 0.90 | 13.4% | 33.7% |
+| Quant screen only | 1.15 | 1.57 | 29.6% | 35.4% |
+| Quant screen + LLM agents | 1.01 | 1.32 | 24.5% | 38.5% |
+
+Daily returns 2018-02-01 to 2025-01-30, 10 positions, max 4 per sector.
+Source: [`docs/eval/three_series_llm/latest.json`](docs/eval/three_series_llm/latest.json).
+Survivorship bias and LLM look-ahead are not corrected, so treat these as
+upper bounds (details under [Limitations](#limitations)).
 
 ---
 
 ## What It Does
 
 1. You input a stock ticker (or run a backtest across a universe)
-2. The system fetches SEC EDGAR filings (10-K, 10-Q, XBRL financials), enriches with multi-provider price data (Alpaca/Tiingo), FMP fundamentals, Finnhub sentiment, FRED macro indicators, Tavily web research, and Pinecone RAG context
-3. A quant signal pipeline computes technical + fundamental signals per ticker, validated via CPCV combinatorial purged cross-validation
+2. The system fetches SEC EDGAR filings (10-K, 10-Q, XBRL financials) and adds price data (Alpaca/Tiingo), FMP fundamentals, Finnhub sentiment, FRED macro indicators, Tavily web research, and Pinecone RAG context
+3. A quant signal pipeline computes technical and fundamental signals per ticker
 4. Six analyst agents run in parallel, each examining the data through a different lens
 5. A synthesis agent cross-references all six reports, resolves contradictions, and produces a final investment brief with a structured JSON verdict
 
@@ -34,18 +51,16 @@ Input: AAPL
        |
        v
  Quant Signal Pipeline
- +-- OBV trend (validated alpha), RSI, SMA, Bollinger, mean reversion, ATR
- +-- Fundamental scoring: balance sheet quality + earnings revision momentum
+ +-- Technicals: OBV, RSI, SMA, Bollinger, mean reversion, ATR
+ +-- Fundamentals: quality (QMJ), earnings surprise (SUE), revision momentum (ERM)
  +-- Finnhub sentiment: FinBERT/VADER news scoring + insider MSPR
  +-- Optional: TimesFM / LSTM price forecasts, WRDS point-in-time fundamentals
        |
        v asyncio.gather()
  +------------------------------------------------------------+
  |  DCF Analyst        |  Risk Analyst    |  Earnings          |
- |  (Morgan Stanley)   |  (Bridgewater)   |  (JPMorgan)        |
  +------------------------------------------------------------+
  |  Competitive Analyst |  Pattern Analyst |  Macro Strategist  |
- |  (Bain & Co.)       |  (Renaissance)   |  (Goldman Sachs)   |
  +------------------------------------------------------------+
        |
        v
@@ -68,11 +83,11 @@ Input: AAPL
 | Component lib | Radix UI primitives, Lucide icons |
 | Backend API | FastAPI + Uvicorn (Python 3.11+) |
 | Analysis engine | asyncio orchestrator, 6 parallel agents |
-| Quant engine | Walk-forward backtesting, CPCV validation, signal stress testing |
+| Quant engine | Walk-forward backtesting, CPCV, signal stress testing |
 | LLM | Anthropic Claude (`claude-sonnet-4-20250514` default), OpenAI-compatible fallback |
 | Market data | Alpaca (primary, switchable) / Tiingo (price history + quotes), FMP (fundamentals + estimates), Finnhub (sentiment + earnings), FRED (macro) |
 | SEC data | SEC EDGAR API + edgartools + XBRL parser |
-| RAG | Pinecone (llama-text-embed-v2, index: `financial-analyst`) |
+| RAG | Pinecone (index: `financial-analyst`) |
 | Time-series forecasting | Google TimesFM 2.5 (optional), custom LSTM walk-forward (optional) |
 | Cache | SQLite (SEC + warehouse + FMP fundamentals), Redis (TimesFM forecast cache) |
 | Hosting | Railway (backend), Vercel (frontend) |
@@ -119,12 +134,12 @@ ai-financial-analyst/
 |       +-- pages/             # AnalysisPage, WatchlistPage, StockDeepDivePage, NewsPage, IndustryPage, BacktestPage, PaperTradingPage
 +-- agents/                    # Six analyst agents
 |   +-- base.py                # BaseAgent: build_context(), append_enrichment_sections()
-|   +-- dcf.py                 # DCF Analyst (Morgan Stanley style)
-|   +-- risk.py                # Risk Analyst (Bridgewater style)
-|   +-- earnings.py            # Earnings Analyst (JPMorgan style)
-|   +-- competitive.py         # Competitive Analyst (Bain style)
-|   +-- pattern.py             # Pattern Analyst (Renaissance style) — OBV + fundamentals primary
-|   +-- macro.py               # Macro Strategist (Goldman Sachs style)
+|   +-- dcf.py                 # DCF Analyst
+|   +-- risk.py                # Risk Analyst
+|   +-- earnings.py            # Earnings Analyst
+|   +-- competitive.py         # Competitive Analyst
+|   +-- pattern.py             # Pattern Analyst (technicals + fundamentals)
+|   +-- macro.py               # Macro Strategist
 |   +-- sector.py              # Sector specialist briefings
 +-- quant/                     # Quantitative pipeline
 |   +-- signals.py             # SignalVector: 6 technical signals + composite scoring
@@ -157,7 +172,7 @@ ai-financial-analyst/
 |   +-- change_detector.py     # Incremental update on new SEC filings
 |   +-- scheduler.py           # Batch refresh loop
 |   +-- reader.py              # Translate warehouse rows -> AnalysisData
-|   +-- embedder.py            # Pinecone upsert (llama-text-embed-v2)
+|   +-- embedder.py            # Pinecone upsert
 |   +-- financial_vectors.py   # Financial time-series RAG vectors
 |   +-- macro_vectors.py       # Macro indicator RAG vectors
 |   +-- xbrl_vectors.py        # XBRL structured data vectors
@@ -179,7 +194,7 @@ ai-financial-analyst/
 |   +-- seed_wrds.py           # WRDS data seeding
 |   +-- bulk_bootstrap.py      # One-time Pinecone bootstrap for large ticker lists
 |   +-- seed_timeseries.py     # Seed RAG time-series namespaces
-+-- tests/                     # pytest suite (72+ tests)
++-- tests/                     # pytest suite (~1,050 tests)
 +-- plans/                     # Implementation plans and research docs
 +-- orchestrator.py            # Core pipeline: prepare_data() + asyncio.gather() + synthesis
 +-- market_enrichment.py       # Parallel enrichment: Tiingo/Alpaca, FMP, Finnhub, FRED, Tavily, peers, RAG
@@ -202,72 +217,97 @@ ai-financial-analyst/
 
 ## Quant Pipeline
 
-The quantitative backtesting engine validates all signals before they're used in production.
+The backtesting engine runs walk-forward backtests (monthly rebalance, VIX
+regime filter), with combinatorial purged cross-validation (CPCV) available
+as an opt-in check against overfitting. Every signal is scored by its
+information coefficient (IC): the rank correlation between the signal and
+forward returns.
 
-### Signal Hierarchy
+### Signal results
 
-| Signal | IC | Status | Role |
-|--------|-----|--------|------|
-| **OBV trend** | Validated | Primary | Volume-confirmed price trend — only technical signal with alpha |
-| **Earnings Revision Momentum** | 0.04-0.10 | Primary | Analyst consensus trend (IBES/FMP) |
-| **Balance sheet quality** | 0.04-0.10 | Primary | Equity ratio + current ratio scoring |
-| **Finnhub sentiment** | Validated | Overlay | FinBERT/VADER news scoring + insider MSPR |
-| SMA, RSI, Bollinger, Mean Rev, ATR | ~0 | Regime context | Describe environment, not direction |
+From the latest IC re-judgment (August 2026, 120 monthly cross-sections),
+using HAC t-stats and a moving-block bootstrap to account for overlapping
+return windows. Full tables are in
+[`docs/audit/2026-08-25-rejudge/rejudgment.md`](docs/audit/2026-08-25-rejudge/rejudgment.md).
 
-### Backtest Validation
+| Signal | 1-month mean IC | Bootstrap p | Verdict |
+|--------|---:|---:|---|
+| QMJ (quality minus junk) | +0.025 | 0.007 | Significant at 1M only |
+| SUE (earnings surprise) | +0.018 | 0.036 | Significant at 1M only |
+| ERM (earnings revision momentum) | +0.014 | 0.111 | Marginal |
+| Balance sheet quality | +0.019 | 0.058 | Marginal |
+| OBV trend | −0.008 | 0.524 | No signal |
+| Insider MSPR, institutional flow, Piotroski, momentum, dispersion, book-to-market | ~0 | > 0.2 | No signal |
 
-- **Gold standard baseline:** VIX 30/40 regime filter, monthly rebalance (Sharpe 1.04, PBO 0%)
-- **CPCV validation:** 252 combinatorial purged cross-validation paths — prevents overfitting
-- **Alpha sweep:** Automated sweep tool with CPCV gate for any new signal
-- **Signal stress test:** IC analysis, factor attribution (FF5+Mom), redundancy detection
+At 3, 6, and 12 month horizons nothing is significant once overlap is
+accounted for. Technical indicators (SMA, RSI, Bollinger, mean reversion,
+ATR) are used to describe the market regime, not to predict direction.
+
+### Running it
 
 ```bash
-# Run the gold-standard backtest
-python scripts/run_backtest.py --start 2020-01-01 --end 2026-01-01 --cpcv
+# Walk-forward backtest (add --cpcv for combinatorial purged CV)
+python scripts/run_backtest.py --start 2020-01-01 --end 2026-01-01
 
-# Signal stress test
+# Signal stress test: IC, factor attribution (FF5+Mom), redundancy
 python scripts/signal_stress_test.py
 
-# Alpha sweep for a new signal
+# Alpha sweep for a new signal, gated by CPCV
 python scripts/cpcv_alpha_sweep.py
 ```
 
-### Backtest bias disclosure
+---
 
-Two known biases affect the historical replay numbers in this repo and are
-**not corrected** — treat replay results as upper bounds, not measurements:
+## Limitations
+
+These are why the headline numbers are upper bounds, not measurements:
 
 1. **Survivorship / selection bias.** Candidate lists under `runs/candidates/`
-   were built from the current WRDS PIT universe, so early rebalances select
-   from a menu that already includes stocks that survived and won (APP, SMCI,
-   AXON, ...). Point-in-time index constituents are not applied.
-2. **LLM look-ahead contamination.** The LLM-mode replay
+   were built from the current WRDS point-in-time universe, so early
+   rebalances select from a menu that already includes stocks that survived
+   and won (APP, SMCI, AXON, ...). Point-in-time index constituents are not
+   applied.
+2. **LLM look-ahead.** The LLM-mode replay
    (`modal_app/functions/ai_replay.py`) asks a model whose training data
    covers the replay period to pick among historical candidates. No prompt
-   guardrail can remove knowledge baked into the model weights, so a
-   historical replay systematically overstates AI value.
+   guardrail can remove knowledge baked into the weights, so a historical
+   replay overstates AI value. Even with that advantage, the agents lowered
+   Sharpe.
+3. **Weak signals.** Only two signals are significant, and only at a
+   one-month horizon (see above). Most of the quant screen's edge over SPY
+   may come from the biased universe rather than the signals.
+4. **One configuration.** The result is one universe, one 7-year window, and
+   10 positions. Earlier internal baselines from other configurations and
+   windows (for example a Sharpe of 1.04 quoted in older docs) are
+   superseded and should not be compared directly.
 
-The honest measurement of AI value over the quant baseline is **forward
-shadow mode**: LLM picks recorded at rebalance time from now on, scored
-against the quant-only series as real time passes. Post-training-cutoff
-replay months are the only trustworthy historical window.
+The honest test of AI value over the quant baseline is **forward shadow
+mode**: LLM picks recorded at rebalance time, scored against the quant-only
+series as real time passes. That is part of the rebuild.
 
 ---
 
 ## Agents
 
-| Agent | Style | Focus |
-|-------|-------|-------|
-| **DCF Analyst** | Morgan Stanley | Intrinsic valuation, FCF projections, WACC, price target |
-| **Risk Analyst** | Bridgewater | Balance sheet risk, macro sensitivity, tail scenarios, agent veto |
-| **Earnings Analyst** | JPMorgan | EPS trajectory, margin analysis, earnings quality, SUE signals |
-| **Competitive Analyst** | Bain & Co. | Moat analysis, Porter's Five Forces, sector dynamics |
-| **Pattern Analyst** | Renaissance Tech | OBV + fundamentals (primary), regime classification via technicals |
-| **Macro Strategist** | Goldman Sachs | Macro regime, monetary policy impact, sector rotation |
+| Agent | Persona | Focus |
+|-------|---------|-------|
+| **DCF Analyst** | Morgan Stanley-style | Intrinsic valuation, FCF projections, WACC, price target |
+| **Risk Analyst** | Bridgewater-style | Balance sheet risk, macro sensitivity, tail scenarios, agent veto |
+| **Earnings Analyst** | JPMorgan-style | EPS trajectory, margin analysis, earnings quality, SUE signals |
+| **Competitive Analyst** | Bain-style | Moat analysis, Porter's Five Forces, sector dynamics |
+| **Pattern Analyst** | Renaissance-style | Technicals and fundamentals, regime classification |
+| **Macro Strategist** | Goldman Sachs-style | Macro regime, monetary policy impact, sector rotation |
 
-The synthesis agent acts as CIO — reads all six reports, resolves contradictions, and issues a final verdict (Strong Buy to Strong Sell) with a 1-10 health score across each analytical dimension.
+Each prompt asks the model to take on an analytical style associated with a
+well-known firm. These are prompt personas only. The project has no
+affiliation with, endorsement from, or access to the methods of any of these
+firms.
 
-Agent prompts live in `prompts/` as Markdown files. Edit them directly without touching Python code. Placeholder tokens: `[COMPANY NAME]`, `[STOCK NAME]`, `[TICKER]`.
+The synthesis agent acts as CIO. It reads all six reports, resolves
+contradictions, and issues a final verdict (Strong Buy to Strong Sell) with a
+1-10 health score for each analytical dimension.
+
+Agent prompts live in `prompts/` as Markdown files and can be edited without touching Python code. Placeholder tokens: `[COMPANY NAME]`, `[STOCK NAME]`, `[TICKER]`.
 
 ---
 
@@ -512,7 +552,7 @@ The FastAPI backend auto-generates interactive API docs at `/docs` (Swagger) and
 ```bash
 pip install -r requirements-dev.txt
 
-pytest                                     # full suite (870+ tests)
+pytest                                     # full suite (~1,050 tests)
 pytest tests/test_metrics.py -v            # canonical metrics
 pytest tests/test_scoring.py -v            # threshold classification
 pytest tests/test_schema_validation.py -v  # API schema validation
@@ -552,8 +592,8 @@ Both `pytest` and the eval suites run on every pull request via
 - **LLM** — Anthropic Claude (`claude-sonnet-4-20250514`)
 - **Market data** — Alpaca / Tiingo (switchable), FMP, Finnhub, FRED, Yahoo Finance (fallback)
 - **SEC** — EDGAR API, edgartools, custom XBRL parser
-- **RAG** — Pinecone (llama-text-embed-v2)
-- **Quant** — CPCV validation, walk-forward backtest, signal stress testing
+- **RAG** — Pinecone
+- **Quant** — walk-forward backtest, CPCV, signal stress testing
 - **Time-series** — Google TimesFM 2.5 (optional), LSTM walk-forward (experimental)
 - **Hosting** — Railway (API) + Vercel (frontend)
 - **Monitoring** — Sentry
