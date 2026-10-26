@@ -12,6 +12,8 @@ import {
 import {
   SERIES_NAMES,
   fetchEvidence,
+  formatDelta,
+  yearTicks,
   type EvidencePayload,
   type SeriesName,
 } from "@/lib/evidence";
@@ -53,6 +55,7 @@ export function EvidencePage() {
         <>
           <div className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full min-w-[480px] text-sm">
+              <caption className="sr-only">Backtest metrics by series, 2018–2025</caption>
               <thead className="text-left text-muted-foreground">
                 <tr>
                   <th className="p-3 font-medium">Series</th>
@@ -84,6 +87,13 @@ export function EvidencePage() {
             </table>
           </div>
 
+          <p className="text-sm text-muted-foreground">
+            Sharpe: Quant-only {formatDelta(data.series["Quant-only"].sharpe, data.series.SPY.sharpe)} vs
+            SPY · AI-augmented{" "}
+            {formatDelta(data.series["AI-augmented"].sharpe, data.series["Quant-only"].sharpe)} vs
+            Quant-only
+          </p>
+
           <section aria-label="Growth of $1, log scale">
             <h2 className="mb-2 text-sm font-medium text-muted-foreground">
               Growth of $1 (log scale)
@@ -95,7 +105,8 @@ export function EvidencePage() {
                   dataKey="date"
                   tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
                   tickFormatter={(d: string) => d.slice(0, 4)}
-                  minTickGap={40}
+                  ticks={yearTicks(data.curve)}
+                  interval={0}
                 />
                 <YAxis
                   scale="log"

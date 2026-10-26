@@ -1,4 +1,5 @@
 import type { AnalysisResult } from "@/api/types";
+import { isJson } from "./http";
 
 export interface ShowcaseIndexEntry {
   ticker: string;
@@ -18,11 +19,6 @@ export interface ShowcaseBrief {
 
 /** Fallback so example tickers never route to the paid live-run path. */
 export const EXAMPLE_TICKERS = ["NVDA", "JPM", "KO", "XOM"];
-
-// vercel.json rewrites unknown paths to index.html, so a missing file can be 200 HTML.
-function isJson(res: Response): boolean {
-  return (res.headers.get("content-type") ?? "").includes("application/json");
-}
 
 export async function fetchShowcaseIndex(): Promise<ShowcaseIndexEntry[]> {
   const res = await fetch("/showcase/index.json");

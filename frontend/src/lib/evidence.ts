@@ -1,3 +1,5 @@
+import { isJson } from "./http";
+
 export const SERIES_NAMES = ["SPY", "Quant-only", "AI-augmented"] as const;
 export type SeriesName = (typeof SERIES_NAMES)[number];
 
@@ -25,11 +27,6 @@ export interface EvidencePayload {
   generated_at: string;
 }
 
-// vercel.json rewrites unknown paths to index.html, so a missing file can be 200 HTML.
-function isJson(res: Response): boolean {
-  return (res.headers.get("content-type") ?? "").includes("application/json");
-}
-
 export async function fetchEvidence(): Promise<EvidencePayload> {
   const res = await fetch("/evidence/three_series.json");
   if (!res.ok || !isJson(res)) throw new Error("Performance data is unavailable");
@@ -42,4 +39,18 @@ export function formatDelta(a: number, b: number): string {
   if (d === 0) return "0.00";
   const text = Math.abs(d).toFixed(2);
   return d > 0 ? `+${text}` : `−${text}`;
+}
+
+/** First curve date of each calendar year, for de-duplicated x-axis ticks. */
+export function yearTicks(curve: { date: string }[]): string[] {
+  const seen = new Set<string>();
+  const ticks: string[] = [];
+  for (const { date } of curve) {
+    const year = date.slice(0, 4);
+    if (!seen.has(year)) {
+      seen.add(year);
+      ticks.push(date);
+    }
+  }
+  return ticks;
 }
