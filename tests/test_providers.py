@@ -69,7 +69,7 @@ def _provider_with(fake_create):
 
 
 @pytest.mark.asyncio
-async def test_anthropic_default_model_sonnet_5_5_thinking_off():
+async def test_anthropic_default_model_opus_5_5():
     seen = {}
 
     async def fake_create(**kw):
@@ -77,9 +77,23 @@ async def test_anthropic_default_model_sonnet_5_5_thinking_off():
         return _Msg([_Block("text", "hi")])
 
     p = _provider_with(fake_create)
-    assert p.default_model == "claude-sonnet-5-5"
+    assert p.default_model == "claude-opus-5-5"
     assert await p.generate("s", "u") == "hi"
-    assert seen["model"] == "claude-sonnet-5-5"
+    assert seen["model"] == "claude-opus-5-5"
+    assert "thinking" not in seen
+    assert "temperature" not in seen
+
+
+@pytest.mark.asyncio
+async def test_anthropic_sonnet_5_5_sends_thinking_off():
+    seen = {}
+
+    async def fake_create(**kw):
+        seen.update(kw)
+        return _Msg([_Block("text", "hi")])
+
+    p = _provider_with(fake_create)
+    assert await p.generate("s", "u", model="claude-sonnet-5-5") == "hi"
     assert seen["thinking"] == {"type": "between_tools"}
     assert "temperature" not in seen
 
