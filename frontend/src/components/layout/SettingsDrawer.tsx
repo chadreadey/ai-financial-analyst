@@ -34,10 +34,10 @@ const DEFAULT_SETTINGS: Settings = {
   enable_yahoo: true,
   enable_tavily: true,
   max_agent_context_chars: 12000,
-  max_agent_output_tokens: 1200,
+  max_agent_output_tokens: 3000,
   synthesis_report_max_chars: 4500,
-  synthesis_input_max_chars: 22000,
-  max_synthesis_output_tokens: 1500,
+  synthesis_input_max_chars: 30000,
+  max_synthesis_output_tokens: 3000,
 };
 
 function loadFromStorage(): Settings {

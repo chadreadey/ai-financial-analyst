@@ -106,3 +106,24 @@ async def test_anthropic_no_text_block_raises_clear_error():
 
     with pytest.raises(RuntimeError, match="max_tokens"):
         await _provider_with(fake_create).generate("s", "u")
+
+
+@pytest.mark.asyncio
+async def test_anthropic_max_tokens_cutoff_logs_warning(caplog):
+    async def fake_create(**kw):
+        return _Msg([_Block("text", "partial report, no score")], stop_reason="max_tokens")
+
+    with caplog.at_level("WARNING", logger="llm.providers"):
+        text = await _provider_with(fake_create).generate("s", "u", max_tokens=1200)
+    assert text == "partial report, no score"
+    assert "max_tokens=1200" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_anthropic_end_turn_no_warning(caplog):
+    async def fake_create(**kw):
+        return _Msg([_Block("text", "done")])
+
+    with caplog.at_level("WARNING", logger="llm.providers"):
+        await _provider_with(fake_create).generate("s", "u")
+    assert "max_tokens" not in caplog.text

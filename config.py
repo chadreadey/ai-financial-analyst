@@ -52,7 +52,7 @@ class Settings(BaseSettings):
 
     # ── Agent context budgets ──────────────────────────────────────
     max_agent_context_chars: int = 12000
-    max_agent_output_tokens: int = 1200
+    max_agent_output_tokens: int = 3000
     max_context_dcf_chars: int = 0
     max_context_risk_chars: int = 0
     max_context_earnings_chars: int = 0
@@ -62,8 +62,8 @@ class Settings(BaseSettings):
 
     # ── Synthesis budgets ──────────────────────────────────────────
     synthesis_report_max_chars: int = 4500
-    synthesis_input_max_chars: int = 22000
-    max_synthesis_output_tokens: int = 1500
+    synthesis_input_max_chars: int = 30000
+    max_synthesis_output_tokens: int = 3000
 
     # ── Enrichment section caps ────────────────────────────────────
     max_market_section_chars: int = 1200

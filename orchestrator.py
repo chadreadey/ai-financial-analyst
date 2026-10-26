@@ -26,7 +26,7 @@ from agents import (
     SectorSpecialistAgent,
 )
 from config import settings
-from context_budget import trim_text
+from context_budget import trim_middle, trim_text
 from llm import LLMProvider, get_provider
 from market_enrichment import build_enrichment_context
 from models import AgentReport, AnalysisData, AnalysisResult, FilingInfo
@@ -155,6 +155,11 @@ def _conviction_label(conviction_score: float) -> str:
 
 
 SYNTHESIS_PROMPT_FILE = Path("prompts/synthesis.md")
+# Room kept at the end of each trimmed agent report: covers the earnings JSON
+# block plus the terminal SIGNAL_SCORE line.
+SYNTHESIS_REPORT_TAIL_CHARS = 1500
+# Per-report "REPORT FROM" banner plus the joining blank lines.
+SYNTHESIS_REPORT_HEADER_CHARS = 200
 
 SECTOR_SPECIALIST_MAP: dict[str, str] = {
     "Healthcare": "prompts/sector_healthcare.md",
@@ -734,12 +739,20 @@ class Orchestrator:
             progress_callback("Preparing synthesis context from agent reports...", 74)
 
         report_sections = []
-        per_report_cap = settings.synthesis_report_max_chars
+        # Each report gets an equal share of the total budget, so the final
+        # safety-net trim below never drops the tail of the last reports.
+        fair_share = (
+            settings.synthesis_input_max_chars // max(1, len(agent_reports))
+            - SYNTHESIS_REPORT_HEADER_CHARS
+        )
+        per_report_cap = min(settings.synthesis_report_max_chars, fair_share)
         for report in agent_reports:
-            trimmed_analysis = trim_text(
+            # Cut the middle: the JSON block and SIGNAL_SCORE line sit at the end.
+            trimmed_analysis = trim_middle(
                 report.analysis,
                 per_report_cap,
-                marker="\n...[agent report trimmed]...",
+                tail_chars=SYNTHESIS_REPORT_TAIL_CHARS,
+                marker="\n...[agent report trimmed]...\n",
             )
             report_sections.append(
                 f"{'=' * 60}\nREPORT FROM: {report.agent_name}\n{'=' * 60}\n\n{trimmed_analysis}\n"

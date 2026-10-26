@@ -92,6 +92,11 @@ class AnthropicProvider(LLMProvider):
         )
         if message.stop_reason == "refusal":
             raise RuntimeError(f"Model {resolved_model} refused the request")
+        if message.stop_reason == "max_tokens":
+            # The reply is cut off; agents put SIGNAL_SCORE last, so it is lost.
+            logger.warning(
+                "Model %s hit max_tokens=%d; output is truncated", resolved_model, max_tokens
+            )
         for block in message.content:
             if block.type == "text":
                 return block.text
