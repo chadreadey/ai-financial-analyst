@@ -33,15 +33,16 @@ def _limit_message(reason: str | None, retry_after: int | None) -> str:
             "try one of the example briefs or retry shortly."
         )
     minutes = max(1, -(-(retry_after or 60) // 60))
-    return (
-        "Live run limit reached for now; try one of the example briefs "
-        f"or come back in {minutes} minutes."
-    )
+    wait = f"{minutes} minutes" if minutes < 120 else f"{-(-minutes // 60)} hours"
+    return f"Live run limit reached for now; try one of the example briefs or come back in {wait}."
 
 
 @router.post("/run", response_model=JobCreated)
 async def run_analysis(req: RunAnalysisRequest, request: Request):
     if is_admin(request):
+        if "provider" not in req.model_fields_set:
+            req.provider = settings.llm_provider
+        req.ticker = req.ticker.strip().upper()
         job = create_job(req.ticker)
         thread = threading.Thread(
             target=run_analysis_job,

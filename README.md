@@ -18,7 +18,7 @@ The home page shows four precomputed example briefs. Live runs are limited to 3 
 
 ## Run locally
 
-Requires Python 3.11+ and Node.js 18+.
+Requires Python 3.11+ and Node.js 22.12+.
 
 Backend (FastAPI):
 
@@ -335,7 +335,7 @@ All metric computation, scoring thresholds, and API response validation are cent
 ### Prerequisites
 
 - Python 3.11+
-- Node.js 18+
+- Node.js 22.12+
 - (Optional) Redis — only needed if `ENABLE_TIMESFM=true`
 
 ### Backend Setup
@@ -594,7 +594,7 @@ Both `pytest` and the eval suites run on every pull request via
 ## Tech Stack Summary
 
 - **Python 3.11+** — FastAPI, Pydantic v2, asyncio, SQLite
-- **Node 18+** — Vite 6, React 19, TypeScript, Tailwind CSS v3
+- **Node 22.12+** — Vite 6, React 19, TypeScript, Tailwind CSS v3
 - **LLM** — Anthropic Claude (`claude-sonnet-5-5`)
 - **Market data** — Alpaca / Tiingo (switchable), FMP, Finnhub, FRED, Yahoo Finance (fallback)
 - **SEC** — EDGAR API, edgartools, custom XBRL parser

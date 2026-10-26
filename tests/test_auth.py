@@ -29,6 +29,7 @@ def client(monkeypatch):
         ("POST", "/api/industry/technology/analyze"),
         ("GET", "/api/analysis/history"),
         ("GET", "/api/diagnostics/assumptions"),
+        ("GET", "/api/market/sparkline/AAPL"),
     ],
 )
 def test_lab_endpoints_forbidden_without_key(client, method, path):

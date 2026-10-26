@@ -89,19 +89,48 @@ def test_public_run_429_after_limit(env):
     assert len(calls) == 3
 
 
+class SwallowingThread(InlineThread):
+    """Like a real thread: an exception in the target never reaches the caller."""
+
+    def start(self):
+        try:
+            super().start()
+        except Exception:
+            pass
+
+
 def test_slot_released_when_job_raises(env, monkeypatch):
     client, _, analysis = env
-    monkeypatch.setattr(analysis, "limiter", RunLimiter(10, 30, 1))
+    monkeypatch.setattr(analysis.threading, "Thread", SwallowingThread)
+    monkeypatch.setattr(analysis, "limiter", RunLimiter(3, 30, 1))
 
     def boom(job, request, auto_paper_trade=None):
         raise RuntimeError("x")
 
     monkeypatch.setattr(analysis, "run_analysis_job", boom)
-    tc = TestClient(client.app, raise_server_exceptions=False)
     for i in range(3):
-        # inline thread re-raises inside the request; slot must still free
-        tc.post("/api/analysis/run", json=BODY, headers={"X-Forwarded-For": f"1.1.1.{i}"})
+        r = client.post("/api/analysis/run", json=BODY, headers={"X-Forwarded-For": f"1.1.1.{i}"})
+        assert r.status_code == 200
     assert analysis.limiter.acquire("9.9.9.9")[0] is True
+
+
+def test_limit_message_uses_hours_for_long_waits():
+    from backend.routers.analysis import _limit_message
+
+    assert "24 hours" in _limit_message("day", 86400)
+    assert "30 minutes" in _limit_message("ip", 1800)
+    assert "limit" in _limit_message("day", 86400)
+
+
+def test_admin_run_defaults_provider_and_normalizes_ticker(env):
+    client, calls, _ = env
+    r = client.post(
+        "/api/analysis/run", json={"ticker": " nvda "}, headers={"X-API-Key": "test-key"}
+    )
+    assert r.status_code == 200
+    req, _ = calls[-1]
+    assert req.provider == settings.llm_provider
+    assert req.ticker == "NVDA"
 
 
 def test_admin_run_bypasses_limits_and_keeps_params(env):

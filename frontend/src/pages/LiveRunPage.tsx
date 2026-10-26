@@ -21,11 +21,13 @@ export function LiveRunPage() {
 
   if (error) {
     const { status, detail } = parseApiError(error);
+    const busy = status === 429 && /in progress|concurrent/i.test(detail);
+    const showExamples = status === 422 || (status === 429 && !busy);
     return (
       <div className="space-y-3">
         <h1 className="text-xl font-bold text-foreground">Could not run {ticker}</h1>
         <p className="text-sm text-muted-foreground break-words">{detail}</p>
-        {status === 429 ? (
+        {showExamples ? (
           <Link to="/" className="inline-block text-sm text-primary underline">Browse the example briefs</Link>
         ) : (
           <button

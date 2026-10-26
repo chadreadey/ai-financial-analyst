@@ -103,7 +103,7 @@ app.add_middleware(
     # TODO: replace `ai-financial-analyst` with actual Vercel project slug if different.
     # Lookup: Vercel dashboard > project > Settings > Domains.
     allow_origin_regex=r"https://ai-financial-analyst(-[a-z0-9]+)?\.vercel\.app",
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -154,7 +154,12 @@ app.include_router(
     dependencies=[Depends(require_admin)],
     tags=["watchlist"],
 )
-app.include_router(market_data.router, prefix="/api/market", tags=["market"])
+app.include_router(
+    market_data.router,
+    prefix="/api/market",
+    dependencies=[Depends(require_admin)],
+    tags=["market"],
+)
 app.include_router(
     recommendations.router,
     prefix="/api/recommendations",
