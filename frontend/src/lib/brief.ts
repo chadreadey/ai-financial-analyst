@@ -60,8 +60,19 @@ export function parseConflict(code: string): string | null {
 export function describeConflict(code: string): string {
   const parsed = parseConflict(code);
   if (parsed) return parsed;
-  const text = code.replace(/_/g, " ").trim();
-  return text.charAt(0).toUpperCase() + text.slice(1);
+  const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+  return code
+    .split("_vs_")
+    .map((side) =>
+      cap(
+        side
+          .replace(/_/g, " ")
+          .trim()
+          .replace(/\b(dcf|fcf|eps|roe)\b/gi, (m) => m.toUpperCase())
+          .replace(/\bpe\b/gi, "P/E"),
+      ),
+    )
+    .join(" vs ");
 }
 
 export function upsidePct(
@@ -72,12 +83,22 @@ export function upsidePct(
   return (target / entry - 1) * 100;
 }
 
+// Tailwind 3 cannot apply an opacity modifier to a var() colour, so mix explicitly.
+// Full class strings are written out so the JIT scanner sees them.
+const TINTS = {
+  positive: "bg-[color-mix(in_srgb,var(--positive)_10%,transparent)] border-[color-mix(in_srgb,var(--positive)_20%,transparent)] text-[--positive]",
+  negative: "bg-[color-mix(in_srgb,var(--negative)_10%,transparent)] border-[color-mix(in_srgb,var(--negative)_20%,transparent)] text-[--negative]",
+  warning: "bg-[color-mix(in_srgb,var(--warning)_10%,transparent)] border-[color-mix(in_srgb,var(--warning)_20%,transparent)] text-[--warning]",
+  primary: "bg-[color-mix(in_srgb,hsl(var(--primary))_10%,transparent)] border-[color-mix(in_srgb,hsl(var(--primary))_20%,transparent)] text-primary",
+} as const;
+const tint = (k: keyof typeof TINTS) => TINTS[k];
+
 export function verdictClassName(verdict: string): string {
   const v = verdict.toUpperCase();
-  if (v.includes("BUY") || v.includes("BULLISH")) return "bg-[--positive]/10 text-[--positive] border-[--positive]/20";
-  if (v.includes("SELL") || v.includes("BEARISH")) return "bg-[--negative]/10 text-[--negative] border-[--negative]/20";
-  if (v.includes("HOLD") || v.includes("NEUTRAL")) return "bg-[--warning]/10 text-[--warning] border-[--warning]/20";
-  return "bg-primary/10 text-primary border-primary/20";
+  if (v.includes("BUY") || v.includes("BULLISH")) return tint("positive");
+  if (v.includes("SELL") || v.includes("BEARISH")) return tint("negative");
+  if (v.includes("HOLD") || v.includes("NEUTRAL")) return tint("warning");
+  return tint("primary");
 }
 
 /** Turn client.ts's "API error <status>: <body>" into a user-facing message. */

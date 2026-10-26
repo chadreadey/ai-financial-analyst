@@ -40,7 +40,7 @@ export function BriefView({ result, runAt, isExample }: Props) {
               {verdictLabel && (
                 <Badge variant="outline" className={verdictClassName(verdictLabel)}>{verdictLabel}</Badge>
               )}
-              {conviction && <Badge variant="secondary">Conviction: {conviction}</Badge>}
+              {conviction != null && conviction !== "" && <Badge variant="secondary">Conviction: {conviction}</Badge>}
             </div>
           )}
         </div>
@@ -92,7 +92,7 @@ export function BriefView({ result, runAt, isExample }: Props) {
           Read each analyst's report
         </summary>
         <div className="overflow-x-auto">
-          <AgentReportTabs synthesis={result.synthesis} agentReports={result.agent_reports} tradeParams={sv} />
+          <AgentReportTabs synthesis={result.synthesis} agentReports={result.agent_reports} tradeParams={sv} hideSynthesis />
         </div>
       </details>
 
@@ -108,7 +108,7 @@ export function BriefView({ result, runAt, isExample }: Props) {
       )}
 
       <p className="text-xs text-muted-foreground">
-        AI-generated research for demonstration only. Not investment advice.
+        Research demo, not investment advice.
       </p>
     </div>
   );

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildConsensus, parseApiError, parseConflict, upsidePct } from "./brief";
+import { buildConsensus, describeConflict, formatRunDate, parseApiError, parseConflict, upsidePct } from "./brief";
 
 describe("buildConsensus", () => {
   it("returns [] for null or missing breakdown", () => {
@@ -57,5 +57,27 @@ describe("parseApiError", () => {
   });
   it("handles plain messages", () => {
     expect(parseApiError("Failed to fetch")).toEqual({ status: null, detail: "Failed to fetch" });
+  });
+});
+
+describe("describeConflict", () => {
+  it("uses the parsed form when it matches", () => {
+    expect(describeConflict("risk_bearish_vs_earnings_bullish")).toBe("Risk (bearish) vs Earnings (bullish)");
+  });
+  it("falls back with acronyms and per-side capitalisation", () => {
+    expect(describeConflict("dcf_bullish_vs_macro_rate_headwind")).toBe("DCF bullish vs Macro rate headwind");
+    expect(describeConflict("dcf_normalized_fcf_vs_reported_fcf_shortfall")).toBe(
+      "DCF normalized FCF vs Reported FCF shortfall",
+    );
+    expect(describeConflict("pe_compression_vs_eps_beat")).toBe("P/E compression vs EPS beat");
+  });
+});
+
+describe("formatRunDate", () => {
+  it("formats an ISO timestamp", () => {
+    expect(formatRunDate("2026-10-26T16:40:55.206365+00:00")).toBe("Oct 26, 2026");
+  });
+  it("returns the input when invalid", () => {
+    expect(formatRunDate("nope")).toBe("nope");
   });
 });
