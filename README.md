@@ -1,14 +1,58 @@
 # AI Financial Analyst
 
-A production-grade multi-agent equity research platform with a validated quantitative backtesting engine. Enter a ticker and get a full investment brief produced by six specialist AI analysts running in parallel — each modeled after a top-tier firm's methodology — synthesized into a single verdict with health scores, price target, and conviction rating.
+![An example investment brief for NVDA](docs/img/brief.png)
 
-The platform combines LLM-based qualitative analysis with a rigorous quant signal pipeline (CPCV-validated, Sharpe 1.04 baseline) and multi-provider market data layer.
+**Live app: https://ai-financial-analyst-eight.vercel.app/**
 
-**Live deployment:**
-- Frontend: Vercel
-- Backend API: Railway
+Enter a ticker; six LLM analyst agents work in parallel and a synthesis agent reconciles them into one investment brief. A separate quantitative screen is backtested against SPY, and the honest result is published on the app's "How it performs" page.
+
+The agent prompts are written in the style of well-known research desks (for example a DCF analyst, a risk analyst, a macro strategist). These are prompt personas only, with no affiliation, endorsement, or access to those firms' methods.
+
+## How it performs
+
+In a 2018–2025 backtest (10 positions), the quantitative screen alone had a Sharpe ratio of 1.15 against 0.74 for SPY; adding the LLM agents lowered it to 1.01. Survivorship bias and LLM look-ahead are not corrected, so treat these as upper bounds.
+
+## Public demo limits
+
+The home page shows four precomputed example briefs. Live runs are limited to 3 per IP per hour and 30 per day. The `/lab` area (backtests, paper trading, deep dives) is gated by an API key and is not part of the public demo.
+
+## Run locally
+
+Requires Python 3.11+ and Node.js 18+.
+
+Backend (FastAPI):
+
+```bash
+pip install -r requirements.txt
+pip install -e .
+cp .env.example .env        # then fill in your keys
+uvicorn backend.main:app --reload --port 8000
+```
+
+Frontend (Vite + React):
+
+```bash
+cd frontend
+cp .env.example .env.local  # VITE_API_URL=http://localhost:8000
+npm install
+npm run dev                 # http://localhost:5173
+```
+
+Key environment variables (see `.env.example` and the full reference under Research notes):
+
+- `ANTHROPIC_API_KEY` with `LLM_PROVIDER=anthropic` (default model `claude-sonnet-5-5`)
+- `TIINGO_API_KEY` (or Alpaca keys with `PRICE_PROVIDER=alpaca`), `FMP_API_KEY`, `FINNHUB_API_KEY`, `TAVILY_API_KEY`
+- `INTERNAL_API_KEY` to unlock the `/lab` area and the protected backend routes
+- `CORS_ORIGINS` for a deployed frontend; `VITE_API_URL` on the frontend
+
+Tests: `pytest -q` (backend, offline) and `cd frontend && npm test && npm run build`.
 
 ---
+
+## Research notes
+
+Everything below is the original engineering documentation for the research platform behind the app. It contains no performance figures; the only published results are in the section above.
+
 
 ## What It Does
 
@@ -39,7 +83,7 @@ Input: AAPL
  +-- Finnhub sentiment: FinBERT/VADER news scoring + insider MSPR
  +-- Optional: TimesFM / LSTM price forecasts, WRDS point-in-time fundamentals
        |
-       v asyncio.gather()
+       v asyncio.gather()   (analyst styles are prompt personas only; see Agents)
  +------------------------------------------------------------+
  |  DCF Analyst        |  Risk Analyst    |  Earnings          |
  |  (Morgan Stanley)   |  (Bridgewater)   |  (JPMorgan)        |
@@ -69,7 +113,7 @@ Input: AAPL
 | Backend API | FastAPI + Uvicorn (Python 3.11+) |
 | Analysis engine | asyncio orchestrator, 6 parallel agents |
 | Quant engine | Walk-forward backtesting, CPCV validation, signal stress testing |
-| LLM | Anthropic Claude (`claude-sonnet-4-20250514` default), OpenAI-compatible fallback |
+| LLM | Anthropic Claude (`claude-sonnet-5-5` default), OpenAI-compatible fallback |
 | Market data | Alpaca (primary, switchable) / Tiingo (price history + quotes), FMP (fundamentals + estimates), Finnhub (sentiment + earnings), FRED (macro) |
 | SEC data | SEC EDGAR API + edgartools + XBRL parser |
 | RAG | Pinecone (llama-text-embed-v2, index: `financial-analyst`) |
@@ -206,23 +250,23 @@ The quantitative backtesting engine validates all signals before they're used in
 
 ### Signal Hierarchy
 
-| Signal | IC | Status | Role |
-|--------|-----|--------|------|
-| **OBV trend** | Validated | Primary | Volume-confirmed price trend — only technical signal with alpha |
-| **Earnings Revision Momentum** | 0.04-0.10 | Primary | Analyst consensus trend (IBES/FMP) |
-| **Balance sheet quality** | 0.04-0.10 | Primary | Equity ratio + current ratio scoring |
-| **Finnhub sentiment** | Validated | Overlay | FinBERT/VADER news scoring + insider MSPR |
-| SMA, RSI, Bollinger, Mean Rev, ATR | ~0 | Regime context | Describe environment, not direction |
+| Signal | Status | Role |
+|--------|--------|------|
+| **OBV trend** | Primary | Volume-confirmed price trend |
+| **Earnings Revision Momentum** | Primary | Analyst consensus trend (IBES/FMP) |
+| **Balance sheet quality** | Primary | Equity ratio + current ratio scoring |
+| **Finnhub sentiment** | Overlay | FinBERT/VADER news scoring + insider MSPR |
+| SMA, RSI, Bollinger, Mean Rev, ATR | Context | Describe environment, not direction |
 
 ### Backtest Validation
 
-- **Gold standard baseline:** VIX 30/40 regime filter, monthly rebalance (Sharpe 1.04, PBO 0%)
+- **Baseline:** VIX 30/40 regime filter, monthly rebalance
 - **CPCV validation:** 252 combinatorial purged cross-validation paths — prevents overfitting
 - **Alpha sweep:** Automated sweep tool with CPCV gate for any new signal
 - **Signal stress test:** IC analysis, factor attribution (FF5+Mom), redundancy detection
 
 ```bash
-# Run the gold-standard backtest
+# Run the baseline backtest
 python scripts/run_backtest.py --start 2020-01-01 --end 2026-01-01 --cpcv
 
 # Signal stress test
@@ -255,6 +299,8 @@ replay months are the only trustworthy historical window.
 ---
 
 ## Agents
+
+> These are prompt personas only, with no affiliation, endorsement, or access to those firms' methods.
 
 | Agent | Style | Focus |
 |-------|-------|-------|
@@ -549,7 +595,7 @@ Both `pytest` and the eval suites run on every pull request via
 
 - **Python 3.11+** — FastAPI, Pydantic v2, asyncio, SQLite
 - **Node 18+** — Vite 6, React 19, TypeScript, Tailwind CSS v3
-- **LLM** — Anthropic Claude (`claude-sonnet-4-20250514`)
+- **LLM** — Anthropic Claude (`claude-sonnet-5-5`)
 - **Market data** — Alpaca / Tiingo (switchable), FMP, Finnhub, FRED, Yahoo Finance (fallback)
 - **SEC** — EDGAR API, edgartools, custom XBRL parser
 - **RAG** — Pinecone (llama-text-embed-v2)
