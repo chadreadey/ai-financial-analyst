@@ -46,7 +46,7 @@ export function ModalRunDetailPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
-          <Button variant="secondary" size="sm" onClick={() => navigate("/backtest")}>
+          <Button variant="secondary" size="sm" onClick={() => navigate("/lab/backtest")}>
             <ArrowLeft size={13} className="mr-1.5" />
             Runs
           </Button>
@@ -278,7 +278,7 @@ function ComboRow({ runId, combo }: { runId: string; combo: ModalCombination }) 
     <tr className="hover:bg-secondary/40 transition-colors border-b border-border/50">
       <td className="px-3 py-2 text-xs text-muted-foreground">
         <Link
-          to={`/backtest/modal/runs/${runId}/combos/${combo.combo_idx}`}
+          to={`/lab/backtest/modal/runs/${runId}/combos/${combo.combo_idx}`}
           className="hover:text-primary transition-colors"
         >
           #{combo.combo_idx}

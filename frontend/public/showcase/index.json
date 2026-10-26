@@ -1,0 +1,45 @@
+{
+  "generated_at": "2026-10-26T16:43:07.983367+00:00",
+  "briefs": [
+    {
+      "ticker": "NVDA",
+      "company_name": "NVIDIA CORP",
+      "verdict": "BUY",
+      "conviction": "MEDIUM",
+      "price_target": 232.0,
+      "entry_price": 210.96,
+      "has_conflicts": true,
+      "run_at": "2026-10-26T16:40:55.206365+00:00"
+    },
+    {
+      "ticker": "JPM",
+      "company_name": "JPMORGAN CHASE & CO",
+      "verdict": "HOLD",
+      "conviction": "LOW",
+      "price_target": 335.0,
+      "entry_price": 331.58,
+      "has_conflicts": true,
+      "run_at": "2026-10-26T16:41:40.612645+00:00"
+    },
+    {
+      "ticker": "KO",
+      "company_name": "COCA COLA CO",
+      "verdict": "HOLD",
+      "conviction": "LOW",
+      "price_target": null,
+      "entry_price": 92.71,
+      "has_conflicts": true,
+      "run_at": "2026-10-26T16:42:26.317713+00:00"
+    },
+    {
+      "ticker": "XOM",
+      "company_name": "Exxon Mobil Corporation",
+      "verdict": "HOLD",
+      "conviction": "LOW",
+      "price_target": 183.21,
+      "entry_price": 183.21,
+      "has_conflicts": true,
+      "run_at": "2026-10-26T16:43:07.983105+00:00"
+    }
+  ]
+}

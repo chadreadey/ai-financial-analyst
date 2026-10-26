@@ -107,7 +107,7 @@ export function StockDeepDivePage() {
     <div className="p-6 max-w-6xl mx-auto space-y-4">
       {/* Back link */}
       <Link
-        to={fromPortfolio ? "/paper-trading" : "/portfolio"}
+        to={fromPortfolio ? "/lab/paper-trading" : "/lab/analysis"}
         className="inline-flex items-center gap-2 text-sm text-blue-500 hover:text-blue-400 transition-colors"
       >
         <ArrowLeft size={16} /> {fromPortfolio ? "Back to Portfolio" : "Back to Watchlist"}
@@ -130,7 +130,7 @@ export function StockDeepDivePage() {
         </div>
         <Button
           size="sm"
-          onClick={() => navigate(`/analysis?ticker=${t}`)}
+          onClick={() => navigate(`/lab/analysis?ticker=${t}`)}
           className="flex items-center gap-2"
         >
           <RefreshCw size={14} /> Re-analyze

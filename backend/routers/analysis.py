@@ -1,11 +1,15 @@
 import asyncio
 import logging
+import re
 import threading
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from backend.auth import is_admin, require_admin
+from backend.rate_limit import RunLimiter, client_ip
+from config import settings
 from backend.jobs import create_job, get_job, run_analysis_job, JobState
 from backend.schemas import RunAnalysisRequest, JobCreated, JobStatus, HistoryDetail
 
@@ -13,15 +17,67 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+limiter = RunLimiter(
+    settings.public_runs_per_ip_per_hour,
+    settings.public_runs_per_day,
+    settings.public_max_concurrent_runs,
+)
+
+_PUBLIC_TICKER_RE = re.compile(r"^[A-Z]{1,5}(\.[A-Z])?$")
+
+
+def _limit_message(reason: str | None, retry_after: int | None) -> str:
+    if reason == "concurrent":
+        return (
+            "Live run limit reached for now (other runs are in progress); "
+            "try one of the example briefs or retry shortly."
+        )
+    minutes = max(1, -(-(retry_after or 60) // 60))
+    wait = f"{minutes} minutes" if minutes < 120 else f"{-(-minutes // 60)} hours"
+    return f"Live run limit reached for now; try one of the example briefs or come back in {wait}."
+
+
 @router.post("/run", response_model=JobCreated)
-async def run_analysis(req: RunAnalysisRequest):
-    job = create_job(req.ticker)
-    thread = threading.Thread(
-        target=run_analysis_job,
-        args=(job, req),
-        daemon=True,
-    )
-    thread.start()
+async def run_analysis(req: RunAnalysisRequest, request: Request):
+    if is_admin(request):
+        if "provider" not in req.model_fields_set:
+            req.provider = settings.llm_provider
+        req.ticker = req.ticker.strip().upper()
+        job = create_job(req.ticker)
+        thread = threading.Thread(
+            target=run_analysis_job,
+            args=(job, req),
+            daemon=True,
+        )
+        thread.start()
+        return JobCreated(job_id=job.job_id)
+
+    ticker = req.ticker.strip().upper()
+    if not _PUBLIC_TICKER_RE.match(ticker):
+        raise HTTPException(status_code=422, detail="Ticker must look like AAPL or BRK.B")
+
+    ok, reason, retry_after = limiter.acquire(client_ip(request))
+    if not ok:
+        raise HTTPException(
+            status_code=429,
+            detail=_limit_message(reason, retry_after),
+            headers={"Retry-After": str(retry_after or 60)},
+        )
+
+    clamped = RunAnalysisRequest(ticker=ticker, provider=settings.llm_provider)
+
+    def _run() -> None:
+        try:
+            run_analysis_job(job, clamped, auto_paper_trade=False)
+        finally:
+            limiter.release()
+
+    try:
+        job = create_job(ticker)
+        threading.Thread(target=_run, daemon=True).start()
+    except Exception:
+        limiter.release()
+        raise
     return JobCreated(job_id=job.job_id)
 
 
@@ -75,7 +131,7 @@ async def get_result(job_id: str):
     return JobStatus(job_id=job_id, status=job.status)
 
 
-@router.get("/history")
+@router.get("/history", dependencies=[Depends(require_admin)])
 async def get_history(ticker: str = "", limit: int = 20, offset: int = 0):
     from sec.cache import SECCache
     from backend.history_outcomes import compute_outcome_metrics
@@ -90,7 +146,11 @@ async def get_history(ticker: str = "", limit: int = 20, offset: int = 0):
         cache.close()
 
 
-@router.get("/history/{analysis_id}", response_model=HistoryDetail)
+@router.get(
+    "/history/{analysis_id}",
+    response_model=HistoryDetail,
+    dependencies=[Depends(require_admin)],
+)
 async def get_history_detail(analysis_id: str):
     from sec.cache import SECCache
     from backend.history_outcomes import compute_outcome_metrics

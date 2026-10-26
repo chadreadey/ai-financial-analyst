@@ -75,6 +75,14 @@ class AnthropicProvider(LLMProvider):
         kwargs = {}
         if not resolved_model.startswith(_NO_SAMPLING_MODEL_PREFIXES):
             kwargs["temperature"] = 0.0
+        if resolved_model.startswith("claude-sonnet-5-5"):
+            # Thinking-off mode for this model ("disabled" returns a 400); keeps
+            # small max_tokens budgets from being consumed by adaptive thinking.
+            kwargs["thinking"] = {"type": "between_tools"}
+        elif resolved_model.startswith("claude-opus-5-5"):
+            # Thinking can't be disabled on this model; low effort keeps it
+            # small so it doesn't consume the small max_tokens budgets.
+            kwargs["output_config"] = {"effort": "low"}
         message = await self._client.messages.create(
             model=resolved_model,
             max_tokens=max_tokens,
@@ -84,7 +92,12 @@ class AnthropicProvider(LLMProvider):
         )
         if message.stop_reason == "refusal":
             raise RuntimeError(f"Model {resolved_model} refused the request")
-        return next(b.text for b in message.content if b.type == "text")
+        for block in message.content:
+            if block.type == "text":
+                return block.text
+        raise RuntimeError(
+            f"Model {resolved_model} returned no text block (stop_reason={message.stop_reason})"
+        )
 
 
 class OpenAIProvider(LLMProvider):

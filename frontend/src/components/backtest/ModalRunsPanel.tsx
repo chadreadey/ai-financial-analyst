@@ -127,7 +127,7 @@ export function ModalRunsPanel() {
                   <tr
                     key={head.run_id}
                     className="cursor-pointer hover:bg-secondary/40 transition-colors border-b border-border/50"
-                    onClick={() => navigate(`/backtest/modal/runs/${head.run_id}`)}
+                    onClick={() => navigate(`/lab/backtest/modal/runs/${head.run_id}`)}
                   >
                     <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
                       {formatDateTime(head.started_at)}

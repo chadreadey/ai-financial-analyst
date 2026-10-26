@@ -101,7 +101,7 @@ export function ModalComboDetailPage() {
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => navigate(`/backtest/modal/runs/${runId}`)}
+            onClick={() => navigate(`/lab/backtest/modal/runs/${runId}`)}
           >
             <ArrowLeft size={13} className="mr-1.5" />
             Run
@@ -277,7 +277,7 @@ export function ModalComboDetailPage() {
                 <TradeRow
                   key={`${t.ticker}-${t.entry_date}-${i}`}
                   trade={t}
-                  tickerLink={t.ticker ? `/stock/${t.ticker}` : undefined}
+                  tickerLink={t.ticker ? `/lab/stock/${t.ticker}` : undefined}
                 />
               ))}
               {!isLoading && filteredTrades.length === 0 && (

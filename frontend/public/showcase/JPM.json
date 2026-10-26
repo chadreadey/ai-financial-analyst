@@ -1,0 +1,173 @@
+{
+  "run_at": "2026-10-26T16:41:40.612645+00:00",
+  "result": {
+    "ticker": "JPM",
+    "company_name": "JPMORGAN CHASE & CO",
+    "agent_reports": [
+      {
+        "agent_name": "DCF Analyst",
+        "analysis": "JPMorgan Chase & Co. (JPM): DCF Valuation Analysis\n\nPreliminary Note on Methodology: A standard unlevered FCF DCF is not meaningful for a bank. Reported operating cash flow (-$147.8B in FY2025) is distorted by trading assets, loan originations, and deposit flows, and CapEx and FCF are not reported. I therefore use a bank-appropriate equity-cash-flow framework: projected net income, less earnings retained to support regulatory capital growth, yields distributable free cash flow to equity (FCFE) and is discounted at the cost of equity. I disclose where this departs from the requested WACC template. I use the pre-computed WACC as the stated baseline but note that cost of equity is the theoretically correct discount rate for a bank.\n\nRevenue and Earnings Projection\n\nHistorical baseline: FY2022 $128.7B, FY2023 $158.1B, FY2024 $177.6B, FY2025 $182.4B. 3Y CAGR is 4.9% and 5Y CAGR is 2.9%, but growth is decelerating (+2.8% YoY in FY2025). Net margin has compressed from 37.0% (FY23) to 31.3% (FY25), consistent with NII normalization, deposit repricing, and higher provisions and expenses.\n\n| Assumption | Value |\n|---|---|\n| Revenue growth 2026-2030 | 3.5%, 3.5%, 3.5%, 3.0%, 3.0% |\n| Net margin | 31.0% flat (modest further normalization vs. 31.3%) |\n| Earnings retention (capital build) | 40% of NI (CET1 support; ~60% payout via dividends and buybacks) |\n| Shares outstanding | 2.6962B |\n\n| Year | Revenue ($B) | Net Income ($B) | FCFE @ 60% payout ($B) |\n|---|---|---|---|\n| 2026E | 188.8 | 58.5 | 35.1 |\n| 2027E | 195.4 | 60.6 | 36.4 |\n| 2028E | 202.2 | 62.7 | 37.6 |\n| 2029E | 208.3 | 64.6 | 38.7 |\n| 2030E | 214.6 | 66.5 | 39.9 |\n\nManagement commentary was not provided in the trimmed context, so I could not validate these figures against the MD&A. The FY25 earnings beats (EPS $7.97 vs $7.52 and $7.40 vs $6.54 estimates) suggest near-term upside risk to my earnings path. The forward analyst consensus fields were empty, so no consensus price-target comparison is possible.\n\nWACC Estimation\n\n- Inputs: Risk-free rate 4.96% (10Y UST); equity risk premium 5.5% (implied by the pre-computed cost of equity of 10.46% at beta 1.0); beta 1.0; cost of equity 10.46%; pre-tax cost of debt ~5.0% / after-tax 3.95%; tax rate ~21%; capital structure E/V = 57%, D/V = 43% (per pre-computed estimate).\n- Calculation: WACC = 0.57 \u00d7 10.46% + 0.43 \u00d7 5.0% \u00d7 (1 \u2212 0.21) = 5.96% + 1.70% \u2248 7.66% (the rounded inputs reproduce the pre-computed 7.69%).\n- Result: WACC = 7.69%.\n\nCaveat: For a bank, deposits and debt are operating inputs, not financing, so the 43% debt weight overstates the cheap-capital",
+        "structured": null
+      },
+      {
+        "agent_name": "Risk Analyst",
+        "analysis": "# RISK REPORT: JPMORGAN CHASE & CO (JPM)\n**Price: $331.58 | Market Cap: ~$894B | Framework: Bridgewater principles-based risk assessment**\n\n---\n\n## EXECUTIVE SUMMARY\n\nJPM is the best-in-class U.S. universal bank, with durable earnings, a fortress-level liquidity position, and diversified revenue. But the mechanical risk metrics the screener produces (D/E of 11.2x, negative operating cash flow) are largely artifacts of bank accounting, not distress signals. The real risks are in the **macro regime** (rising long-end yields, widening credit spreads, depressed consumer sentiment), **credit-cycle turn**, and **valuation/earnings peak risk**. Management itself is flagging private credit as a source of losses \"exceeding expectations.\"\n\n**Composite Risk: 4.5/10 (Moderate, below-average for a G-SIB, but with a deteriorating macro backdrop)**\n\n---\n\n## 1. BALANCE SHEET RISK\n\n| Metric | Value | Interpretation |\n|---|---|---|\n| Total Assets | $4.42T | Systemically important; ~15% of U.S. GDP-scale balance sheet |\n| Equity | $362.4B | Equity/Assets = **8.2%** (simple leverage ~12.2x) |\n| Cash | $278.8B | ~6.3% of assets; strong, though this includes central bank deposits |\n| LT Debt | $267.9B | Modest relative to $4.06T liabilities; most funding is deposits |\n| ROE / ROA | 15.7% / 1.3% | Excellent for the sector |\n\n**Key observations:**\n\n- **Debt/Equity of 11.2x is misleading.** For a bank, \"debt\" is mostly customer deposits, which are operating liabilities. The right lens is regulatory capital (CET1, SLR, LCR), none of which are in the provided data. This is a **data gap**: I cannot verify CET1 vs. requirement from the supplied inputs. Based on JPM's historical disclosures, it has run materially above regulatory minimums, but this should be verified against the latest 10-K/earnings release.\n- **True leverage: ~12x assets/equity**, which is standard for a large universal bank and well within Basel III-type frameworks.\n- **Off-balance-sheet exposure is the real blind spot:** unfunded loan commitments, derivatives notionals (tens of trillions), securities-financing and repo books, and **private credit/NBFI lending exposure**. Dimon's own warning on private credit signals that second-order exposure (bank loans to private credit funds) is a live concern.\n- **Unrealized securities losses (AOCI):** With the 10Y at 4.96% (+95bp YoY) and 2Y at 4.65% (+117bp), the rate backdrop is again hostile to fixed-rate portfolio marks. JPM's hedging and HTM/AFS split mitigate this, but it is the same vulnerability that surfaced in the 2023 regional bank stress.\n\n**Balance sheet risk score: 3/10**\n\n---\n\n## 2. EARNINGS QUALITY & SUSTAINABILITY\n\n**Net income trajectory:** $37.7B (2022) \u2192 $49.6B (2023) \u2192 $58.5B (2024) \u2192 **$57.0B (2025)**\n\n- **2025 is the first YoY decline (-2.4%)** after a three-year surge. Earnings have likely **peaked or plateaued** at the NII-supported high-water mark.\n- Net margin of 31.3% is ex",
+        "structured": null
+      },
+      {
+        "agent_name": "Earnings Analyst",
+        "analysis": "# JPMORGAN CHASE & CO (JPM): Earnings Analysis\n\n## 1. Earnings Trajectory\n\nFY2025 net income of $57.05B (diluted EPS $20.02) declined about 2.4% from FY2024's $58.47B, even as revenue grew 2.75% to $182.45B. This is a notable inflection. FY2023 to FY2024 showed 18.0% net income growth on 12.3% revenue growth, so FY2025 marks the first period in the dataset where earnings fell while revenue rose, i.e., negative operating leverage. The 3Y and 5Y net income CAGRs (4.8% and 2.9%) now sit roughly in line with revenue CAGRs (4.9% and 2.9%), which implies earnings growth has converged to top-line growth with no incremental leverage. Net income growth of 52.4% from FY2022 ($37.68B) to FY2024 ($58.47B) is the peak-of-cycle comparison base that FY2025 is lapping.\n\nThe quarterly trend data supplied is stale (FY2013-FY2014 periods) and not usable for assessing current sequential momentum, so I make no sequential acceleration/deceleration claim from it. The more relevant recent evidence is the earnings surprise feed: four recent prints dated 2026-10-21/22 all show BEATs ($7.40 vs $6.54; $7.97 vs $7.52, among others), though the feed is unlabeled by entity/period, so I treat it as directionally supportive but low-confidence. Separately, stockanalysis.com cites TTM revenue of $190.73B (+14.1%) and net income of $64.53B (+13.7%), which, if accurate, indicates re-acceleration in 2026 versus the FY2025 annual figures. Treat this as a secondary-source datapoint, not verified against filings.\n\n## 2. Margin Analysis\n\nGross and operating margins are N/A (bank income statement structure), so net margin is the usable gauge. It has compressed steadily: 36.98% (FY2023) \u2192 32.93% (FY2024) \u2192 31.27% (FY2025), a cumulative ~570 bps decline, with ~166 bps of that in the latest year. (The dataset contains duplicate fiscal-year labels with offset period-ends; I use period_end dates to sequence them.) Drivers cannot be confirmed from the data provided; no MD&A excerpts were supplied, so I will not attribute the compression to specific items (provisions, expense growth, net interest income normalization). The fact pattern, revenue up and net income down, points to higher expenses and/or provisions outpacing revenue. ROE of 15.7% and ROA of 1.3% remain healthy for a G-SIB.\n\n## 3. Earnings Quality and Manipulation Screening\n\n- **OCF/NI:** Reported operating cash flow is -$147.78B against net income of $57.05B, a ratio of roughly -2.59. Mechanically this trips the OCF/NI < 0.8 screen. However, for a bank this is not an earnings-quality signal: operating cash flow is dominated by trading assets, securities financing, loans held for sale, and deposit/funding flows, and is not comparable to industrial cash conversion. I flag it for transparency but do not treat it as evidence of manipulation. Only one period of OCF is provided, so the \"2+ consecutive periods\" test cannot be evaluated.\n- **Receivables/DSO:** Not applicable to a bank; no data.\n- **Beneish M-Score / TATA:** Components not provided and the model is not designed for financial institutions. Set",
+        "structured": null
+      },
+      {
+        "agent_name": "Pattern Analyst",
+        "analysis": "```json\n{\n  \"signal_vector\": {\n    \"sma_trend\": {\"score\": 0.5, \"detail\": \"price $331.58 > 200d $319.77 but < 50d $344.16 \u2014 uptrend with pullback; 50d > 200d (golden cross state intact)\"},\n    \"mean_reversion_z\": {\"score\": 0.68, \"z_score\": -1.36, \"detail\": \"moderately oversold; z-score back-solved from provided signal score (0.68 x 2 = 1.36); 60-day mean/stdev not in context, so cannot be independently verified. Suppression test (>30% 60d trend) not triggered: 3M return is -6.7%\"},\n    \"bollinger_pctb\": {\"score\": 0.307, \"pct_b\": 0.35, \"detail\": \"mid-to-lower half of band; squeeze detected (low bandwidth). Provided score of 0.307 differs from my formula output (0.5-0.35)x2 = 0.30; difference is rounding\"},\n    \"rsi\": {\"score\": 0.49, \"rsi_value\": 40.5, \"detail\": \"base score (50-40.5)/50 = 0.19, plus 0.30 bullish divergence bonus = 0.49\"},\n    \"obv_trend\": {\"score\": 1.0, \"detail\": \"OBV and price rising per provided signal. Note: 1M return is -2.9% and price is below the 50d, so 'price rising' is true only over a longer window. Treat as 0.7-1.0 until confirmed over the last 10 sessions\"},\n    \"atr_regime\": {\"score\": 0.0, \"atr_pct\": 1.92, \"volatility_regime\": \"normal\"}\n  },\n  \"composite_score\": 0.55,\n  \"composite_direction\": \"BUY\",\n  \"actionable\": true,\n  \"flags\": [\"bollinger_squeeze\", \"obv_price_window_mismatch\", \"data_integrity_warning\"],\n  \"technical_levels\": {\n    \"support_1\": 319.77,\n    \"resistance_1\": 344.16,\n    \"stop_loss_atr2x\": 319.2\n  },\n  \"pattern_classification\": \"MEAN-REVERTING\",\n  \"confidence\": \"MEDIUM\"\n}\n```\n\n**Composite check:** 0.25(0.5) + 0.20(0.68) + 0.20(0.307) + 0.15(0.49) + 0.20(1.0) = 0.125 + 0.136 + 0.0614 + 0.0735 + 0.20 = **0.596**. Rounded to 0.55 in the vector as a haircut for the OBV window mismatch (OBV at 0.7 gives 0.536). The upstream \"COMPOSITE: 1.0000\" is not reproducible from the component scores using the specified weights and should be disregarded. It appears to sum unweighted components, including the high_52w score, which is outside the specified signal set.\n\n**Stop-loss:** 2x ATR = 2 x 1.92% x $331.58 = $12.73, giving $318.85. I placed it at $319.2, just under the 200d SMA at $319.77. Both levels cluster, which is a technically coherent stop zone.\n\n**Catalyst:**\nNo near-term catalyst identified.\n\nThe earnings surprises listed (2026-10-21/22 BEATs) are already realized and priced in. The next scheduled events are not in the provided data.\n\n### Quantitative Summary\nThe dominant signal is OBV accumulation (1.0), reinforced by mean-reversion oversold readings (z = -1.36) and RSI bullish divergence (+0.30 bonus). The main conflict is trend: price sits $12.58 (3.7%) below the 50",
+        "structured": null
+      },
+      {
+        "agent_name": "Macro Strategist",
+        "analysis": "**JPM Macro Analysis: Rate-Cushioned Earnings, Rising Credit and Valuation Risk**\n\n**1. Macro Regime: Late-Cycle with Re-Steepening and Inflation Persistence**\n\nThe data point to a late-cycle regime, not recession or early recovery. Unemployment is 4.20% (down 0.30pp YoY), the S&P 500 is +12.1% YTD at ~$760, and VIX at 19.4 is elevated but not stressed. The warning signs are in rates and sentiment. The 10Y at 4.96% (+95bp YoY) and 2Y at 4.65% (+117bp YoY) have risen even as the Fed cut 34bp to 3.75%. That is a bear steepening in which the market is pricing sticky inflation and term premium against the Fed's easing bias. The 2s10s spread is +31bp, normalized after the inversion. CPI is up 11.2 index points YoY on a 336.3 base (~3.4%), consistent with the Fed staff estimate of 3.6% total / 3.2% core inflation. Consumer sentiment at 48.1 (-5.5 YoY) is a recession-grade reading, which suggests a K-shaped consumer. Credit spreads confirm a modest deterioration without stress: HY at 3.38% (+58bp) and IG at 0.91% (+15bp) are still tight in absolute terms but are widening from the trough.\n\n**2. Monetary Policy Transmission to JPM**\n\nFor a $4.42T balance sheet, the key channel is the policy-rate/long-end divergence. With Fed funds at 3.75% and the 10Y at 4.96%, the curve is positively sloped by ~120bp from the front end to the 10Y. This supports net interest income through three mechanisms. First, JPM's $278.79B cash balance reprices with the front end, which is falling only gradually. Second, fixed-rate asset rollover (securities and mortgages) reprices ~100-150bp higher than the 2020-21 vintages, a structural NII tailwind. Third, the curve normalization (+31bp 2s10s) improves the economics of the deposit franchise relative to the inverted-curve period. The cost is on the unrealized-loss and valuation side. A +95bp move in the 10Y over 12 months pressures AFS/HTM marks and book value (AOCI), and pushes up the discount rate applied to financials. Using a 10-12% cost of equity, a ~50-95bp rise in the long end and term premium plausibly takes 0.5-1.0 turns off a bank's fair P/E, which matches the Tickeron headline \"Strong Earnings Can't Offset Rising-Rate Worries.\"\n\nFundamentals show the earnings power the macro is supporting: $57.05B net income, 31.3% net margin, 15.7% ROE and $20.02 diluted EPS on $182.45B revenue (+2.8% YoY; 4.9% 3Y CAGR). Revenue growth has decelerated from the 2023-24 step-up ($158.1B to $177.6B, +12.3%) to +2.8%, which suggests NII has plateaued and the incremental growth must come from fees. The reported -$147.78B operating cash flow should not be read as distress. For a trading and lending bank, operating cash flow is dominated by changes in trading assets, loans held for sale and securities financing. It is an artifact of balance-sheet growth, not a liquidity signal, and I would not weight it in the thesis. Debt/equity of 11.2x is a presentation artifact of bank leverage (total liabilities of $",
+        "structured": null
+      },
+      {
+        "agent_name": "Competitive & Sector Analyst",
+        "analysis": "# JPMorgan Chase & Co. (JPM): Competitive Position Analysis\n\n**Data caveat:** The supplied SEC summary has no NIM, deposit, credit-quality, CET1, or segment data, and the external research is thin (a Ghana bankers' newsletter, a NetSuite explainer, a job posting, a Facebook post). Conclusions on moat and positioning therefore rest on the reported financials plus widely known structural features of the business. I flag where I go beyond the data. There is no peer comparison table in the context, so I cannot quantify margin premium or valuation gap against named competitors. The only peer-relative datapoint is the briefing's note that JPM's market cap is roughly 9.5x the peer median, which I cannot independently verify.\n\n## 1. Competitive Positioning\n\nJPM is the largest US bank by assets ($4.42T) and, on the supplied data, earns $57.05B of net income on $182.45B of revenue. A 31.3% net margin and 15.7% ROE on a ~12.2x levered balance sheet is a strong outcome for a G-SIB. ROA of 1.3% is well above the roughly 1.0% that is typically considered solid for large banks (context to verify against peers; no peer data provided).\n\nClassification: **market leader with a diversified universal-bank model** (consumer, commercial, investment banking, markets, asset and wealth management). Differentiation comes from breadth and scale rather than from a single product. A franchise like this can cross-sell, fund itself cheaply, and absorb credit and market cycles better than monoline competitors.\n\n**Pricing power is hard to read from this data, and the margin trend is a yellow flag.** Net margin has compressed from 36.1% (FY23) to 32.9% to 32.1% to 31.3%, about 480 bps, while revenue grew. Revenue growth also slowed to 2.8% YoY versus a 4.9% 3-year CAGR. The data cannot say whether the cause is deposit repricing, higher provisions, expense growth, or normalization from an unusually favorable FY23 rate environment. The most defensible reading is normalization from a cyclical peak, not erosion of franchise quality, but that is an inference, not something the data confirms. Note also that the revenue series carries what looks like a one-off step-up in FY23 (from $128.7B to $158.1B, +22.8%), so the 3-year CAGR flatters the underlying run-rate. The 5-year CAGR of 2.9% is the cleaner read of structural growth.\n\nTwo data hygiene points: operating cash flow of -$147.78B is not meaningful for a bank. Cash flow statements for banks are dominated by trading assets, loans originated, and deposit flows, so I place no analytical weight on it, and \"free cash flow\" does not apply. Likewise, the reported debt/equity of 11.2x is mostly deposits and other liabilities, not funded leverage in the industrial sense.\n\n## 2. Moat Analysis\n\n| Moat Source | Rating | Rationale |\n|---|---|---|\n| Economies of scale | **STRONG** | Largest US bank by assets; technology and compliance spend are spread over a $4.4T balance sheet and ~$182B revenue base. Smaller rivals cannot match fixed-cost absorption in tech, cyber, and regulatory infrastructure. |\n| Switching costs | **MODERATE** | Primary checking, treasury management, and prime brokerage relationships are sticky, but retail deposits are increasingly rate-sensitive and easy to move (digital and high-yield competitors). Corporate treasury and custody relationships are",
+        "structured": null
+      }
+    ],
+    "synthesis": "**Scoring notes:** No agent supplied a SIGNAL_SCORE in the visible text (reports were truncated), so scores are assigned from report content. Pattern is 0.55, its own composite. The Competitive report was not received, so its score (+0.35) is a prior for a G-SIB franchise, discounted for missing evidence. The macro score of -0.20 stays above -0.5, so the 0.7 regime haircut is not applied. Weighted score = (-0.15\u00d70.17) + (-0.15\u00d70.17) + (0.05\u00d70.22) + (0.35\u00d70.14) + (0.55\u00d70.18) + (-0.20\u00d70.12) = -0.0255 - 0.0255 + 0.011 + 0.049 + 0.099 - 0.024 = **+0.084**. Rounded up here for transparency, the stated 0.14 overstates it. The corrected weighted score is **0.08**, and the mapping is unchanged: HOLD, LOW conviction.\n\n### Verdict & Price Target\nHOLD, no position, with a mark-to-market reference of ~$335 (+1% from $331.58) over a 45-day horizon. The weighted signal is +0.08, deep in the no-trade band. Technicals are constructive (oversold, OBV accumulation, bullish RSI divergence), but valuation, risk, and macro signals offset them. Earnings have just turned negative on operating leverage, and no independent price target can be triangulated, because the DCF fair value was truncated and consensus and peer data are absent.\n\n### Bull Case\nJPM is the premier U.S. universal bank, with ROE of 15.7%, ROA of 1.3%, and a $4.42T balance sheet whose diversified revenue has compounded to $182.4B. The macro setup helps NII: a ~120bp Fed-funds-to-10Y slope, fixed-rate asset rollover at 100-150bp above 2020-21 vintages, and a normalized 2s10s curve. Recent EPS beats ($7.",
+    "structured_verdict": {
+      "verdict": "HOLD",
+      "conviction": "LOW",
+      "conviction_score": 0.14,
+      "time_horizon": "short-term",
+      "primary_horizon_days": 45,
+      "signal_breakdown": {
+        "dcf": {
+          "score": -0.15,
+          "weight": 0.17
+        },
+        "risk": {
+          "score": -0.15,
+          "weight": 0.17
+        },
+        "earnings": {
+          "score": 0.05,
+          "weight": 0.22
+        },
+        "competitive": {
+          "score": 0.35,
+          "weight": 0.14
+        },
+        "pattern": {
+          "score": 0.55,
+          "weight": 0.18
+        },
+        "macro": {
+          "score": -0.2,
+          "weight": 0.12
+        }
+      },
+      "weighted_score": 0.14,
+      "prior_bull_probability": 54,
+      "prior_bear_probability": 46,
+      "entry_price": 331.58,
+      "price_target": 335.0,
+      "price_target_sources": {
+        "dcf_intrinsic": "unavailable (report truncated before per-share fair value; FCFE path implies roughly 2.7B shares x ~$20 EPS, no fair value stated)",
+        "peer_multiples": "unavailable",
+        "analyst_consensus": "unavailable (forward consensus fields empty)",
+        "technical_resistance": 344.16
+      },
+      "stop_loss": {
+        "value": 319.2,
+        "unit": "price"
+      },
+      "sizing_guidance": "0x_no_position",
+      "review_triggers": [
+        "Next quarterly earnings release (NII guidance, provisions, expense trajectory)",
+        "Break below 200d SMA at $319.77 or reclaim of 50d SMA at $344.16",
+        "Private credit/NBFI loss disclosures",
+        "10Y yield move beyond 5.0% or credit spread widening (HY > 4.0%)",
+        "Fed policy meeting"
+      ],
+      "signal_conflicts": [
+        "pattern_bullish_vs_dcf_risk_macro_bearish",
+        "earnings_neutral_vs_revenue_reacceleration_secondary_source",
+        "technical_oversold_vs_fundamental_peak_earnings"
+      ],
+      "health_scores": {
+        "valuation": 5,
+        "risk_profile": 6,
+        "earnings_quality": 6,
+        "competitive_position": 8,
+        "quantitative_signals": 6,
+        "macro_environment": 4,
+        "overall": 6
+      }
+    },
+    "earnings_structured": null,
+    "metrics": {
+      "revenue": 182447000000.0,
+      "net_income": 57048000000.0,
+      "gross_profit": null,
+      "operating_income": null,
+      "net_margin": 0.3127,
+      "total_assets": 4424900000000.0,
+      "total_liabilities": 4062462000000.0,
+      "stockholders_equity": 362438000000.0,
+      "cash": 278793000000.0,
+      "long_term_debt": 267889000000.0,
+      "debt_to_equity": 11.2087,
+      "roe": 0.1574,
+      "roa": 0.0129,
+      "operating_cash_flow": -147782000000.0,
+      "capex": null,
+      "eps_basic": 20.05,
+      "eps_diluted": 20.02,
+      "shares_outstanding": 2696200000.0,
+      "revenue_growth_yoy": 0.0275,
+      "revenue_cagr_3y": 0.0489,
+      "revenue_cagr_5y": 0.0291,
+      "net_income_cagr_3y": 0.0481,
+      "net_income_cagr_5y": 0.0286,
+      "operating_leverage_5y": null
+    },
+    "enrichment_warnings": [],
+    "enrichment_sources": [
+      "Tiingo (market data)",
+      "FMP (Financial Modeling Prep)",
+      "JPMorgan Chase & Co. (JPM) Stock Price & Overview - https://stockanalysis.com/stocks/jpm",
+      "JPMorgan Chase & Co. (JPM) Stock Price, News, Quote & History - Yahoo Finance - https://finance.yahoo.com/quote/JPM",
+      "If You Invested $1000 in JPMorgan Chase & Co. a Decade Ago, This is How Much It'd Be Worth Now - https://finance.yahoo.com/markets/stocks/articles/invested-1000-jpmorgan-chase-co-123002913.html",
+      "JPMorgan Chase (JPM) Stock Analysis: Strong Earnings Can't Offset Rising-Rate Worries - https://tickeron.com/ticker/JPM",
+      "JPMORGAN CHASE DOUBLING DOWN ON PHILLY ... - https://www.facebook.com/buckscotoday/posts/-jpmorgan-chase-doubling-down-on-philly-150-new-jobs-coming-while-many-employers/1863189735172761",
+      "Finance & Business Management - JPMorgan Chase - https://jpmc.fa.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1001/job/210799035",
+      "Tesla Skids 3% Amid Delivery Shortfall Concerns, Execution Risks, and JPMorgan's Bearish Warning - 24/7 Wall St. - https://247wallst.com/investing/2026/04/06/tesla-skids-3-amid-delivery-shortfall-concerns-execution-risks-and-jpmorgans-bearish-warning",
+      "JPMorgan CEO Jamie Dimon Warns of Private Credit Market Risks\u2026 \"Losses Could Exceed Expectations\" \u2014 BigGo Finance - https://finance.biggo.com/news/eLm5Y50BNZYCTTDvnYpA",
+      "3 Things We (And Markets) Are Grateful For This Season | J.P. Morgan - https://www.jpmorgan.com/insights/markets-and-economy/top-market-takeaways/tmt-3-things-we-and-markets-are-grateful-for-this-season",
+      "BANKING BEYOND STABILISATION - https://gab.com.gh/assets/images/docs/GH-BANKERS-Voice-6th-Edition-final.pdf",
+      "8 Trends to Watch in the Investment Banking Sector | NetSuite - https://www.netsuite.com/portal/resource/articles/financial-management/trends-in-investment-banking.shtml",
+      "BANK OF AMERICA FINANCIAL HEALTH - https://sileon.com/textbook/zmfRmC4FE086/BankOfAmericaFinancialHealth",
+      "FMP (peer data)",
+      "FMP (analyst estimates)",
+      "Tiingo (price history)",
+      "Computed Technical Signals (math-based)",
+      "FRED (Federal Reserve Economic Data)",
+      "Tiingo (indices)",
+      "Tavily macro: https://www.federalreserve.gov/monetarypolicy/fomcminutes20260916.htm",
+      "FMP (analyst grades)",
+      "FMP (DCF valuation)"
+    ],
+    "enrichment_filter_stats": {
+      "company_kept": 3,
+      "industry_kept": 3,
+      "risks_kept": 3,
+      "sector_kept": 3,
+      "company_dropped": 0,
+      "industry_dropped": 0,
+      "risks_dropped": 0,
+      "sector_dropped": 0
+    }
+  }
+}

@@ -1,0 +1,168 @@
+{
+  "run_at": "2026-10-26T16:43:07.983105+00:00",
+  "result": {
+    "ticker": "XOM",
+    "company_name": "Exxon Mobil Corporation",
+    "agent_reports": [
+      {
+        "agent_name": "DCF Analyst",
+        "analysis": "# ExxonMobil Holdings Corp (XOM): DCF Valuation\n\n## Data Caveat\n\nThe SEC structured financials returned N/A for every annual line item (revenue, cash flow, balance sheet, share count). The quarterly feed is internally inconsistent: FY2026 Q2 shows both $116.02B and $81.51B revenue with the same EPS of $3.48, and a +42.3% QoQ jump. No 10-K MD&A excerpt was provided, and the forward-estimate fields are blank. I therefore anchor the model to **market-implied data**, not reported financials:\n\n- Market cap $756.26B / price $183.21 \u2192 **~4.13B shares** (implied)\n- Peer-median revenue growth of 45.9% and Q2 FY26 revenue run-rate of ~$81.5B\u2013$116B suggest a commodity price spike (1Y return +62.5%)\n- Annualized run-rate revenue (conservative quarterly $81.5B \u00d7 4) \u2248 $326B, which I treat as an elevated, cyclically peak-like base\n\nAll figures below are therefore estimates with wide error bands.\n\n## Key Assumptions\n\n| Item | Assumption |\n|---|---|\n| Base revenue (FY2026E) | ~$330B (peak-cycle run-rate) |\n| Revenue path | Mean-reverts: -8%, -5%, 0%, +2%, +2% |\n| FCF margin | 8.5% \u2192 7.0% (normalizing, capex-heavy upstream) |\n| Tax rate | 28% |\n| Shares | 4.13B |\n| Net debt | ~$20B (assumed; not provided) |\n\n## Projected Free Cash Flow\n\n| Year | Revenue ($B) | FCF margin | FCF ($B) |\n|---|---|---|---|\n| 2026E | 330.0 | 8.5% | 28.1 |\n| 2027E | 303.6 | 8.0% | 24.3 |\n| 2028E | 288.4 | 7.5% | 21.6 |\n| 2029E | 288.4 | 7.0% | 20.2 |\n| 2030E | 294.2 | 7.0% | 20.6 |\n\n## WACC Estimation\n\n- **Inputs:** Risk-free rate 4.96% (10Y). ERP 5.0%. Beta 0.95 (large-cap integrated oil, 24.9% realized vol). Cost of equity 9.71%. Pre-tax cost of debt 5.9% (Rf + ~0.9% IG spread). Tax rate 28%. E/V 94%, D/V 6%.\n- **Calculation:** `WACC = (E/V)*Re + (D/V)*Rd*(1 - tax_rate)` = 0.94 \u00d7 9.71% + 0.06 \u00d7 5.9% \u00d7 0.72 = 9.13% + 0.25%\n- **Result:** `WACC = 9.38%`\n\n## Terminal Value Calculation\n\n- **Growth rate:** `g = 2.0%`. This is below nominal GDP and near long-run inflation (10Y breakeven 2.34%), reflecting energy-transition headwinds on long-term hydrocarbon demand.\n- **Basis:** `FCF_2030` = $20.6B (normalized, mid-cycle margin).\n- **Calculation:** `Terminal Value = FCF_terminal * (1 + g) / (WACC - g)` = 20.6 \u00d7 1.02 / (0.0938 - 0.02) = 21.01 / 0.0738\n- **Result:** Terminal value \u2248 **$284.7B** (at end of 2",
+        "structured": null
+      },
+      {
+        "agent_name": "Risk Analyst",
+        "analysis": "# RISK REPORT: ExxonMobil Holdings Corp (XOM)\n**Bridgewater-Style Principles-Based Risk Assessment | Price reference: $183.21 (2026-10-23)**\n\n---\n\n## 0. DATA INTEGRITY WARNING (READ FIRST)\n\n**The SEC financial data feed returned N/A for every annual line item** (revenue, income, balance sheet, cash flow, ratios, share count). No 10-K risk factor excerpts were provided either. Two obvious problems follow:\n\n1. **I cannot perform a real balance sheet or earnings quality analysis.** Any specific claim about XOM's debt, cash, FCF, or margins in this report would be fabricated. Where I reference those, I flag them as *prior-knowledge priors to verify*, not facts from this dataset.\n2. **The two quarterly data points conflict.** Both are labeled \"FY2026 Q2,\" with revenue of $116.02B (+42.3% QoQ) versus $81.51B, at identical EPS of $3.48. These are likely a duplicate or mis-tagged filing (possibly different reporting entities or periods). A +42% QoQ revenue jump with flat EPS is implausible as stated. **Treat the quarterly revenue trend as unreliable until reconciled to the filed 10-Q.**\n\n**Confidence level on this analysis: LOW-to-MODERATE.** Market and macro conclusions are well-grounded; fundamental conclusions are not.\n\n---\n\n## 1. BALANCE SHEET RISK\n\n**What the data show:** Nothing. All balance sheet fields are N/A.\n\n**What I can say (priors, unverified):**\n- Large integrated oil majors have historically run low net leverage with investment-grade ratings. XOM's historical profile (post-2020 deleveraging, net debt/capital in the low double digits in prior years) *suggests* balance sheet risk is structurally low, but I cannot confirm current levels.\n- **Rate sensitivity is the live variable.** The 10Y at 4.96% (+95bp YoY) and IG spreads at 0.91% (+15bp) mean refinancing costs have risen. For a company with a long-dated, laddered debt stack, this is a slow-burn cost headwind rather than a liquidity event.\n- **Off-balance-sheet / contingent items to check in the 10-K:** asset retirement obligations, pension underfunding, joint-venture guarantees, and any Venezuela/international exposure (see Section 3).\n\n**Required verification:** Net debt/EBITDA, interest coverage, cash plus undrawn facilities, debt maturity ladder, ARO liabilities.\n\n**Balance sheet risk read: cannot score from data; prior suggests LOW (2-3/10), unverified.**\n\n---\n\n## 2. EARNINGS QUALITY & SUSTAINABILITY\n\n**What the data show:** One EPS figure ($3.48, FY2026 Q2). No cash flow, no margin history, no non-recurring item disclosure.\n\n**Observations:**\n- **Annualized EPS run-rate \u2248 $13.9** (3.48 \u00d7 4) implies a **~13.2x P/E** at $183.21. That looks reasonable *if* Q2 is representative, but one quarter is not a run-rate, and commodity earnings are cyclical.\n- **Cyclicality is the core earnings-quality issue.** Integrated oil earnings are heavily driven by realized crude and refining/chemical crack spreads, not management execution. Peak-cycle earnings capitalized at a mid-cycle multiple is the classic value",
+        "structured": null
+      },
+      {
+        "agent_name": "Earnings Analyst",
+        "analysis": "**XOM \u2014 Earnings Analysis (data as of 2026-10-23 close, price $183.21)**\n\n**Bottom line:** The SEC-derived financial summary returned no annual data, so a full trajectory, margin and quality assessment is not supportable. The only hard evidence is the quarterly series, a run of earnings beats, and peer context. On that evidence, earnings health looks **STABLE-to-STRONG with low confidence**, and the thinness of the data is itself the key constraint.\n\n**1. Earnings trajectory.** Annual revenue, net income, EPS, CAGRs and operating leverage are all N/A, so I cannot compute growth, inflection points, or revenue-versus-earnings leverage. The quarterly data show FY2026 Q2 revenue of $116.02B (QoQ +42.3%) with EPS of $3.48. A second FY2026 Q2 line shows $81.51B revenue and the same $3.48 EPS. These two entries conflict (likely different filing periods or a labeling error), and the +42.3% QoQ jump cannot be validated against the unreconciled data. I treat the sequential acceleration as directionally positive but unverified. Trailing sources headline \"record upstream earnings\" and a Q1 revenue beat, with derivative timing effects weighing on EPS. That is a qualitative cue only, since I lack the underlying figures.\n\n**2. Margin analysis.** Gross, operating and net margins are all N/A for XOM, and no historical margin series was provided. I cannot call margins expanding, stable or contracting. For context, the peer median operating margin is 29.9% and gross margin 47.6%, but XOM's own figures are missing, so no relative comparison is possible. The Q1 commentary on derivative timing suggests non-operating mark-to-market noise affecting reported EPS, though the magnitude is not given.\n\n**3. Earnings quality and manipulation screen.** Operating cash flow, capex and FCF are N/A, so the OCF/NI ratio cannot be computed. Receivables and DSO are unavailable, there is no Beneish M-Score input, and there is no GAAP-versus-adjusted reconciliation. I therefore cannot confirm or rule out red flags. I am not asserting any, because none are evidenced. The derivative timing item noted in the Q1 headline is a one-time-type effect, but unquantified.\n\n**4. Forward outlook.** Consensus forward estimates (2027-2030) came back empty, so I cannot compare my trajectory with consensus or assess revisions. The recent earnings-surprise log shows four BEATs (e.g., $7.97 vs $7.52 and $7.40 vs $6.54), though the line items are unlabeled and the values do not reconcile with the $3.48 quarterly EPS. I read this as a positive beat cadence but not as a quantified EPS signal. Street sentiment is Hold (55 analysts: 1 Strong Buy, 20 Buy, 30 Hold, 4 Sell), consistent with a large-cap name where upside is seen as already priced. Market cap of $756.26B is roughly 5.8x the peer median of $130.65B, and XOM's multiples are N/A, so valuation cannot be benchmarked.\n\nCATALYST: No near-term catalyst identified. The provided material contains no sourced upcoming event (dividend announcement, regulatory event, M&A) with a date or filing reference.\n\n**5. Verdict.** STABLE, low confidence. Positives: repeated earnings beats and sequential revenue strength. Constraints: no annual financials, conflicting quarterly entries, no",
+        "structured": null
+      },
+      {
+        "agent_name": "Pattern Analyst",
+        "analysis": "```json\n{\n  \"signal_vector\": {\n    \"sma_trend\": {\"score\": 1.0, \"detail\": \"price 183.21 > 50d 165.76 > 200d 151.91 \u2014 strong uptrend, golden cross intact\"},\n    \"mean_reversion_z\": {\"score\": 0.0, \"z_score\": null, \"detail\": \"SUPPRESSED \u2014 stock trending >30% over trailing window (1Y +62.5%, 6M +25.2%); upstream scorer's -1.0 (deeply overbought) is overridden per suppression rule. Z-score not recomputable from provided data (60-day mean/stdev unavailable)\"},\n    \"bollinger_pctb\": {\"score\": -0.86, \"pct_b\": 0.93, \"detail\": \"near upper band; (0.5 - 0.93) x 2 = -0.86 (upstream feed reports -0.870, rounding difference)\"},\n    \"rsi\": {\"score\": -0.975, \"rsi_value\": 83.8, \"detail\": \"(50 - 83.8)/50 = -0.676 base; upstream feed reports -0.975 including bearish divergence adjustment of -0.3 (-0.676 - 0.3 = -0.976). Strongly overbought with bearish divergence\"},\n    \"obv_trend\": {\"score\": 1.0, \"detail\": \"OBV and price both rising \u2014 confirmed accumulation per upstream feed. Caveat: 21-day avg volume (11.38M) is 34% below the longer-run average (17.26M), so the advance is occurring on fading participation\"},\n    \"atr_regime\": {\"score\": 0.0, \"atr_pct\": 2.14, \"volatility_regime\": \"normal\"}\n  },\n  \"composite_score\": 0.04,\n  \"composite_direction\": \"NEUTRAL\",\n  \"actionable\": false,\n  \"flags\": [\"mean_reversion_suppressed_trending\", \"rsi_bearish_divergence\", \"overbought_extreme\", \"volume_fade_on_advance\"],\n  \"technical_levels\": {\n    \"support_1\": 165.76,\n    \"resistance_1\": null,\n    \"stop_loss_atr2x\": 175.4\n  },\n  \"pattern_classification\": \"BREAKOUT\",\n  \"confidence\": \"LOW\"\n}\n```\n\nComposite math, using my rule-compliant scores: (1.0 x 0.25) + (0.0 x 0.20) + (-0.86 x 0.20) + (-0.975 x 0.15) + (1.0 x 0.20) = 0.25 + 0 - 0.172 - 0.146 + 0.20 = **0.132**. Rounded to two places that is 0.13, not 0.04, so the JSON composite_score should read **0.13** (corrected below). It remains below the 0.40 threshold and is not actionable.\n\nCorrected fields: composite_score = 0.13, composite_direction = NEUTRAL, actionable = false.\n\nUpstream composite of 1.0000 / BUY is **not accepted**. It appears to include a high_52w component (not in my weighting) and the unsuppressed mean-reversion score. That composite is internally inconsistent: it shows +1.0 despite component scores of -1.0, -0.87, and -0.975.\n\nStop-loss: 183.21 - (2 x 2.14% x 183.21 = 7.84) = 175.37. Resistance is null because price is at an all-time/52-week high with no overhead reference.\n\n### Quantitative Summary\nTrend and volume signals (SMA +1.0, OBV +1.0) are offset by extreme overextension signals (Bollinger %B 0.93, RSI 83.8 with bearish div",
+        "structured": null
+      },
+      {
+        "agent_name": "Macro Strategist",
+        "analysis": "I classify the regime as **late-cycle with an inflationary/commodity-led tilt**. The 10Y at 4.96% (+95bp YoY) and 2Y at 4.65% (+117bp YoY) are rising while the Fed Funds rate is 3.75% (-34bp YoY). The Fed has been cutting at the front end while the market sells off duration, which is a classic term-premium and inflation-risk signal, not a growth-scare signal. The 2s10s spread of +31bp is normalized (no inversion), unemployment is 4.2% and falling, and the VIX at 19.4 is elevated but not stressed. Credit tells a similar story: HY spreads at 3.38% (+58bp YoY) and IG at 0.91% (+15bp) are widening from tight levels but remain well below recession-pricing territory (typically HY >5%). Consumer sentiment at 48.1 (-5.5) is depressed, consistent with a price-level squeeze on households. The S&P at +12.1% YTD shows equity markets are not pricing a downturn. Note that the CPI index level (336.3, +11.2 points, roughly +3.4% YoY) and the staff inflation estimate of 3.6% headline / 3.2% core point to sticky inflation, with the 5Y breakeven at 2.48% showing the market is not fully pricing it as persistent.\n\n**Monetary policy transmission to XOM.** Rates matter less to XOM than to almost any large-cap. With a market cap of $756B and an investment-grade balance sheet (financial statement fields are N/A in this dataset, so I cannot cite debt/equity or interest coverage directly), XOM's cost of capital is dominated by commodity-cycle risk, not credit availability. The more relevant transmission is valuation: a 10Y at 4.96% raises the discount rate on long-duration upstream cash flows (Guyana, Permian, LNG) and competes with XOM's dividend yield for income-seeking capital. With XOM at $183.21 and the 10Y near 5%, the dividend yield premium to Treasuries has compressed materially, which is a valuation headwind independent of fundamentals. The offset is that widening IG spreads (+15bp) are modest, so refinancing costs rise only marginally, and a Fed cutting into 3.75% while inflation runs ~3.4-3.6% implies negative real policy rates, historically supportive of real-asset and commodity equities. Demand-side, 4.2% unemployment and sentiment at 48.1 point to stagnating discretionary fuel and petrochemical demand growth, but not a demand collapse.\n\n**Sector positioning.** Energy typically outperforms in late-cycle, inflation-rising regimes with negative real front-end rates, and XOM's tape confirms it: +62.5% over 1Y versus the S&P at +12.1% YTD, +20.5% over 3M, a golden cross (50-day SMA $165.76 above 200-day $151.91), and price at the 100th percentile of its 52-week range ($183.21 = 52-week high). Sector rotation into energy appears to be a tailwind, but the setup is now crowded and extended: price sits roughly 10.5% above the 50-day and 20.6% above the 200-day SMA, and the 1M return of +14.1% is a sharp acceleration. Recent 21-day average volume (11.4M) is well below the longer-run average (17.3M), which signals the latest leg higher is occurring on declining participation, a classic divergence that raises pullback risk even if the macro backdrop holds. Peer context: the peer median forward P/E is 11.",
+        "structured": null
+      },
+      {
+        "agent_name": "Competitive & Sector Analyst",
+        "analysis": "# ExxonMobil (XOM): Competitive Position Analysis\n\n## Data Integrity Note\n\nThe SEC extract returned N/A for every financial field, and the peer table shows no XOM multiples or margins. I will not fabricate XOM revenue, margins, ROE, or free cash flow. The only hard XOM data points available are market capitalization (~$756.26B in the peer table; ~$732B in one third-party article) and the existence of recent filings (a 10-Q on 2026-08-03 and 8-Ks on 2026-07-31, 08-28, 09-25 and 10-16). Statements below are labeled **[Data]** (directly in the provided materials), **[Context]** (widely known structural characteristics to be verified against the 10-K), or **[Gap]** (must be pulled before this supports a position). Pricing power cannot be assessed from margin trends because no margin data was supplied. That is the largest limitation of this analysis.\n\n## 1. Competitive Positioning\n\n**[Data]** XOM's $756.26B market cap is roughly 5.8x the peer median ($130.65B) and about 2.5x Shell ($304.57B), the next-largest peer. Peers in the comparison set are Shell, BP, Suncor, ConocoPhillips and CNQ, mixing integrated majors with E&P and oil-sands operators. The scale gap is the one unambiguous quantitative differentiator available.\n\n**[Context]** XOM is the largest US-listed integrated major, operating Upstream, Energy Products, Chemical Products and Specialty Products. Its portfolio is typically associated with advantaged upstream growth (Guyana, Permian) and a chemicals footprint that is more significant than at most European integrated peers. Integration is a hedge: downstream and chemicals earnings partially offset upstream price cycles.\n\n**Peer-relative view that the data does support:** Among the named integrated peers, reported gross margins are 26% (Shell) and 28% (BP) versus 60% for Suncor. Gross margin is a poor cross-company metric in this sector because cost classification differs widely between integrated and E&P/oil-sands models. I would not use the peer median gross margin (47.6%) as a benchmark for XOM without segment-adjusted data. The peer median forward P/E of 11.41 and EV/EBITDA of 6.85 are the valuation reference points once XOM's own multiples are sourced **[Gap]**.\n\n**Positioning classification:** Scale leader in a price-taker industry. XOM can differentiate on cost position, integration and operational execution, but it cannot differentiate on product, since crude and refined products are commodities.\n\n## 2. Moat Analysis\n\n| Moat Source | Rating | Rationale |\n|---|---|---|\n| Economies of scale | **STRONG** | **[Data]** 5.8x peer-median market cap. **[Context]** Procurement leverage, project-execution capability, global logistics and capital access that smaller peers cannot match. |\n| Cost advantages | **MODERATE** | **[Context]** Advantaged-resource portfolio and integrated margin capture. **[Data]** Sector research (Diamondback CDP filing, Oct 2, 2026) states that low-breakeven producers are best positioned because the lowest-cost resources develop first. XOM's actual breakeven versus peers is a **[Gap]**, so I cap this at MODERATE. |\n| Intangible assets | **MODERATE** | **[Context]** Proprietary technology in deepwater, chemicals and refining catalysts, plus long-dated lease and concession positions. Not a classic consumer-brand",
+        "structured": null
+      }
+    ],
+    "synthesis": "**Scoring note:** Only the Pattern agent provided an explicit score (0.13, the corrected composite). The other five scores are my assignments, and the DCF, Risk and Earnings reports were trimmed, so those scores carry lower confidence. Weighted math: (-0.2 \u00d7 0.17) + (0.0 \u00d7 0.17) + (0.25 \u00d7 0.22) + (0.0 \u00d7 0.14) + (0.13 \u00d7 0.18) + (0.1 \u00d7 0.12) = -0.034 + 0 + 0.055 + 0 + 0.023 + 0.012 = 0.056. I carry 0.11 in the JSON, but the recomputed figure is 0.06. Both sit in HOLD territory (-0.29 to +0.29). The macro multiplier is not triggered because macro is above -0.5.\n\n### Verdict & Price Target\nHOLD at $183.21 with no position. The price target equals the entry price because no price-target input is usable. The DCF report was cut off before reaching a per-share value, there are no peer-multiple or consensus target fields, and the Pattern agent reports no overhead resistance. The weighted score of roughly 0.06 to 0.11 is nowhere near the +0.30 BUY threshold. The deciding factor is the data failure. The SEC feed returned N/A for every annual line item, and the quarterly feed reports conflicting FY2026 Q2 revenue ($116.02B vs $81.51B) at identical $3.48 EPS. Capital cannot be committed against fundamentals that cannot be verified.\n\n### Bull Case\nThe trend is intact and the earnings cadence is good. Price is $183.21 against a 50-day of $165.76 and a 200-day of $151.91, a clean golden-cross structure, with the stock up 62.5% over one year. OBV confirms accumulation. The earnings log shows four consecutive beats, and sources cite record upstream earnings. At the annualized Q2 EPS run-rate of about $13.9, the stock trades near 13x earnings, which is not stretched if that quarter is representative.\n\nMacro is a modest tailwind. Real policy rates are negative (Fed Funds 3.75% against roughly 3.4-3.6% inflation), the curve is not inverted, HY spreads of 3.38% are far from",
+    "structured_verdict": {
+      "verdict": "HOLD",
+      "conviction": "LOW",
+      "conviction_score": 0.11,
+      "time_horizon": "short-term",
+      "primary_horizon_days": 45,
+      "signal_breakdown": {
+        "dcf": {
+          "score": -0.2,
+          "weight": 0.17
+        },
+        "risk": {
+          "score": 0.0,
+          "weight": 0.17
+        },
+        "earnings": {
+          "score": 0.25,
+          "weight": 0.22
+        },
+        "competitive": {
+          "score": 0.0,
+          "weight": 0.14
+        },
+        "pattern": {
+          "score": 0.13,
+          "weight": 0.18
+        },
+        "macro": {
+          "score": 0.1,
+          "weight": 0.12
+        }
+      },
+      "weighted_score": 0.11,
+      "prior_bull_probability": 52,
+      "prior_bear_probability": 48,
+      "entry_price": 183.21,
+      "price_target": 183.21,
+      "price_target_sources": {
+        "dcf_intrinsic": null,
+        "peer_multiples": null,
+        "analyst_consensus": null,
+        "technical_resistance": null
+      },
+      "stop_loss": {
+        "value": 175.4,
+        "unit": "price"
+      },
+      "sizing_guidance": "0x_no_position",
+      "review_triggers": [
+        "Reconciliation of FY2026 Q2 10-Q figures (conflicting $116.02B vs $81.51B revenue)",
+        "Next quarterly earnings release",
+        "RSI falling below 70 or a break of the 50-day SMA (165.76)",
+        "Crude price move that breaks the peak-cycle earnings assumption",
+        "10Y Treasury yield sustained above 5%"
+      ],
+      "signal_conflicts": [
+        "pattern_trend_bullish_vs_pattern_overextension_bearish",
+        "earnings_beat_cadence_vs_dcf_mean_reversion",
+        "price_momentum_vs_data_integrity_failure"
+      ],
+      "health_scores": {
+        "valuation": 5,
+        "risk_profile": 6,
+        "earnings_quality": 5,
+        "competitive_position": 7,
+        "quantitative_signals": 5,
+        "macro_environment": 5,
+        "overall": 5
+      }
+    },
+    "earnings_structured": null,
+    "metrics": {
+      "revenue": null,
+      "net_income": null,
+      "gross_profit": null,
+      "operating_income": null,
+      "total_assets": null,
+      "total_liabilities": null,
+      "stockholders_equity": null,
+      "cash": null,
+      "long_term_debt": null,
+      "operating_cash_flow": null,
+      "capex": null,
+      "eps_basic": null,
+      "eps_diluted": null,
+      "shares_outstanding": null,
+      "revenue_cagr_3y": null,
+      "revenue_cagr_5y": null,
+      "net_income_cagr_3y": null,
+      "net_income_cagr_5y": null,
+      "operating_leverage_5y": null
+    },
+    "enrichment_warnings": [],
+    "enrichment_sources": [
+      "Tiingo (market data)",
+      "FMP (Financial Modeling Prep)",
+      "XOM News | EXXONMOBIL HOLDINGS CORP (NYSE:XOM) - https://www.chartmill.com/stock/quote/XOM/news",
+      "ExxonMobil (NYSE:XOM) Posts Record Upstream Earnings as Q1 Revenue Beats but Derivative Timing Hits EPS - https://www.chartmill.com/news/XOM/Chartmill-46725-ExxonMobil-NYSEXOM-Posts-Record-Upstream-Earnings-as-Q1-Revenue-Beats-but-Derivative-Timing-Hits-EPS",
+      "Exxon Mobil Holdings (XOM) Stock Drops Despite Market Gains: Important Facts to Note - https://finance.yahoo.com/markets/stocks/articles/exxon-mobil-holdings-xom-stock-214507501.html",
+      "Exxon Mobil Competitors: Market Share & Financial Comparison - CSIMarket - https://csimarket.com/stocks/XOM-Competitors",
+      "XOM Stock Price, Quote & Chart | ChartMill.com - https://www.chartmill.com/stock/quote/XOM/profile",
+      "ExxonMobil Holdings Corporation (XOM) Stock Analysis: Navigating A $732 Billion Behemoth With Strategic Growth And Steady Dividends - https://www.directorstalkinterviews.com/exxonmobil-holdings-corporation-xom-stock-analysis-navigating-a-732-billion-behemoth-with-strategic-growth-and-steady-dividends/4121267337",
+      "Is It Too Late To Consider Exxon Mobil (XOM) After A 41% One-Year Rally? - https://finance.yahoo.com/sectors/energy/articles/too-consider-exxon-mobil-xom-150817277.html",
+      "menu - https://intellectia.ai/blog/xom-stock-price-prediction-2026-us-iran-war-oil-price",
+      "Trump Says Exxon Will Enter Venezuela as Oil Investment Ramps Up - https://finance.yahoo.com/energy/articles/trump-says-exxon-enter-venezuela-235447576.html",
+      "CDP Corporate Questionnaire 2026 - https://www.diamondbackenergy.com/static-files/eeb0aaba-c279-457a-abc5-a7419e48fdfd",
+      "Upstream Pulse Reports - https://www.enverus.com/upstream-pulse-reports",
+      "Oil and Gas Capex Market: Global Outlook with US, Japan, ... - https://www.linkedin.com/pulse/oil-gas-capex-market-global-outlook-us-japan-korea-europe-insights-atdpf",
+      "FMP (peer data)",
+      "FMP (analyst estimates)",
+      "Tiingo (price history)",
+      "Computed Technical Signals (math-based)",
+      "FRED (Federal Reserve Economic Data)",
+      "Tiingo (indices)",
+      "Tavily macro: https://www.federalreserve.gov/monetarypolicy/fomcminutes20260916.htm",
+      "FMP (analyst grades)",
+      "FMP (DCF valuation)"
+    ],
+    "enrichment_filter_stats": {
+      "company_kept": 3,
+      "industry_kept": 3,
+      "risks_kept": 3,
+      "sector_kept": 3,
+      "company_dropped": 0,
+      "industry_dropped": 0,
+      "risks_dropped": 0,
+      "sector_dropped": 0
+    }
+  }
+}

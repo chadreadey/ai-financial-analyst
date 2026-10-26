@@ -124,7 +124,7 @@ export function PositionsWithVerdictsTable({ positions, onClose }: Props) {
                 >
                   <td className="px-3 py-1.5 text-xs font-medium">
                     <Link
-                      to={`/deepdive/${p.ticker}?source=portfolio`}
+                      to={`/lab/deepdive/${p.ticker}?source=portfolio`}
                       className="text-primary hover:underline"
                     >
                       {p.ticker}

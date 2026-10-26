@@ -74,10 +74,10 @@ export function CandidatePipeline() {
         synthesis_input_max_chars: s.synthesis_input_max_chars,
         max_synthesis_output_tokens: s.max_synthesis_output_tokens,
       });
-      navigate(`/deepdive/${c.ticker}?source=portfolio&job_id=${job.job_id}`);
+      navigate(`/lab/deepdive/${c.ticker}?source=portfolio&job_id=${job.job_id}`);
     } catch {
       // Navigate anyway — the deep dive page can show prior history
-      navigate(`/deepdive/${c.ticker}?source=portfolio`);
+      navigate(`/lab/deepdive/${c.ticker}?source=portfolio`);
     } finally {
       setAnalyzingTicker(null);
     }

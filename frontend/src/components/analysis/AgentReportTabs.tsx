@@ -7,6 +7,7 @@ interface AgentReportTabsProps {
   synthesis: string;
   agentReports: AgentReport[];
   tradeParams?: Record<string, any> | null;
+  hideSynthesis?: boolean;
 }
 
 const AGENT_ORDER = ["Synthesis", "DCF", "Risk", "Earnings", "Competitive", "Pattern", "Macro"];
@@ -27,7 +28,7 @@ function normalizeAgentName(raw: string): string {
   return raw.replace(/\s*(Analyst|Strategist|Specialist|Agent).*$/, "").trim();
 }
 
-export function AgentReportTabs({ synthesis, agentReports, tradeParams }: AgentReportTabsProps) {
+export function AgentReportTabs({ synthesis, agentReports, tradeParams, hideSynthesis = false }: AgentReportTabsProps) {
   const reportMap: Record<string, string> = { Synthesis: synthesis };
   for (const r of agentReports) {
     // Handle both object form {agent_name, analysis} and legacy tuple [name, analysis]
@@ -38,10 +39,10 @@ export function AgentReportTabs({ synthesis, agentReports, tradeParams }: AgentR
     reportMap[name] = analysis;
   }
 
-  const availableTabs = AGENT_ORDER.filter((name) => reportMap[name]);
+  const availableTabs = AGENT_ORDER.filter((name) => reportMap[name] && !(hideSynthesis && name === "Synthesis"));
 
   return (
-    <Tabs defaultValue="Synthesis" className="mt-4">
+    <Tabs defaultValue={availableTabs[0] ?? "Synthesis"} className="mt-4">
       <TabsList className="bg-secondary border border-border h-8">
         {availableTabs.map((name) => (
           <TabsTrigger key={name} value={name} className="text-xs h-7 data-[state=active]:text-primary">

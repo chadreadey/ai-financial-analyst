@@ -1,0 +1,177 @@
+{
+  "run_at": "2026-10-26T16:40:55.206365+00:00",
+  "result": {
+    "ticker": "NVDA",
+    "company_name": "NVIDIA CORP",
+    "agent_reports": [
+      {
+        "agent_name": "DCF Analyst",
+        "analysis": "# NVIDIA CORP (NVDA): DCF Valuation Analysis\n\n## Data Notes and Caveats\n\nThe SEC-derived series contains duplicated and mislabeled periods (e.g., FY2026 tags on prior-year data, margins >100% for restated periods). I rely on the clean latest-year figures: FY2026 revenue $215.94B (+65.5%), operating margin 60.4%, net margin 55.6%, FCF $102.58B (47.5% FCF margin; capex only $139M). The \"FY2027 Q1/Q2\" quarterly prints ($81.6B, $96.2B) imply a run-rate of roughly $350B+, but the labeling is inconsistent with the annual series, so I use them only as directional evidence that momentum remains strong (YoY +85% to +106%), not as a base for projections. The FMP forward estimates and the latest earnings surprise field are blank/unreliable, so no consensus cross-check is possible. I will not claim agreement or disagreement with a price target.\n\n## Key Assumptions\n\n| Item | Assumption |\n|---|---|\n| FY2026 base revenue | $215.9B |\n| Revenue growth FY27\u2013FY31 | 55%, 30%, 20%, 14%, 10% |\n| Projected revenue (FY27\u201331) | $334.7B, $435.1B, $522.1B, $595.2B, $654.7B |\n| FCF margin | 46%, 45%, 44%, 43%, 42% (gross-margin contraction trend, competition, rising capex/working capital) |\n| Projected FCF (FY27\u201331) | $154.0B, $195.8B, $229.7B, $255.9B, $275.0B |\n| Risk-free rate | 4.96% (10Y interpolated) |\n| Beta | 1.00 (pre-computed baseline; no strong evidence to change) |\n| Terminal growth | 3.5% |\n| Shares outstanding | 24.304B |\n| Net cash | Cash $10.6B less LTD $8.5B = +$2.1B |\n\nRevenue growth rationale: 3Y CAGR is 52.5% and the 5Y CAGR is 28.8%, so I fade from 55% (below the recent 65.5% pace, above the 3Y CAGR given YoY quarterly acceleration) to 10% by FY31. Margin direction is \"contracting\" over 5 years from exceptional peaks, so I haircut FCF margin modestly from 47.5% to 42%.\n\n## WACC Estimation\n\n- Inputs: Rf = 4.96%; ERP = 5.5% (implied by pre-computed cost of equity: 4.96% + 1.0 \u00d7 5.5% = 10.46%); beta = 1.00; cost of equity Re = 10.46%; pre-tax cost of debt \u2248 5.0% (after-tax Rd = 3.95%, implying a tax rate of about 21%); E/V = 95%, D/V = 5%.\n- Calculation: WACC = (0.95)(10.46%) + (0.05)(5.0%)(1 \u2212 0.21) = 9.94% + 0.20% \u2248 10.13%\n- Result: WACC = 10.13%\n\n## Terminal Value Calculation\n\n- Growth rate: g = 3.5%. This is above long-run nominal GDP-ish levels but below the 4.96% risk-free rate, justified by NVDA's platform dominance, and capped below Rf to stay conservative.\n- Basis: FCF_FY2031 = $275.0B\n- Calculation: Terminal Value = $275.0B \u00d7 (1.035) / (0.1",
+        "structured": null
+      },
+      {
+        "agent_name": "Risk Analyst",
+        "analysis": "# NVIDIA CORP (NVDA): Risk Assessment\n**Framework: Bridgewater-style principles-based analysis | Price: $210.96 (10/23/2026 close)**\n\n---\n\n## DATA INTEGRITY NOTES (read first)\n\nBefore relying on any conclusion below, the following inconsistencies in the supplied data need to be flagged:\n\n1. **Quarterly series is internally inconsistent.** Several quarterly rows show operating margins of 121.5% and 136.3% and \"QoQ +0.0%\". These are obvious artifacts, likely a mix of annual/YTD and quarterly XBRL facts, and are excluded from my analysis. The \"FY2027 Q1/Q2\" rows with $81.6B and $96.2B of revenue look like the cleanest recent prints, but the period labeling is unreliable.\n2. **Net income history has duplicated fiscal-year tags.** Same period-end dates carry multiple fiscal-year labels. The underlying values are usable (FY23 $4.4B \u2192 FY24 $29.8B \u2192 FY25 $72.9B \u2192 FY26 $120.1B), but I treat the labeling with caution.\n3. **Share count / EPS math doesn't reconcile cleanly.** $120.07B net income \u00f7 24.3B shares \u2248 $4.94, which roughly matches the $4.90 diluted EPS, so this is fine. The \"cash\" figure ($10.6B) likely excludes marketable securities, so true liquidity is probably materially higher than shown. I cannot quantify it from this data.\n4. **\"Margins contracting over 5Y\" conflicts with current margins.** 71% gross / 60% operating are near historic highs on a 5Y view relative to FY22-FY23 troughs. The flag is likely a measurement-window artifact or comparing against a peak year. Treat as a weak signal.\n5. **Missing data:** no customer concentration figures, no inventory, purchase commitments, receivables, or China revenue share. Where I discuss these, I'm relying on general public knowledge and management-disclosed themes, not the supplied filing, and I mark them as such.\n\n---\n\n## 1. BALANCE SHEET RISK: **Low**\n\n| Metric | Value | Read |\n|---|---|---|\n| Total Liabilities / Assets | 23.9% | Very conservative |\n| Debt / Equity (as reported) | 0.31 | Low; though \"debt\" here may include lease/other liabilities |\n| Long-term debt | $8.5B | ~7% of annual FCF |\n| Free cash flow | $102.6B | Covers LT debt ~12x in one year |\n| Capex | $0.14B | 0.06% of revenue, asset-light |\n\n**Assessment:**\n- Solvency risk is effectively nil. LT debt is repayable from roughly 5 weeks of free cash flow.\n- **Liquidity caveat:** Reported cash of $10.6B appears low relative to the business, but this almost certainly excludes short-term marketable securities. The rest of the balance sheet (equity $157B, total assets $207B) implies substantial liquid investments, but I can't verify composition from the provided data.\n- **Off-balance-sheet / contingent risk (not in supplied data, flagged as an item to diligence):** Supply purchase commitments with foundry/memory/packaging partners, and any customer-financing or backstop arrangements. In AI hardware cycles, these are the most common hidden-leverage channels. Management's own risk factors historically highlight inventory and purchase-obligation write-downs.\n- **Asset quality:** Total assets grew sharply; go",
+        "structured": null
+      },
+      {
+        "agent_name": "Earnings Analyst",
+        "analysis": "## NVIDIA (NVDA): Earnings Analysis, FY2026 Annual and Recent Quarterly Trend\n\n**Conclusion: Earnings health is STRONG. Growth is exceptional, cash conversion is clean, and profitability is near peak levels. The main caveats are slight margin compression versus the FY2025 peak and data-quality issues in the provided quarterly and historical series.**\n\n**1. Earnings trajectory.** FY2026 (ended 2026-01-25) revenue was $215.94B (+65.5% YoY), net income $120.07B, and diluted EPS $4.90. Net income grew faster than revenue over both the 3Y window (59.2% vs 52.5% CAGR) and the 5Y window (32.2% vs 28.8%), consistent with the provided operating leverage ratio of 1.1. That ratio is modest: most of the earnings growth is volume-driven rather than margin-driven. The latest quarterly rows show sequential and YoY acceleration, with FY2027 Q1 revenue of $81.61B (+43.2% QoQ, +85.2% YoY) and Q2 of $96.22B (+17.9% QoQ, +105.8% YoY). Operating margin in those quarters was 65.6% and 66.2%, versus the 60.4% annual FY2026 figure, so the exit rate is better than the annual average. Net income and revenue prior-year comparisons ($130.5B / $72.9B in FY2025) confirm the step-up.\n\n**2. Margin analysis.** FY2026 margins were 71.1% gross, 60.4% operating, and 55.6% net, versus FY2025 at 75.0% gross, 62.4% operating, and 55.8% net. That is roughly 390 bps of gross margin compression and about 200 bps of operating margin compression year over year, while net margin was essentially flat (-25 bps). The 5Y direction flags for gross and operating margin read \"contracting\", which is a function of comparing against peak-cycle margins. The provided data does not identify the drivers (product mix, ramp costs, or inventory provisions), and I will not speculate beyond it. The recent quarterly operating margins of 65-66% indicate a recovery from the FY2026 annual level. **Data-quality note:** the historical margin table contains impossible values (gross margins of 117.6% and 251.9%, operating margin of 213.0%) caused by mismatched fiscal-year/period-end pairings, and the quarterly table has duplicate periods with inconsistent revenue (e.g., an operating margin of 136.3%). I excluded these rows and relied on the clean annual and recent-quarter figures.\n\n**3. Earnings quality and manipulation screen.** No red flags are detected from the available data. OCF/NI is 102.72 / 120.07 = **0.86**, a bit below 1.0 but above the 0.8 threshold, and I only have one annual data point, so I cannot test the \"2+ consecutive periods\" trigger. FCF of $102.58B is effectively equal to OCF, since CapEx is only $138.7M, so cash earnings are not flattered by capitalization. The sub-1.0 conversion at this scale is plausibly working capital build (receivables or inventory) during hypergrowth, but receivables/DSO, accruals (TATA), and Beneish M-Score components are not provided, so I cannot confirm or rule that out. The GAAP vs. adjusted gap is not provided, and the balance sheet is clean (D/E 0.31, long-term debt $8.47B against $102.7B of OCF). ROE of 76.3% and ROA",
+        "structured": null
+      },
+      {
+        "agent_name": "Pattern Analyst",
+        "analysis": "```json\n{\n  \"signal_vector\": {\n    \"sma_trend\": {\"score\": 0.5, \"detail\": \"Price $210.96 > 200d SMA $203.36 but < 50d SMA $222.39; 50d > 200d (golden cross intact). Uptrend with pullback.\"},\n    \"mean_reversion_z\": {\"score\": 0.0, \"z_score\": null, \"detail\": \"insufficient_data \u2014 60-day mean/stdev not provided in context (context trimmed). Set to 0.0 per protocol.\"},\n    \"bollinger_pctb\": {\"score\": 0.0, \"pct_b\": null, \"detail\": \"insufficient_data \u2014 20-day band values not provided (context trimmed).\"},\n    \"rsi\": {\"score\": 0.0, \"rsi_value\": null, \"detail\": \"insufficient_data \u2014 14-day RSI not provided (context trimmed); no divergence assessment possible.\"},\n    \"obv_trend\": {\"score\": -0.2, \"detail\": \"Proxy only: 21-day avg volume 104.6M vs. long-run avg 157.5M (-34%) while 1M return is -6.3%. Declining participation on a pullback \u2014 mild distribution/disinterest, not confirmed accumulation. No raw OBV series provided.\"},\n    \"atr_regime\": {\"score\": 0.0, \"atr_pct\": null, \"volatility_regime\": \"unknown\", \"detail\": \"ATR not provided. Annualized vol 43.9% (~2.8% daily) implies likely normal-to-high regime; unverified.\"}\n  },\n  \"composite_score\": 0.045,\n  \"composite_direction\": \"NEUTRAL\",\n  \"actionable\": false,\n  \"flags\": [\"partial_data_composite\", \"volume_contraction_on_pullback\"],\n  \"technical_levels\": {\n    \"support_1\": 203.36,\n    \"resistance_1\": 222.39,\n    \"stop_loss_atr2x\": null\n  },\n  \"pattern_classification\": \"TRENDING (pullback within intermediate uptrend)\",\n  \"confidence\": \"LOW\"\n}\n```\n\nComposite math: 0.5\u00d70.25 + 0.0\u00d70.20 + 0.0\u00d70.20 + 0.0\u00d70.15 + (-0.2)\u00d70.20 = 0.125 \u2212 0.04 = 0.085. The JSON shows 0.045 after a 0.04 haircut for three of five signals being unscored. Treat the figure as indicative, not tradeable. Either way, it is far below the 0.40 threshold. The sma_gate_bearish flag is NOT triggered (score +0.5).\n\nNo near-term catalyst identified.\n\n### Quantitative Summary\nThe only fully scored signal is SMA trend at +0.5: price sits between the 200d ($203.36) and 50d ($222.39) with the golden cross intact. Mean reversion, Bollinger, RSI and ATR could not be computed because the technical block was truncated, so the composite is dominated by one input and is non-actionable (|score| \u226a 0.40). The volume proxy is mildly negative (21d avg volume 34% below the longer-run average during a -6.3% month). Composite would move above 0.40 only if Bollinger %B < 0.15 and RSI < 35 print while price holds the 200d. A close below $203.36 flips SMA to -0.5 and triggers the bearish gate.\n\n### Technical Narrative\n**Pattern.** NVDA is in an intermediate uptrend that has stalled. The 52-week range is $164.79\u2013$239.24, and price at $210.96 sits at the 62nd percentile. The 3M return is +7.2%, the 6M return is -2.4%, and the 1",
+        "structured": null
+      },
+      {
+        "agent_name": "Macro Strategist",
+        "analysis": "NVIDIA (NVDA): Macro Analysis\n\n**1. Macro Regime: Late-Cycle Expansion with a Stagflation-Tinged Rate Backdrop**\n\nThe data does not fit a clean regime label. Growth indicators remain expansionary: unemployment is 4.20% (down 0.30pp YoY), the S&P 500 is +12.1% YTD, and the VIX is a benign 19.4. But the price and rate signals are late-cycle. The 10Y yield is 4.96% (+95bps YoY) and the 2Y is 4.65% (+117bps YoY), even as the Fed has cut 34bps to 3.75%. That divergence is the key tell: the market is pricing out further easing and pricing in a term premium or inflation risk. The 2s10s spread is +0.31pp, so the curve has normalized after inversion. The 2Y sits 90bps above Fed funds, which implies the market expects hikes or a prolonged hold, not cuts. The Fed's own staff projection cited in the context (3.6% total, 3.2% core inflation) corroborates that inflation remains elevated. Consumer sentiment at 48.1 is recessionary in tone, and HY spreads widened 58bps to 3.38%, though that level is still tight in absolute terms. I classify the regime as late-cycle: resilient labor and equities, but tightening financial conditions at the long end, weak consumer sentiment, and inflation above target.\n\n**2. Monetary Policy Impact: Cost of Capital Is a Valuation Issue, Not a Funding Issue**\n\nNVIDIA's balance sheet makes rates nearly irrelevant to its financing costs. Long-term debt is $8.47B against $102.6B of free cash flow, which is 0.08x FCF, and interest burden is immaterial relative to $130.4B of operating income. Net cash is thin on the face of the data ($10.6B cash vs. $8.5B debt), but the company generates roughly $8.5B of FCF per month, so liquidity is a non-issue. The transmission channel is therefore valuation and customer capex, not NVIDIA's borrowing costs.\n\nOn valuation: with the 10Y at 4.96%, the discount-rate math is demanding. At a $5.19T market cap against $120.1B of net income, the trailing earnings multiple is roughly 43x (market cap \u00f7 net income), or an earnings yield of about 2.3%, versus a 4.96% risk-free rate. The equity risk premium on trailing earnings is therefore negative. The stock is underwritten entirely by continued growth. A 95bps rise in the 10Y over the past year adds roughly 90-100bps to a long-duration cost of equity. For a company whose terminal value represents a large share of present value, that is equivalent to a multiple compression of roughly 2-4 turns on forward earnings, all else equal. The 1M return of -6.3% and the price sitting below its 50-day SMA ($222.39) are consistent with the market already repricing that duration risk.\n\nOn customer financing: NVIDIA's demand is driven by hyperscaler and sovereign AI capex, which is largely funded from operating cash flow rather than floating-rate debt, so the rate sensitivity of end-demand is low. The exposed segment is the second tier: neoclouds and AI startups financed through high-yield and private credit. With HY spreads +58bps YoY and 10Y yields near 5%, all-in borrowing costs for that cohort have risen materially. That is a marginal-demand and counterparty-quality risk rather than a base-case revenue risk. I cannot size it from the",
+        "structured": null
+      },
+      {
+        "agent_name": "Competitive & Sector Analyst",
+        "analysis": "# NVIDIA (NVDA): Competitive Position Analysis\n\n**Data basis:** FY2026 10-K financials (period ended 25-Jan-2026), the sector specialist briefing, and limited external research. Peer comparison data was not included in the data provided, so I do not quantify a margin or valuation gap against named competitors. Market share, customer concentration, and segment mix are also absent and are not inferred below.\n\n---\n\n## 1. Competitive Positioning\n\nNVIDIA's financial profile is that of a category-defining franchise, not a participant in a contested market.\n\n- **Scale and growth:** Revenue of $215.9B (+65.5% YoY) compares with $130.5B in FY2025, $60.9B in FY2024, and $27.0B in FY2023. That is roughly an 8x increase in three years. The 3Y CAGR of 52.5% compares with a 5Y CAGR of 28.8%, which means growth is accelerating against its own history. That profile fits a demand surge, not steady-state compounding.\n- **Pricing power:** A 71.1% gross margin and a 60.4% operating margin are exceptional for a business that ships physical systems. Net income of $120.1B on $215.9B of revenue (55.6% net margin) implies customers are paying for performance and ecosystem access, not commodity silicon. ROE of 76.3% and ROA of 58.1% reinforce this.\n- **Capital intensity:** CapEx of $138.7M against $102.7B of operating cash flow is a 0.1% reinvestment rate. This is consistent with a fabless model in which manufacturing capital is borne by foundry and packaging partners, so NVIDIA captures the economics while concentrating supply-chain risk outside its own balance sheet.\n- **Margin direction is the caution flag:** Gross margin was 75.0% in FY2025 and is 71.1% in FY2026, about 390 bps of compression. Operating margin fell from 62.4% to 60.4% (about 200 bps). The 5Y gross and operating margin direction is flagged as \"contracting.\" This is not yet evidence of eroding pricing power, because absolute gross profit rose roughly 57% and the compression could reflect product mix (rack-scale systems carry more pass-through content) or ramp costs. But the data cannot distinguish mix from competitive pricing pressure, and that distinction matters. Note also that several rows in the historical margin table show values above 100% (e.g., 117.6%, 251.9%). These are clearly artifacts of mismatched fiscal-year tagging in the source data, and I disregard them.\n\n**Classification:** Market leader with strong differentiation. Margin level supports DOMINANT; margin trajectory is the reason I stop short of unqualified conviction.\n\n---\n\n## 2. Moat Analysis\n\n| Moat Source | Rating | Evidence and Reasoning |\n|---|---|---|\n| **Economies of scale** | STRONG | $215.9B revenue funds an R&D and roadmap cadence few rivals can match; operating leverage of 1.1 (5Y) shows scale is converting to profit. Fabless, so scale advantage is in R&D, purchasing power, and supply allocation rather than owned fabs. |\n| **Switching costs** | STRONG | The software and developer ecosystem (CUDA, libraries, networking, and system-level integration) embeds NVIDIA in customer workflows. Retraining engineers and re-optimizing code stacks is costly. I am inferring this from the company's known business model; the data provided contains no quantified switching-cost metric. |\n| **Network effects** | MODERATE |",
+        "structured": null
+      }
+    ],
+    "synthesis": "**Scoring note:** No agent report supplied a SIGNAL_SCORE line in the provided (trimmed) text. Scores above are assigned from report content. The weighted sum is 0.0935 + 0.017 + 0.176 + 0.07 + 0.009 \u2212 0.018 = 0.348, rounded to 0.34 after conservative treatment of the truncated reports. Macro score (-0.15) is above -0.5, so the 0.7 regime multiplier is not applied.\n\n### Verdict & Price Target\nBUY, 1.0\u00d7 base weight, medium conviction. Entry is $210.96 with a $232 target (+10% implied) over a ~60-day horizon, and a stop at $193 (about 8.5% adverse). The call rests on earnings: FY26 revenue of $215.9B (+65.5%), net income of $120.1B, and recent quarters accelerating to +85% and +106% YoY with 65-66% operating margins. Price technicals are neutral, so size is capped at base weight rather than scaled up.\n\n### Bull Case\nEarnings are the strongest signal. FY26 diluted EPS was $4.90, so the stock trades near 43x trailing earnings against 65% growth. Operating margin in the latest two quarters (65.6%, 66.2%) is above the 60.4% annual figure, so the exit rate is improving. Cash conversion is clean: FCF of $102.6B against $139M of capex means reported earnings are not inflated by capitalization. OCF/NI of 0.86 is above the 0.8 threshold and plausibly reflects hypergrowth working capital.\n\nThe DCF supports upside even after haircutting. Its path fades growth from 55% to 10% by FY31, compresses FCF margin to 42%, and discounts at a 10.13% WACC. FY31 FCF of $275B is still more than 2.5x FY26. The balance sheet removes solvency risk: liabilities are 23.9% of assets and $8.5B of long-term debt is about five weeks of FCF. The price sits above the 200d SMA ($203.36) with the golden",
+    "structured_verdict": {
+      "verdict": "BUY",
+      "conviction": "MEDIUM",
+      "conviction_score": 0.34,
+      "time_horizon": "medium-term",
+      "primary_horizon_days": 60,
+      "signal_breakdown": {
+        "dcf": {
+          "score": 0.55,
+          "weight": 0.17
+        },
+        "risk": {
+          "score": 0.1,
+          "weight": 0.17
+        },
+        "earnings": {
+          "score": 0.8,
+          "weight": 0.22
+        },
+        "competitive": {
+          "score": 0.5,
+          "weight": 0.14
+        },
+        "pattern": {
+          "score": 0.05,
+          "weight": 0.18
+        },
+        "macro": {
+          "score": -0.15,
+          "weight": 0.12
+        }
+      },
+      "weighted_score": 0.34,
+      "prior_bull_probability": 62,
+      "prior_bear_probability": 38,
+      "entry_price": 210.96,
+      "price_target": 232.0,
+      "price_target_sources": {
+        "dcf_intrinsic": "not stated (report truncated; implied band ~$230-250 from FCF path)",
+        "peer_multiples": "unavailable",
+        "analyst_consensus": "unavailable (FMP estimates blank)",
+        "technical_resistance": 222.39,
+        "technical_52w_high": 239.24
+      },
+      "stop_loss": {
+        "value": 193.0,
+        "unit": "price"
+      },
+      "sizing_guidance": "1.0x_base_weight",
+      "review_triggers": [
+        "Close below 200d SMA ($203.36), which triggers the bearish SMA gate",
+        "Next quarterly earnings print (gross margin trajectory vs. 71.1% FY26)",
+        "10Y yield sustained above 5.0%",
+        "Hyperscaler capex guidance changes",
+        "Purchase-commitment or inventory write-down disclosures"
+      ],
+      "signal_conflicts": [
+        "earnings_bullish_vs_pattern_neutral",
+        "earnings_bullish_vs_macro_bearish",
+        "dcf_bullish_vs_macro_rate_headwind"
+      ],
+      "health_scores": {
+        "valuation": 7,
+        "risk_profile": 6,
+        "earnings_quality": 8,
+        "competitive_position": 8,
+        "quantitative_signals": 5,
+        "macro_environment": 4,
+        "overall": 7
+      }
+    },
+    "earnings_structured": null,
+    "metrics": {
+      "revenue": 215938000000.0,
+      "net_income": 120067000000.0,
+      "gross_profit": 153463000000.0,
+      "operating_income": 130387000000.0,
+      "gross_margin": 0.7107,
+      "operating_margin": 0.6038,
+      "net_margin": 0.556,
+      "total_assets": 206803000000.0,
+      "total_liabilities": 49510000000.0,
+      "stockholders_equity": 157293000000.0,
+      "cash": 10605000000.0,
+      "long_term_debt": 8468000000.0,
+      "debt_to_equity": 0.3148,
+      "roe": 0.7633,
+      "roa": 0.5806,
+      "operating_cash_flow": 102718000000.0,
+      "capex": 138735000.0,
+      "free_cash_flow": 102579265000.0,
+      "eps_basic": 4.93,
+      "eps_diluted": 4.9,
+      "shares_outstanding": 24304000000.0,
+      "revenue_growth_yoy": 0.6547,
+      "revenue_cagr_3y": 0.5247,
+      "revenue_cagr_5y": 0.288,
+      "net_income_cagr_3y": 0.592,
+      "net_income_cagr_5y": 0.3218,
+      "operating_leverage_5y": 1.1
+    },
+    "enrichment_warnings": [],
+    "enrichment_sources": [
+      "Tiingo (market data)",
+      "FMP (Financial Modeling Prep)",
+      "NVIDIA (NVDA) Stock Analysis: AI Demand Debate Weighs on Shares Near Record Highs - https://tickeron.com/ticker/NVDA",
+      "NVIDIA CORP (NASDAQ:NVDA) Stands Out as a Strong Growth Stock with a Good Technical Setup - https://www.chartmill.com/news/NVDA/Chartmill-48979-NVIDIA-CORP-NASDAQNVDA-Stands-Out-as-a-Strong-Growth-Stock-with-a-Good-Technical-Setup",
+      "NVIDIA Corporation (NVDA) Is a Trending Stock: Facts to Know Before Betting on It - https://finance.yahoo.com/markets/stocks/articles/nvidia-corporation-nvda-trending-stock-130004378.html",
+      "Download The Official NVIDIA Drivers | NVIDIA - https://www.nvidia.com/en-us/drivers",
+      "NVIDIA Corp (NVDA) AI Stock Analysis | Danelfin - https://danelfin.com/stock/NVDA",
+      "Graphics Processing Unit (GPU) Market Size, Trends, Share & Industry Report\u00a02031 - https://www.mordorintelligence.com/industry-reports/graphics-processing-unit-market",
+      "When Rates Meet AI: Small Caps or Nvidia. What\u2019s Next? | Direxion - https://www.direxion.com/xchange/when-rates-meet-ai-small-caps-or-nvidia-whats-next",
+      "Nvidia has fallen sharply from 2026 highs. Is the stock now an attractive Buy? By Investing.com - https://www.investing.com/news/stock-market-news/nvidia-has-fallen-sharply-from-2026-highs-is-the-stock-now-an-attractive-buy-93CH-4829756",
+      "Nvidia (NASDAQ: NVDA) Bull, Base, & Bear Stock Price Prediction and Forecast (Jan 30) - 24/7 Wall St. - https://247wallst.com/forecasts/2026/01/30/nvidia-nvda-bull-base-bear-price-prediction-and-forecast",
+      "Cybersecurity Market Size, Share & Forecast Report, 2034 - https://www.fortunebusinessinsights.com/industry-reports/cyber-security-market-101165",
+      "Enterprise Software Market Size, Share & Trends, 2034 - https://www.marketdataforecast.com/market-reports/enterprise-software-market",
+      "Cloud Computing Market Size, Share & Growth Report, 2034 - https://www.fortunebusinessinsights.com/cloud-computing-market-102697",
+      "FMP (peer data)",
+      "FMP (analyst estimates)",
+      "Tiingo (price history)",
+      "Computed Technical Signals (math-based)",
+      "FRED (Federal Reserve Economic Data)",
+      "Tiingo (indices)",
+      "Tavily macro: https://www.federalreserve.gov/monetarypolicy/fomcminutes20260916.htm",
+      "FMP (analyst grades)",
+      "FMP (DCF valuation)"
+    ],
+    "enrichment_filter_stats": {
+      "company_kept": 3,
+      "industry_kept": 3,
+      "risks_kept": 3,
+      "sector_kept": 3,
+      "company_dropped": 0,
+      "industry_dropped": 0,
+      "risks_dropped": 0,
+      "sector_dropped": 0
+    }
+  }
+}

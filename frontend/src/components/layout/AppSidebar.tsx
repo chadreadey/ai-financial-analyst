@@ -1,20 +1,21 @@
-import { NavLink } from "react-router-dom";
-import { Search, FlaskConical, Wallet, Settings } from "lucide-react";
+import { NavLink, Link, useNavigate } from "react-router-dom";
+import { Search, FlaskConical, Wallet, Settings, Globe, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { clearAdminKey } from "@/lib/adminKey";
 import { Separator } from "@/components/ui/separator";
 
 const navSections = [
   {
     label: "Research",
     items: [
-      { to: "/analysis", label: "Analysis", icon: Search },
-      { to: "/backtest", label: "Backtest Lab", icon: FlaskConical },
+      { to: "/lab/analysis", label: "Analysis", icon: Search },
+      { to: "/lab/backtest", label: "Backtest Lab", icon: FlaskConical },
     ],
   },
   {
     label: "Trading",
     items: [
-      { to: "/paper-trading", label: "Paper Trading", icon: Wallet },
+      { to: "/lab/paper-trading", label: "Paper Trading", icon: Wallet },
     ],
   },
 ];
@@ -24,6 +25,12 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ onSettingsOpen }: AppSidebarProps) {
+  const navigate = useNavigate();
+  const lockLab = () => {
+    clearAdminKey();
+    navigate("/lab");
+  };
+
   return (
     <aside
       className="fixed left-0 top-0 bottom-0 w-48 flex flex-col border-r border-border z-40"
@@ -34,7 +41,7 @@ export function AppSidebar({ onSettingsOpen }: AppSidebarProps) {
         <div className="w-6 h-6 rounded-md flex items-center justify-center bg-primary/10">
           <div className="w-3 h-3 rounded-sm bg-primary" />
         </div>
-        <span className="text-sm font-bold tracking-tight">ATIS</span>
+        <span className="text-xs font-bold tracking-tight leading-tight">AI Financial Analyst · Lab</span>
       </div>
 
       {/* Nav sections */}
@@ -87,6 +94,20 @@ export function AppSidebar({ onSettingsOpen }: AppSidebarProps) {
           </span>
           <span className="text-[10px] text-muted-foreground">VIX 18.3</span>
         </div>
+        <Link
+          to="/"
+          className="w-full mx-1 px-3 py-1.5 rounded-md bg-secondary border border-border flex items-center gap-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Globe size={12} />
+          Public site
+        </Link>
+        <button
+          onClick={lockLab}
+          className="w-full mx-1 px-3 py-1.5 rounded-md bg-secondary border border-border flex items-center gap-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <Lock size={12} />
+          Lock lab
+        </button>
         <button
           onClick={onSettingsOpen}
           className="w-full mx-1 px-3 py-1.5 rounded-md bg-secondary border border-border flex items-center gap-2 text-[11px] text-muted-foreground hover:text-foreground transition-colors"

@@ -7,17 +7,10 @@ import { SignalCards } from "./SignalCards";
 import { AgentReportTabs } from "./AgentReportTabs";
 import { FileText } from "lucide-react";
 import { useState } from "react";
+import { verdictClassName } from "@/lib/brief";
 
 interface Props {
   result: AnalysisResult;
-}
-
-function verdictClassName(verdict: string): string {
-  const v = verdict.toUpperCase();
-  if (v.includes("BUY") || v.includes("BULLISH")) return "bg-[--positive]/10 text-[--positive] border-[--positive]/20";
-  if (v.includes("SELL") || v.includes("BEARISH")) return "bg-[--negative]/10 text-[--negative] border-[--negative]/20";
-  if (v.includes("HOLD") || v.includes("NEUTRAL")) return "bg-[--warning]/10 text-[--warning] border-[--warning]/20";
-  return "bg-primary/10 text-primary border-primary/20";
 }
 
 export function ResultView({ result }: Props) {

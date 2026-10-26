@@ -44,3 +44,65 @@ async def test_fake_provider_generate(fake_provider):
         user="Say hello.",
     )
     assert result == "Test analysis output."
+
+
+class _Msg:
+    def __init__(self, content, stop_reason="end_turn"):
+        self.content = content
+        self.stop_reason = stop_reason
+
+
+class _Block:
+    def __init__(self, type_, text=""):
+        self.type = type_
+        self.text = text
+
+
+def _provider_with(fake_create):
+    from types import SimpleNamespace
+
+    from llm.providers import AnthropicProvider
+
+    p = AnthropicProvider(api_key="test")
+    p._client = SimpleNamespace(messages=SimpleNamespace(create=fake_create))
+    return p
+
+
+@pytest.mark.asyncio
+async def test_anthropic_default_model_opus_5_5():
+    seen = {}
+
+    async def fake_create(**kw):
+        seen.update(kw)
+        return _Msg([_Block("text", "hi")])
+
+    p = _provider_with(fake_create)
+    assert p.default_model == "claude-opus-5-5"
+    assert await p.generate("s", "u") == "hi"
+    assert seen["model"] == "claude-opus-5-5"
+    assert seen["output_config"] == {"effort": "low"}
+    assert "thinking" not in seen
+    assert "temperature" not in seen
+
+
+@pytest.mark.asyncio
+async def test_anthropic_sonnet_5_5_sends_thinking_off():
+    seen = {}
+
+    async def fake_create(**kw):
+        seen.update(kw)
+        return _Msg([_Block("text", "hi")])
+
+    p = _provider_with(fake_create)
+    assert await p.generate("s", "u", model="claude-sonnet-5-5") == "hi"
+    assert seen["thinking"] == {"type": "between_tools"}
+    assert "temperature" not in seen
+
+
+@pytest.mark.asyncio
+async def test_anthropic_no_text_block_raises_clear_error():
+    async def fake_create(**kw):
+        return _Msg([_Block("thinking")], stop_reason="max_tokens")
+
+    with pytest.raises(RuntimeError, match="max_tokens"):
+        await _provider_with(fake_create).generate("s", "u")

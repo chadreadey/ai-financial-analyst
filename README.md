@@ -1,18 +1,16 @@
 # AI Financial Analyst
 
-> **Status: being rebuilt.** The app and its evaluation are mid-revamp. The
-> live deployment is not current, and the numbers below come from the last
-> full backtest (August 2026), which has known biases that are not corrected.
+![An example investment brief for NVDA](docs/img/brief.png)
 
-A multi-agent equity research system with a quantitative backtesting engine.
-You enter a ticker. Six LLM analyst agents run in parallel over SEC filings,
-market data, and quant signals, and a synthesis agent combines their reports
-into one verdict with health scores, a price target, and a conviction rating.
+**Live app: https://ai-financial-analyst-eight.vercel.app/**
 
-**Headline result:** in a 2018–2025 backtest with 10 positions, the
-quantitative screen alone had a Sharpe ratio of **1.15**, against **0.74**
-for SPY. Adding the LLM agents on top **lowered** it to **1.01**. So far the
-agents have not added value over the quant screen they sit on.
+Enter a ticker; six LLM analyst agents work in parallel and a synthesis agent reconciles them into one investment brief. A separate quantitative screen is backtested against SPY, and the honest result is published on the app's "How it performs" page.
+
+The agent prompts are written in the style of well-known research desks (for example a DCF analyst, a risk analyst, a macro strategist). These are prompt personas only, with no affiliation, endorsement, or access to those firms' methods.
+
+## How it performs
+
+In a 2018–2025 backtest (10 positions), the quantitative screen alone had a Sharpe ratio of 1.15 against 0.74 for SPY; adding the LLM agents lowered it to 1.01. Survivorship bias and LLM look-ahead are not corrected, so treat these as upper bounds.
 
 | Series | Sharpe | Sortino | Ann. return | Max drawdown |
 |---|---:|---:|---:|---:|
@@ -22,10 +20,48 @@ agents have not added value over the quant screen they sit on.
 
 Daily returns 2018-02-01 to 2025-01-30, 10 positions, max 4 per sector.
 Source: [`docs/eval/three_series_llm/latest.json`](docs/eval/three_series_llm/latest.json).
-Survivorship bias and LLM look-ahead are not corrected, so treat these as
-upper bounds (details under [Limitations](#limitations)).
+
+## Public demo limits
+
+The home page shows four precomputed example briefs. Live runs are limited to 3 per IP per hour and 30 per day. The `/lab` area (backtests, paper trading, deep dives) is gated by an API key and is not part of the public demo.
+
+## Run locally
+
+Requires Python 3.11+ and Node.js 22.12+.
+
+Backend (FastAPI):
+
+```bash
+pip install -r requirements.txt
+pip install -e .
+cp .env.example .env        # then fill in your keys
+uvicorn backend.main:app --reload --port 8000
+```
+
+Frontend (Vite + React):
+
+```bash
+cd frontend
+cp .env.example .env.local  # VITE_API_URL=http://localhost:8000
+npm install
+npm run dev                 # http://localhost:5173
+```
+
+Key environment variables (see `.env.example` and the full reference under Research notes):
+
+- `ANTHROPIC_API_KEY` with `LLM_PROVIDER=anthropic` (default model `claude-opus-5-5`)
+- `TIINGO_API_KEY` (or Alpaca keys with `PRICE_PROVIDER=alpaca`), `FMP_API_KEY`, `FINNHUB_API_KEY`, `TAVILY_API_KEY`
+- `INTERNAL_API_KEY` to unlock the `/lab` area and the protected backend routes
+- `CORS_ORIGINS` for a deployed frontend; `VITE_API_URL` on the frontend
+
+Tests: `pytest -q` (backend, offline) and `cd frontend && npm test && npm run build`.
 
 ---
+
+## Research notes
+
+Everything below is the original engineering documentation for the research platform behind the app. It contains no performance figures; the only published results are in the section above.
+
 
 ## What It Does
 
@@ -56,11 +92,13 @@ Input: AAPL
  +-- Finnhub sentiment: FinBERT/VADER news scoring + insider MSPR
  +-- Optional: TimesFM / LSTM price forecasts, WRDS point-in-time fundamentals
        |
-       v asyncio.gather()
+       v asyncio.gather()   (analyst styles are prompt personas only; see Agents)
  +------------------------------------------------------------+
  |  DCF Analyst        |  Risk Analyst    |  Earnings          |
+ |  (valuation)        |  (balance sheet) |  (EPS, margins)    |
  +------------------------------------------------------------+
  |  Competitive Analyst |  Pattern Analyst |  Macro Strategist  |
+ |  (moat, sector)     |  (OBV, regime)   |  (rates, cycle)    |
  +------------------------------------------------------------+
        |
        v
@@ -289,6 +327,8 @@ series as real time passes. That is part of the rebuild.
 
 ## Agents
 
+> These are prompt personas only, with no affiliation, endorsement, or access to those firms' methods.
+
 | Agent | Persona | Focus |
 |-------|---------|-------|
 | **DCF Analyst** | Morgan Stanley-style | Intrinsic valuation, FCF projections, WACC, price target |
@@ -329,7 +369,7 @@ All metric computation, scoring thresholds, and API response validation are cent
 ### Prerequisites
 
 - Python 3.11+
-- Node.js 18+
+- Node.js 22.12+
 - (Optional) Redis — only needed if `ENABLE_TIMESFM=true`
 
 ### Backend Setup
@@ -588,7 +628,7 @@ Both `pytest` and the eval suites run on every pull request via
 ## Tech Stack Summary
 
 - **Python 3.11+** — FastAPI, Pydantic v2, asyncio, SQLite
-- **Node 18+** — Vite 6, React 19, TypeScript, Tailwind CSS v3
+- **Node 22.12+** — Vite 6, React 19, TypeScript, Tailwind CSS v3
 - **LLM** — Anthropic Claude (`claude-opus-5-5` default)
 - **Market data** — Alpaca / Tiingo (switchable), FMP, Finnhub, FRED, Yahoo Finance (fallback)
 - **SEC** — EDGAR API, edgartools, custom XBRL parser

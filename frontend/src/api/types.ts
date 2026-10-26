@@ -65,18 +65,18 @@ export interface ConfigDefaults {
 
 export interface RunAnalysisRequest {
   ticker: string;
-  provider: string;
+  provider?: string;
   model?: string;
   api_key?: string;
-  enable_tiingo: boolean;
-  enable_fmp: boolean;
-  enable_yahoo: boolean;
-  enable_tavily: boolean;
-  max_agent_context_chars: number;
-  max_agent_output_tokens: number;
-  synthesis_report_max_chars: number;
-  synthesis_input_max_chars: number;
-  max_synthesis_output_tokens: number;
+  enable_tiingo?: boolean;
+  enable_fmp?: boolean;
+  enable_yahoo?: boolean;
+  enable_tavily?: boolean;
+  max_agent_context_chars?: number;
+  max_agent_output_tokens?: number;
+  synthesis_report_max_chars?: number;
+  synthesis_input_max_chars?: number;
+  max_synthesis_output_tokens?: number;
 }
 
 export interface ReportFile {
