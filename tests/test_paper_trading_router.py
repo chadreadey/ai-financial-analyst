@@ -11,10 +11,12 @@ from fastapi.testclient import TestClient
 
 
 @pytest.fixture
-def client():
+def client(monkeypatch):
     from backend.main import app
+    from config import settings
 
-    return TestClient(app)
+    monkeypatch.setattr(settings, "internal_api_key", "test-key", raising=False)
+    return TestClient(app, headers={"X-API-Key": "test-key"})
 
 
 @pytest.fixture

@@ -8,42 +8,21 @@ so the frontend can navigate to the detail view before the run completes.
 
 from __future__ import annotations
 
-import hmac
 import logging
 import re
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field, field_validator
 
+from backend.auth import require_admin
 from backend import backtest_reader, cpcv_sqlite, supabase_backtest
 from config import settings
 
 logger = logging.getLogger(__name__)
 
 
-def _require_api_key(x_api_key: str = Header(..., alias="X-API-Key")) -> None:
-    """Dependency: validates X-API-Key against INTERNAL_API_KEY env var.
-
-    Raises 403 (not 401) to avoid leaking that the endpoint exists and
-    requires auth — returning 401 would invite credential-stuffing loops.
-    Raises 500 at startup-time if the key is not configured so misconfigured
-    deployments fail loudly.
-    """
-    configured = settings.internal_api_key
-    if not configured:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Server misconfigured: INTERNAL_API_KEY not set.",
-        )
-    if not hmac.compare_digest(configured, x_api_key):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Forbidden.",
-        )
-
-
-router = APIRouter(dependencies=[Depends(_require_api_key)])
+router = APIRouter(dependencies=[Depends(require_admin)])
 
 
 _TICKER_RE = re.compile(r"^[A-Z]{1,5}$")

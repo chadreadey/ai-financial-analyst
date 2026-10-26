@@ -108,6 +108,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from fastapi import Depends
+from backend.auth import require_admin
 from backend.routers import analysis, reports, config as config_router
 from backend.routers import portfolio, news, industry
 from backend.routers import watchlist, market_data, recommendations
@@ -127,18 +129,57 @@ except Exception as exc:  # pragma: no cover - never block startup on this
     logger.warning("assumption audit log not configured: %s", exc)
 
 app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"])
-app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
+app.include_router(
+    reports.router, prefix="/api/reports", dependencies=[Depends(require_admin)], tags=["reports"]
+)
 app.include_router(config_router.router, prefix="/api/config", tags=["config"])
-app.include_router(portfolio.router, prefix="/api/portfolio", tags=["portfolio"])
-app.include_router(news.router, prefix="/api/news", tags=["news"])
-app.include_router(industry.router, prefix="/api/industry", tags=["industry"])
-app.include_router(watchlist.router, prefix="/api/watchlist", tags=["watchlist"])
+app.include_router(
+    portfolio.router,
+    prefix="/api/portfolio",
+    dependencies=[Depends(require_admin)],
+    tags=["portfolio"],
+)
+app.include_router(
+    news.router, prefix="/api/news", dependencies=[Depends(require_admin)], tags=["news"]
+)
+app.include_router(
+    industry.router,
+    prefix="/api/industry",
+    dependencies=[Depends(require_admin)],
+    tags=["industry"],
+)
+app.include_router(
+    watchlist.router,
+    prefix="/api/watchlist",
+    dependencies=[Depends(require_admin)],
+    tags=["watchlist"],
+)
 app.include_router(market_data.router, prefix="/api/market", tags=["market"])
-app.include_router(recommendations.router, prefix="/api/recommendations", tags=["recommendations"])
-app.include_router(backtest.router, prefix="/api/backtest", tags=["backtest"])
+app.include_router(
+    recommendations.router,
+    prefix="/api/recommendations",
+    dependencies=[Depends(require_admin)],
+    tags=["recommendations"],
+)
+app.include_router(
+    backtest.router,
+    prefix="/api/backtest",
+    dependencies=[Depends(require_admin)],
+    tags=["backtest"],
+)
 app.include_router(backtest_modal.router, prefix="/api/backtest", tags=["backtest-modal"])
-app.include_router(paper_trading.router, prefix="/api/paper-trading", tags=["paper-trading"])
-app.include_router(diagnostics.router, prefix="/api/diagnostics", tags=["diagnostics"])
+app.include_router(
+    paper_trading.router,
+    prefix="/api/paper-trading",
+    dependencies=[Depends(require_admin)],
+    tags=["paper-trading"],
+)
+app.include_router(
+    diagnostics.router,
+    prefix="/api/diagnostics",
+    dependencies=[Depends(require_admin)],
+    tags=["diagnostics"],
+)
 
 
 @app.get("/api/health")

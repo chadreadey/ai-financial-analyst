@@ -3,9 +3,10 @@ import logging
 import threading
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
+from backend.auth import require_admin
 from backend.jobs import create_job, get_job, run_analysis_job, JobState
 from backend.schemas import RunAnalysisRequest, JobCreated, JobStatus, HistoryDetail
 
@@ -75,7 +76,7 @@ async def get_result(job_id: str):
     return JobStatus(job_id=job_id, status=job.status)
 
 
-@router.get("/history")
+@router.get("/history", dependencies=[Depends(require_admin)])
 async def get_history(ticker: str = "", limit: int = 20, offset: int = 0):
     from sec.cache import SECCache
     from backend.history_outcomes import compute_outcome_metrics
@@ -90,7 +91,11 @@ async def get_history(ticker: str = "", limit: int = 20, offset: int = 0):
         cache.close()
 
 
-@router.get("/history/{analysis_id}", response_model=HistoryDetail)
+@router.get(
+    "/history/{analysis_id}",
+    response_model=HistoryDetail,
+    dependencies=[Depends(require_admin)],
+)
 async def get_history_detail(analysis_id: str):
     from sec.cache import SECCache
     from backend.history_outcomes import compute_outcome_metrics
