@@ -80,6 +80,7 @@ async def test_anthropic_default_model_opus_5_5():
     assert p.default_model == "claude-opus-5-5"
     assert await p.generate("s", "u") == "hi"
     assert seen["model"] == "claude-opus-5-5"
+    assert seen["output_config"] == {"effort": "low"}
     assert "thinking" not in seen
     assert "temperature" not in seen
 
