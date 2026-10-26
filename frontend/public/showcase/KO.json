@@ -1,0 +1,174 @@
+{
+  "run_at": "2026-10-26T16:42:26.317713+00:00",
+  "result": {
+    "ticker": "KO",
+    "company_name": "COCA COLA CO",
+    "agent_reports": [
+      {
+        "agent_name": "DCF Analyst",
+        "analysis": "# COCA-COLA CO (KO): DCF Valuation\n\n## Data Quality Notes\n- Shares outstanding is N/A in the feed. I use ~4.31B diluted shares, derived as Net Income / EPS ($13.107B / $3.04).\n- FY2025 net income of $13.1B includes a large non-operating gain; operating income grew only ~1.5% YoY ($13.76B vs. ~$13.76B on a $47.06B base at 29.2%). I do not capitalize the full net income uplift.\n- FY2025 operating CF ($7.4B) is depressed relative to FY2023 ($11.6B), which reflects tax and legal payments (e.g., the Fairlife/tax-settlement timing). I normalize FCF modestly upward.\n- The Q1 FY2026 quarterly series contains duplicate/conflicting rows. I rely on the ~+5\u201312% YoY recent momentum, partly FX and pricing driven, as directional support only.\n\n## Key Assumptions\n\n| Item | Assumption | Basis |\n|---|---|---|\n| Revenue growth 2026E\u20132030E | 4.5%, 4.0%, 3.8%, 3.5%, 3.3% | 3Y CAGR 1.6% understates recent momentum (+5\u201312% YoY quarterly); mix of pricing and volume, FX tailwind fading |\n| Operating margin | 29.0% \u2192 29.5% | 5Y direction expanding; FY2025 28.7% |\n| Cash tax rate | ~19% | Historical effective rate on operating income |\n| D&A | ~2.0% of revenue | Mature, asset-light bottler-refranchised model |\n| Capex | ~4.4% of revenue | FY2025 $2.11B / $47.9B |\n| Change in NWC | ~0.3% of revenue | Stable working capital |\n| FY2025 FCF base | $5.3B reported, normalized ~$6.3B | Tax-payment timing depressed 2025 |\n\n## Revenue and FCF Projection (USD billions)\n\n| Year | Revenue | Op. Margin | EBIT | NOPAT (81%) | D&A | Capex | \u0394NWC | FCF |\n|---|---|---|---|---|---|---|---|---|\n| 2025A | 47.94 | 28.7% | 13.76 | n/a | n/a | 2.11 | n/a | 5.30 (reported) |\n| 2026E | 50.10 | 29.0% | 14.53 | 11.77 | 1.00 | 2.20 | 0.15 | 10.42 |\n| 2027E | 52.10 | 29.2% | 15.21 | 12.32 | 1.04 | 2.29 | 0.15 | 10.92 |\n| 2028E | 54.08 | 29.3% | 15.85 | 12.84 | 1.08 | 2.38 | 0.16 | 11.38 |\n| 2029E | 55.97 | 29.4% | 16.46 | 13.33 | 1.12 | 2.46 | 0.17 | 11.82 |\n| 2030E | 57.82 | 29.5% | 17.06 | 13.82 | 1.16 | 2.54 | 0.17 | 12.27 |\n\n**Reconciliation to reported FCF:** The model FCF is an unlevered figure. Reported FCF ($5.3B) is after interest (~$1.6B+), cash taxes, and one-time tax/legal payments. Because unlevered FCF is discounted at WACC, interest is excluded by construction. I haircut model FCF by a further 15% to",
+        "structured": null
+      },
+      {
+        "agent_name": "Risk Analyst",
+        "analysis": "# RISK REPORT: THE COCA-COLA COMPANY (KO)\n**Bridgewater-Style Principles-Based Risk Assessment | Price: $92.71 | Data as of 2026-10-23**\n\n---\n\n## EXECUTIVE SUMMARY\n\nKO is a high-quality, wide-moat franchise that has re-rated sharply (+36% 1Y, 91st percentile of its 52-week range) into a macro backdrop that is *less* friendly than the price action implies. The core business risk is low. The risk I care about is **the asymmetry between the quality of the earnings narrative and the quality of the reported numbers, combined with a leveraged balance sheet and a stretched valuation entering a rising-rate environment.** Several data points in the package do not reconcile, and I flag them explicitly below rather than paper over them.\n\n---\n\n## 1. BALANCE SHEET RISK\n\n**Observed:**\n- Long-term debt: **$37.5B** vs. cash **$10.3B** \u2192 net debt \u2248 **$27.2B**\n- Equity: **$32.2B** \u2192 LT debt/equity \u2248 **1.17x** (total liabilities not reported; true leverage is higher)\n- Total assets $104.8B vs. equity $32.2B \u2192 implied total liabilities \u2248 **$72.6B**, so total liabilities/equity \u2248 **2.3x**\n- ROE of 40.7% is flattering: it is partly a function of a small equity base (buybacks, historical dividends exceeding retained earnings), not purely operating excellence.\n\n**Leverage vs. cash generation:**\n- Net debt / FCF \u2248 **5.1x** ($27.2B / $5.3B). That is not distressed, but it is more than the \"defensive staple\" label implies.\n- Net debt / Operating Income \u2248 **2.0x**, which is manageable on an earnings basis but looks heavier on a cash basis.\n- Interest coverage is comfortable on operating income. Interest expense was not provided, so I cannot compute it precisely, but at a blended ~4% cost, interest is roughly $1.5B against $13.8B of operating income (~9x).\n\n**Refinancing/rate exposure:**\n- The 10Y Treasury is **4.96% (+95bp YoY)** and IG spreads are **91bp (+15bp YoY)**. All-in IG funding is roughly 5.5\u20136%. KO's legacy low-coupon debt is being refinanced into materially higher rates as it matures. This is a slow-burn headwind to interest expense, not an acute risk.\n- Dividend (~$8B+ annually, my estimate) plus capex consumes more than 100% of FCF in the weaker years. **FCF of $5.3B does not cover the dividend on its own**; the gap is bridged by cash, debt, or asset-sale proceeds.\n\n**Off-balance-sheet / structural items to monitor:** pension/OPEB obligations, guarantees to bottlers, and the legal/tax contingencies (the IRS transfer-pricing matter is a historically known large contingent exposure). I do not have the current figures from the excerpts provided, so I treat them as an unquantified tail.\n\n**Balance sheet score: Moderate. Not fragile, but not the fortress the brand suggests.**\n\n---\n\n## 2. EARNINGS QUALITY & SUSTAINABILITY\n\nThis is where the data raises the most flags.\n\n**Red flag #1: Earnings vs. cash flow divergence**\n- FY2025 net income **$13.1B** vs. operating cash flow **$7.4B** \u2192 **cash conversion of ~0.57x**\n-",
+        "structured": null
+      },
+      {
+        "agent_name": "Earnings Analyst",
+        "analysis": "**KO FY2025 Earnings Analysis**\n\n**Earnings trajectory.** KO's FY2025 earnings are strong on the bottom line but driven by non-operating items rather than core growth. Revenue rose 1.9% to $47.94B (3Y CAGR 1.6%, 5Y 0.9%), so the top line is growing at roughly low single digits. Net income jumped to $13.11B from $10.63B (+23.3%), well ahead of the 3Y/5Y net income CAGRs of 7.0%/4.1%. Operating income was $13.76B (28.7% margin), yet net income ($13.11B) sits at 95% of operating income. That is unusual for a company carrying $37.5B of long-term debt and a normal tax burden. It implies large non-operating gains (equity-method income, investment or divestiture gains) or tax benefits, though the data provided does not break these out. The 5Y operating leverage of 4.26 looks flattering but is a function of a very low revenue base growth rate. Quarterly data shows YoY revenue growth of +5.1% (FY25 Q3), +5.7% (Q2) and +12.1% (latest Q1 row). The quarterly feed contains duplicated and inconsistent period labels (two \"FY2026 Q1\" rows with different revenue, $12.47B vs $11.13B, and YoY +12.1% vs -10.0%), so I place low weight on the +12.1% figure and treat the FY25 Q2/Q3 +5% growth as the more reliable read.\n\n**Margins.** Gross margin is 61.6%, down from 62.8% (FY24 comparative) and 64.6% (FY23), which is a contraction of roughly 300bps over the window, consistent with the \"contracting\" 5Y gross margin direction flag. Operating margin is 28.7% vs 29.2% prior and 30.1% two years back, a modest slide in the latest three annual periods despite the \"expanding\" 5Y label. Net margin is 27.3% vs 27.9% and 28.7%. Some historical rows for FY2024 show an operating margin of 21.2% and net margin of 22.6%, which conflicts with other rows for the same period (29.2%/27.9%). This suggests restated or differently-tagged data, so the 5Y expansion likely reflects the depressed FY24 base in one tagging. Net: margins are stable-to-slightly-eroding from a very high level, with gross margin compression (likely input cost, mix, or concentrate/bottler structure effects; the provided data does not identify the driver). Quarterly operating margins of 32-35% (up to 39.2% in one row) are well above the annual 28.7%, which is plausible given seasonal and one-time effects but should be confirmed against the 10-K.\n\n**Earnings quality.** This is the main concern. Operating cash flow was $7.41B against net income of $13.11B, an OCF/NI ratio of 0.57, well below the 0.8 threshold. I cannot confirm a two-period streak, since prior-year OCF is not provided, but the single-period shortfall is large, and this is a flag. FCF is $5.30B (CapEx $2.11B), only 40% of net income. The gap strongly suggests net income includes sizable non-cash or non-recurring gains (consistent with net income at 95% of operating income). Payout implications: with FCF of $5.3B, dividend coverage should be examined; KO's dividend (which the research items show was raised for the 64th consecutive year) likely exceeds this FCF level based on general knowledge, but I cannot verify the dividend dollar amount from the data provided. Receivables,",
+        "structured": null
+      },
+      {
+        "agent_name": "Pattern Analyst",
+        "analysis": "The price/volume data supplied to me was truncated (\"...[context trimmed]...\"). I have only the following:\n\n- Current price: $92.71\n- 52-week high/low: $95.34 / $66.20\n- Returns: 1M +5.6%, 3M +5.7%, 6M +24.4%, 1Y +36.1%\n- Risk stats: annualized vol 18.3%, max drawdown -9.8%, Sharpe 1.16, VaR(95%) -1.55% daily\n- Volume: 18.9M on the last session\n\nI have no OHLCV series, so I cannot compute the 50d/200d SMAs, 60-day mean/\u03c3, Bollinger Bands, RSI, OBV, or ATR. Per protocol, those signals are scored 0.0 as insufficient_data rather than estimated. Two further limitations: the \"30% trend suppression\" rule for mean reversion cannot be evaluated on a 60-day window (I only have 3M return = +5.7%, which would not trigger suppression, but this is moot without the series), and the 6M/1Y returns imply the long-term trend is up but do not substitute for a gate calculation.\n\n```json\n{\n  \"signal_vector\": {\n    \"sma_trend\": {\"score\": 0.0, \"detail\": \"insufficient_data \u2014 no 50d/200d SMA computable; 1Y +36.1% and 6M +24.4% suggest uptrend but not scored without MA values\"},\n    \"mean_reversion_z\": {\"score\": 0.0, \"z_score\": null, \"detail\": \"insufficient_data \u2014 no 60-day price series\"},\n    \"bollinger_pctb\": {\"score\": 0.0, \"pct_b\": null, \"detail\": \"insufficient_data \u2014 no 20-day price series\"},\n    \"rsi\": {\"score\": 0.0, \"rsi_value\": null, \"detail\": \"insufficient_data \u2014 no 14-day price series\"},\n    \"obv_trend\": {\"score\": 0.0, \"detail\": \"insufficient_data \u2014 only single-day volume provided\"},\n    \"atr_regime\": {\"score\": 0.0, \"atr_pct\": null, \"volatility_regime\": \"unknown (annualized vol 18.3% is the only proxy; not ATR-based)\"}\n  },\n  \"composite_score\": 0.0,\n  \"composite_direction\": \"NEUTRAL\",\n  \"actionable\": false,\n  \"flags\": [\"insufficient_price_history\"],\n  \"technical_levels\": {\n    \"support_1\": null,\n    \"resistance_1\": 95.34,\n    \"stop_loss_atr2x\": null\n  },\n  \"pattern_classification\": \"TRENDING (provisional, from return profile only)\",\n  \"confidence\": \"LOW\"\n}\n```\n\nResistance_1 is the 52-week high ($95.34), the only level I can cite directly. No support level is stated, since the data gives only the 52-week low ($66.20), which is too distant to be a useful trading level.\n\n### Quantitative Summary\n\nThe composite is 0.0 and non-actionable because all six price-based signals lack inputs; this reflects data absence, not a neutral market read. The return profile (1Y +36.1%, 6M +24.4%, 3M +5.7%, 1M +5.6%) and a price of $92.71, about 2.8% below the 52-week high, indicate a persistent uptrend near highs, which would likely score SMA Trend at or near +1.0 if the moving averages were available. Position in the 52-week range is roughly 92% [(92.71-66.20)/(95.34-66.20)]. Mean-reversion and Bollinger/RSI signals would likely score negative (overbought) at this range position, creating a trend-vs-reversion conflict that the",
+        "structured": null
+      },
+      {
+        "agent_name": "Macro Strategist",
+        "analysis": "**MACRO REGIME: LATE-CYCLE WITH STAGFLATION-TINGED TERMS**\n\nThe data points to a late-cycle regime with inflationary overtones rather than a recession or early recovery. The 10Y at 4.96% (+95bps YoY) and 2Y at 4.65% (+117bps YoY) are rising while the Fed Funds rate has fallen 34bps to 3.75%. That combination means the market is pricing a policy rate below where long-end yields are heading, a bear-steepening pattern typical of sticky inflation and term-premium repricing rather than easing-driven growth. The 2s10s at +31bps is normal but narrow. CPI is up 11.2 index points YoY, the staff estimate cited in the Fed context puts total inflation at 3.6% and core at 3.2%, and 5Y breakevens at 2.48% are above 10Y breakevens at 2.34%, so near-term inflation risk is priced more heavily than long-run. Offsetting signals: unemployment is low at 4.2% (-30bps YoY), VIX is a moderate 19.4, S&P 500 is +12.1% YTD, and credit spreads (HY 3.38%, IG 0.91%) have widened 58bps and 15bps YoY but remain tight in absolute terms. Consumer sentiment at 48.1 (-5.5 YoY) is the standout weak spot. Expanding equities, resilient labor, rising yields, and depressed sentiment together read as late-cycle.\n\n**MONETARY POLICY TRANSMISSION TO KO**\n\nThe cost-of-capital channel is the most direct. KO carries $37.51B of long-term debt against $10.27B of cash, or roughly $27.2B net. With a 10Y at 4.96% and IG spreads at 91bps, new long-dated issuance prices near 5.9% all-in, versus legacy coupons that are largely sub-4% (not provided in the data, so treat as an assumption). Each $5B of refinancing at ~200bps above the legacy coupon adds about $100M of annual pre-tax interest, roughly $0.02/share after tax on ~4.3B shares (share count not provided, so this is inferred from net income/EPS: $13.11B / $3.04 \u2248 4.31B). That is immaterial against $13.76B of operating income, and the exposure is staggered. The larger channel is valuation: KO is a long-duration, bond-proxy equity. With 10Y real yields rising alongside nominal yields, the equity risk premium over Treasuries compresses. The shares have rallied 36.1% over 1Y to $92.71 (91st percentile of the 52-week range) even as the 10Y rose 95bps, which means multiple expansion has outrun the rate backdrop. Net income of $13.11B on a $92.71 price implies a trailing P/E of roughly 30.5x ($92.71 / $3.04), against a 10Y yield near 5%. An earnings yield of about 3.3% sits ~165bps below the risk-free rate, which is historically thin cushion for a company with 1.9% revenue growth.\n\nOn the demand side, the 3.75% Fed funds rate and a depressed sentiment reading of 48.1 matter less for KO than for discretionary names. Concentrate demand is low-ticket and habitual, and the 5Y revenue CAGR of just 0.9% shows how limited volume-driven growth already is. Pricing carries the top line, and that is where inflation helps nominally while pressuring affordability for lower-income consumers.\n\n**SECTOR POSITIONING AND DEFENS",
+        "structured": null
+      },
+      {
+        "agent_name": "Competitive & Sector Analyst",
+        "analysis": "# Competitive Position Analysis: The Coca-Cola Company (KO)\n\n## Data Quality Caveats\n\nSeveral inputs are inconsistent or thin, and they shape the confidence of this analysis.\n\n- **The margin table is internally inconsistent.** Fiscal-year labels are duplicated with conflicting values (the 12/31/2024 period shows both 29.2% and 21.2% operating margin). I use the latest annual figures (61.6% gross, 28.7% operating) as the baseline and treat earlier rows as directional.\n- **Cash conversion is anomalous.** Operating cash flow of $7.41B against net income of $13.11B is roughly 57% conversion, well below what a mature beverage franchise typically delivers. The $5.30B FCF figure should be treated as unverified until the cash flow statement is reconciled (non-cash gains, tax or legal settlements, or working capital timing are plausible explanations).\n- **No peer, segment, or volume/price-mix data was provided.** I cannot quantify margin premium versus PepsiCo or Keurig Dr Pepper, or split price from volume. Where I draw on general knowledge of KO's model, I say so.\n- **External research was non-substantive** (scraped pages, a social post), so I do not rely on it.\n\n## 1. Competitive Positioning: Dominant Global Brand Owner, Mature Growth Profile\n\nKO is the category-defining franchise in global non-alcoholic beverages. The financials are consistent with that: a 61.6% gross margin, 28.7% operating margin, and 40.7% ROE on $47.94B of revenue. A 28.7% operating margin is exceptional for a consumer products company and indicates the pricing power of an asset-light, concentrate-and-brand business. As general knowledge, KO has largely refranchised bottling, so margins reflect a franchise model rather than a capital-intensive manufacturing one.\n\nPricing power is strong but not unbounded. Revenue growth of 1.9% YoY, a 1.6% 3-year CAGR, and a 0.9% 5-year CAGR show a top line that is barely growing in the reported data. The 5-year gross margin direction is contracting (64.6% in the 2023 row to 61.6% in the latest year). That is consistent with input cost inflation or mix shift not being fully recovered through price, or with structural changes in the business. Operating margin is \"expanding\" over 5 years, with an operating leverage reading of 4.26. Together this implies below-the-line efficiency (opex discipline, refranchising, SG&A reduction) has more than offset gross margin compression. Net income CAGR of 7.0% (3Y) and 4.1% (5Y) well exceeds revenue CAGR, so earnings growth is coming from margin and capital structure rather than top-line expansion.\n\nNet: this is a dominant, highly profitable franchise whose growth is now driven by efficiency rather than volume. I cannot verify the volume versus price split from the data provided.\n\n## 2. Moat Analysis\n\n| Moat Source | Rating | Evidence |\n|---|---|---|\n| **Intangible assets (brand)** | **STRONG** | The 61.6% gross margin and 28.7% operating margin are only sustainable with a brand that commands price premiums and consumer preference. This is the core of the moat. |\n| **Economies of scale** | **STRONG** | Global distribution, advertising leverage, and concentrate production spread fixed costs over a very large revenue base. The 5-year operating leverage of 4.26 shows scale benefits flowing to profit. |\n| **Cost advantages** | **MOD",
+        "structured": null
+      }
+    ],
+    "synthesis": "**Scoring transparency:** No agent report included a visible SIGNAL_SCORE (the reports were truncated), so every score above is my own normalization from the available prose. The Pattern agent's 0.0 reflects missing data (flag: insufficient_price_history). The DCF report was cut off before its fair value output, so I scored it neutral and no DCF target is available. The raw weighted sum is -0.0975, and since macro_score (-0.30) is above -0.5, the 0.7 regime multiplier does not apply.\n\n## Verdict & Price Target\n\n**HOLD, no position, LOW conviction (weighted score -0.10).** I am not publishing a price target. The only valuation input, the DCF fair value, was truncated, and there are no peer multiples or consensus targets in the data. Reference level: $92.71 entry, 52-week high resistance at $95.34. The call is no new capital at a stretched price (+36% over 1Y, 92nd percentile of the 52-week range) while earnings quality and the rate backdrop both argue for caution. The horizon is about 60 days, set by the shortest binding signal, which is the earnings quality check at the next release.\n\n## Bull Case\n\nKO is a wide-moat franchise whose core business is not in question. FY2025 revenue grew 1.9% to $47.94B at a 28.7% operating margin and 61.6% gross margin, and quarterly YoY growth of +5.1% and +5.7% in the two most reliable recent periods shows pricing and volume momentum. The DCF analyst's projections of 3.3-4.5% revenue growth, 29-29.5% operating margins and roughly $10-12B of unlevered FCF are consistent with a stable compounder. Price action confirms it, with returns of +5.6% (1M), +24.4% (6M) and +36.1% (1Y), a Sharpe of 1.16, and a maximum drawdown of only -9.8%.\n\nDefensive positioning also helps in a late-cycle regime. Unemployment is low at 4.2%, the VIX is a moderate 19.4, and staples typically hold up if growth slows. If the Q-level cash conversion normalizes and the FY2025 OCF shortfall proves timing-related (tax and legal payments, as the DCF analyst argues), the earnings-quality concern fades",
+    "structured_verdict": {
+      "verdict": "HOLD",
+      "conviction": "LOW",
+      "conviction_score": 0.1,
+      "time_horizon": "medium-term",
+      "primary_horizon_days": 60,
+      "signal_breakdown": {
+        "dcf": {
+          "score": 0.0,
+          "weight": 0.17
+        },
+        "risk": {
+          "score": -0.35,
+          "weight": 0.17
+        },
+        "earnings": {
+          "score": -0.3,
+          "weight": 0.22
+        },
+        "competitive": {
+          "score": 0.3,
+          "weight": 0.14
+        },
+        "pattern": {
+          "score": 0.0,
+          "weight": 0.18
+        },
+        "macro": {
+          "score": -0.3,
+          "weight": 0.12
+        }
+      },
+      "weighted_score": -0.1,
+      "prior_bull_probability": 47,
+      "prior_bear_probability": 53,
+      "entry_price": 92.71,
+      "price_target": null,
+      "price_target_sources": {
+        "dcf_intrinsic": null,
+        "peer_multiples": null,
+        "analyst_consensus": null,
+        "technical_resistance": 95.34
+      },
+      "stop_loss": {
+        "value": 85.29,
+        "unit": "price"
+      },
+      "sizing_guidance": "0x_no_position",
+      "review_triggers": [
+        "Next quarterly earnings release (OCF/NI conversion and non-operating gain breakdown)",
+        "Fed rate decision and 10Y Treasury move through 5.0%",
+        "Break above $95.34 52-week high or breakdown below ~$88",
+        "10-K disclosure on contingent tax/legal liabilities and dividend coverage"
+      ],
+      "signal_conflicts": [
+        "pattern_uptrend_vs_risk_and_earnings_bearish",
+        "dcf_normalized_fcf_vs_reported_fcf_shortfall",
+        "competitive_moat_quality_vs_stretched_valuation_in_rising_rate_regime"
+      ],
+      "health_scores": {
+        "valuation": 4,
+        "risk_profile": 5,
+        "earnings_quality": 4,
+        "competitive_position": 8,
+        "quantitative_signals": 5,
+        "macro_environment": 4,
+        "overall": 5
+      }
+    },
+    "earnings_structured": null,
+    "metrics": {
+      "revenue": 47941000000.0,
+      "net_income": 13107000000.0,
+      "gross_profit": 29544000000.0,
+      "operating_income": 13762000000.0,
+      "gross_margin": 0.6163,
+      "operating_margin": 0.2871,
+      "net_margin": 0.2734,
+      "total_assets": 104816000000.0,
+      "total_liabilities": null,
+      "stockholders_equity": 32169000000.0,
+      "cash": 10270000000.0,
+      "long_term_debt": 37507000000.0,
+      "roe": 0.4074,
+      "roa": 0.125,
+      "operating_cash_flow": 7408000000.0,
+      "capex": 2112000000.0,
+      "free_cash_flow": 5296000000.0,
+      "eps_basic": 3.05,
+      "eps_diluted": 3.04,
+      "shares_outstanding": null,
+      "revenue_growth_yoy": 0.0187,
+      "revenue_cagr_3y": 0.0157,
+      "revenue_cagr_5y": 0.0094,
+      "net_income_cagr_3y": 0.0695,
+      "net_income_cagr_5y": 0.0411,
+      "operating_leverage_5y": 4.26
+    },
+    "enrichment_warnings": [],
+    "enrichment_sources": [
+      "Tiingo (market data)",
+      "FMP (Financial Modeling Prep)",
+      "Coca-Cola Co Stock (KO) Moved Down by 3.64% on Jul 17: A Full Analysis - https://www.tradingkey.com/news/market-movers/262038359-market-movers-ko-20260717",
+      "The Coca-Cola Company (KO) Raises Annual Dividend for 64th Consecutive Year and Appoints New VP - https://finance.yahoo.com/news/coca-cola-company-ko-raises-165029807.html",
+      "Is The Coca-Cola Company (KO) A Good Stock To Buy Now? - https://finance.yahoo.com/markets/stocks/articles/coca-cola-company-ko-good-163243200.html",
+      "Coca Cola Spiced What You Need To Know: A Fact-Based Exploration - District of Elkford - https://staging.elkford.ca/coca-cola-spiced-what-you-need-to-know-a-factbased-exploration",
+      "United States Soft Drinks Market Size, Share & 2032 Growth Trends Report - https://www.mordorintelligence.com/industry-reports/united-states-soft-drinks-market",
+      "Company Profile: Coca-Cola Bottling Co United - https://umbrex.com/resources/us-largest-private-companies/coca-cola-bottling-co-united",
+      "This Warren Buffett Favorite Still Has Room to Run - 24/7 Wall St. - https://247wallst.com/investing/2026/09/22/this-warren-buffett-favorite-still-has-room-to-run",
+      "Coca-Cola (KO) Stock Jumps On Margin Gains And Strong Cash Flow - Simply Wall St News - https://simplywall.st/stocks/us/food-beverage-tobacco/nyse-ko/coca-cola/news/coca-cola-ko-stock-jumps-on-margin-gains-and-strong-cash-flo",
+      "February 20, 2026 - 10-K: Annual report [Section 13 and 15(d), not S-K Item 405] | The Coca-Cola Company (KO) - https://investors.coca-colacompany.com/filings-reports/all-sec-filings/content/0001628280-26-010047/ko-20251231.htm",
+      "UK Consumer Staples Stocks to Watch as Higher Bills Test Defensive Demand - https://finance.yahoo.com/markets/stocks/articles/uk-consumer-staples-stocks-watch-091425134.html",
+      "Instagram - https://www.instagram.com/p/De6NT5XigR5",
+      "Top 10 Grocery & CPG Stocks: Most Shares Rally as Inflation Rattles Wall Street - Food Trade News & Food World - https://foodtradenews.com/2026/10/19/top-10-grocery-cpg-stocks-most-shares-rally-as-inflation-rattles-wall-street",
+      "FMP (peer data)",
+      "FMP (analyst estimates)",
+      "Tiingo (price history)",
+      "Computed Technical Signals (math-based)",
+      "FRED (Federal Reserve Economic Data)",
+      "Tiingo (indices)",
+      "Tavily macro: https://www.federalreserve.gov/monetarypolicy/fomcminutes20260916.htm",
+      "FMP (analyst grades)",
+      "FMP (DCF valuation)"
+    ],
+    "enrichment_filter_stats": {
+      "company_kept": 3,
+      "industry_kept": 3,
+      "risks_kept": 3,
+      "sector_kept": 3,
+      "company_dropped": 0,
+      "industry_dropped": 0,
+      "risks_dropped": 0,
+      "sector_dropped": 0
+    }
+  }
+}
