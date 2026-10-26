@@ -1,15 +1,17 @@
-// In prod, `/api/backtest/modal/*` hits a Vercel serverless function that
-// injects the server-side INTERNAL_API_KEY before forwarding to Railway.
-// All other `/api/*` paths flow through the rewrite in vercel.json.
-// In local dev (vite dev server), set VITE_API_URL to your local backend
-// and put INTERNAL_API_KEY in backend .env for the router to accept requests.
+// Every lab endpoint requires an X-API-Key header. The key is entered on the
+// /lab gate page and kept in localStorage (see lib/adminKey.ts).
+// In local dev (vite dev server), set VITE_API_URL to your local backend.
+import { getAdminKey } from "@/lib/adminKey";
+
 const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:8000" : "");
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const adminKey = getAdminKey();
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      ...(adminKey ? { "X-API-Key": adminKey } : {}),
       ...(options?.headers as Record<string, string> | undefined),
     },
   });

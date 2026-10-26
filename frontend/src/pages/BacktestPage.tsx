@@ -74,7 +74,7 @@ export function BacktestPage() {
       try {
         const kickoff = await dispatchModal(sub.config);
         setPanelKey((k) => k + 1); // triggers fresh fetch when user navigates back
-        navigate(`/backtest/modal/runs/${kickoff.run_id}`);
+        navigate(`/lab/backtest/modal/runs/${kickoff.run_id}`);
       } catch (e: any) {
         setDispatchError(e?.message ?? "Failed to dispatch Modal run");
       }
