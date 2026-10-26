@@ -43,28 +43,26 @@ def summarize(ticker: str, brief: dict) -> dict:
     }
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--tickers", nargs="+", default=["NVDA", "JPM", "KO", "XOM"])
-    ap.add_argument("--out", default="frontend/public/showcase")
-    args = ap.parse_args()
-
-    out = Path(args.out)
+def build(tickers, out_dir, retries=0, analyze=run_ticker) -> int:
+    out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
-    entries, errors = [], {}
-    for raw in args.tickers:
+    entries, failed = [], {}
+    for raw in tickers:
         ticker = raw.upper()
         brief = None
-        for attempt in (1, 2):
+        for attempt in range(retries + 1):
             try:
-                brief = run_ticker(ticker)
+                brief = analyze(ticker)
                 break
-            except Exception as exc:  # noqa: BLE001
-                print(f"[{ticker}] attempt {attempt} failed: {exc}", file=sys.stderr)
-                errors[ticker] = str(exc)
+            except Exception as exc:
+                print(
+                    f"[{ticker}] attempt {attempt + 1} failed: {type(exc).__name__}: {exc}",
+                    file=sys.stderr,
+                )
+                failed[ticker] = f"{type(exc).__name__}: {exc}"
         if brief is None:
             continue
-        errors.pop(ticker, None)
+        failed.pop(ticker, None)
         (out / f"{ticker}.json").write_text(json.dumps(brief, indent=2, default=str) + "\n")
         entry = summarize(ticker, brief)
         entries.append(entry)
@@ -74,14 +72,24 @@ def main() -> int:
             f"signal_conflicts={json.dumps(conflicts)}"
         )
 
+    if failed:
+        print(f"Failed tickers, index.json not written: {failed}", file=sys.stderr)
+        return 1
     index = {"generated_at": datetime.now(timezone.utc).isoformat(), "briefs": entries}
     (out / "index.json").write_text(json.dumps(index, indent=2) + "\n")
-    if errors:
-        print(f"Errors: {errors}", file=sys.stderr)
     if not any(e["has_conflicts"] for e in entries):
         print("No brief shows agent disagreement; swap a ticker", file=sys.stderr)
         return 1
     return 0
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--tickers", nargs="+", default=["NVDA", "JPM", "KO", "XOM"])
+    ap.add_argument("--out", default="frontend/public/showcase")
+    ap.add_argument("--retries", type=int, default=0)
+    args = ap.parse_args()
+    return build(args.tickers, args.out, args.retries)
 
 
 if __name__ == "__main__":

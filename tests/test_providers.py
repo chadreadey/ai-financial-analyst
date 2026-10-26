@@ -80,8 +80,7 @@ async def test_anthropic_default_model_sonnet_5_5_thinking_off():
     assert p.default_model == "claude-sonnet-5-5"
     assert await p.generate("s", "u") == "hi"
     assert seen["model"] == "claude-sonnet-5-5"
-    thinking = seen.get("thinking") or seen.get("extra_body", {}).get("thinking")
-    assert thinking == {"type": "between_tools"}
+    assert seen["thinking"] == {"type": "between_tools"}
     assert "temperature" not in seen
 
 
