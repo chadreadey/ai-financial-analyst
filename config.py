@@ -170,6 +170,11 @@ class Settings(BaseSettings):
     rebalance_ticker_timeout_seconds: int = 900
     rebalance_total_timeout_seconds: int = 3600
 
+    # ── Public live-run limits (anonymous visitors) ──────────────────────
+    public_runs_per_ip_per_hour: int = 3
+    public_runs_per_day: int = 30
+    public_max_concurrent_runs: int = 2
+
     # ── Internal service auth ────────────────────────────────────────────
     internal_api_key: str = Field(
         default="",
