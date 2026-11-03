@@ -26,7 +26,7 @@ from agents import (
     SectorSpecialistAgent,
 )
 from config import settings
-from context_budget import trim_middle, trim_text
+from context_budget import RunBudgets, trim_middle, trim_text
 from llm import LLMProvider, get_provider
 from market_enrichment import build_enrichment_context
 from models import AgentReport, AnalysisData, AnalysisResult, FilingInfo
@@ -365,19 +365,27 @@ class Orchestrator:
         provider: Optional[LLMProvider] = None,
         llm_provider_name: Optional[str] = None,
         model: Optional[str] = None,
+        budgets: Optional[RunBudgets] = None,
     ):
         self.sec_client = sec_client or SECClient()
         self.provider = provider or get_provider(llm_provider_name)
         self.synthesis_model = model or self.provider.default_model
+        self.budgets = budgets or RunBudgets.from_settings(settings)
+        agent_kwargs = {
+            "provider": self.provider,
+            "model": self.synthesis_model,
+            "max_tokens": self.budgets.agent_output_tokens,
+            "context_chars": self.budgets.agent_context_chars,
+        }
         self.agents = [
-            DCFAgent(provider=self.provider, model=self.synthesis_model),
-            RiskAgent(provider=self.provider, model=self.synthesis_model),
-            EarningsAgent(provider=self.provider, model=self.synthesis_model),
-            CompetitiveAgent(provider=self.provider, model=self.synthesis_model),
-            PatternAgent(provider=self.provider, model=self.synthesis_model),
+            DCFAgent(**agent_kwargs),
+            RiskAgent(**agent_kwargs),
+            EarningsAgent(**agent_kwargs),
+            CompetitiveAgent(**agent_kwargs),
+            PatternAgent(**agent_kwargs),
         ]
         if settings.enable_macro_agent:
-            self.agents.append(MacroAgent(provider=self.provider, model=self.synthesis_model))
+            self.agents.append(MacroAgent(**agent_kwargs))
 
     def prepare_data(
         self,
@@ -742,10 +750,10 @@ class Orchestrator:
         # Each report gets an equal share of the total budget, so the final
         # safety-net trim below never drops the tail of the last reports.
         fair_share = (
-            settings.synthesis_input_max_chars // max(1, len(agent_reports))
+            self.budgets.synthesis_input_max_chars // max(1, len(agent_reports))
             - SYNTHESIS_REPORT_HEADER_CHARS
         )
-        per_report_cap = min(settings.synthesis_report_max_chars, fair_share)
+        per_report_cap = min(self.budgets.synthesis_report_max_chars, fair_share)
         for report in agent_reports:
             # Cut the middle: the JSON block and SIGNAL_SCORE line sit at the end.
             trimmed_analysis = trim_middle(
@@ -761,7 +769,7 @@ class Orchestrator:
         combined_reports = "\n\n".join(report_sections)
         combined_reports = trim_text(
             combined_reports,
-            settings.synthesis_input_max_chars,
+            self.budgets.synthesis_input_max_chars,
             marker="\n...[synthesis input trimmed]...",
         )
         synthesis_template = load_prompt_file(str(SYNTHESIS_PROMPT_FILE))
@@ -782,7 +790,7 @@ class Orchestrator:
                 f"{combined_reports}"
             ),
             model=self.synthesis_model,
-            max_tokens=settings.max_synthesis_output_tokens,
+            max_tokens=self.budgets.synthesis_output_tokens,
         )
 
         logger.info("Synthesis complete")

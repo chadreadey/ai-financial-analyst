@@ -2,6 +2,35 @@
 Helpers for deterministic context budgeting.
 """
 
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class RunBudgets:
+    """Context and output budgets for one analysis run.
+
+    Passed explicitly rather than read from ``config.settings``: the settings
+    singleton is built once at import, so per-request values written to
+    ``os.environ`` never reached it, and mutating it would leak between
+    concurrent jobs.
+    """
+
+    agent_context_chars: int
+    agent_output_tokens: int
+    synthesis_report_max_chars: int
+    synthesis_input_max_chars: int
+    synthesis_output_tokens: int
+
+    @classmethod
+    def from_settings(cls, settings) -> "RunBudgets":
+        return cls(
+            agent_context_chars=settings.max_agent_context_chars,
+            agent_output_tokens=settings.max_agent_output_tokens,
+            synthesis_report_max_chars=settings.synthesis_report_max_chars,
+            synthesis_input_max_chars=settings.synthesis_input_max_chars,
+            synthesis_output_tokens=settings.max_synthesis_output_tokens,
+        )
+
 
 def trim_text(text: str, max_chars: int, marker: str = "\n...[trimmed]...") -> str:
     """Trim text to max_chars with a visible marker."""

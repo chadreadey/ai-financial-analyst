@@ -9,6 +9,8 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+from context_budget import RunBudgets
+
 logger = logging.getLogger(__name__)
 
 
@@ -67,6 +69,17 @@ class ProgressReporter:
         self._job.progress_queue.put({"step": message, "pct": pct})
 
 
+def _budgets_from_request(request) -> RunBudgets:
+    """Per-run budgets from the request (settings.* would ignore them)."""
+    return RunBudgets(
+        agent_context_chars=request.max_agent_context_chars,
+        agent_output_tokens=request.max_agent_output_tokens,
+        synthesis_report_max_chars=request.synthesis_report_max_chars,
+        synthesis_input_max_chars=request.synthesis_input_max_chars,
+        synthesis_output_tokens=request.max_synthesis_output_tokens,
+    )
+
+
 def run_analysis_job(job: JobState, request, auto_paper_trade: Optional[bool] = None) -> None:
     """Run the analysis pipeline in a background thread.
 
@@ -87,11 +100,6 @@ def run_analysis_job(job: JobState, request, auto_paper_trade: Optional[bool] = 
         "ENABLE_TIINGO": "true" if request.enable_tiingo else "false",
         "ENABLE_FMP": "true" if request.enable_fmp else "false",
         "ENABLE_YAHOO_FALLBACK": "true" if request.enable_yahoo else "false",
-        "MAX_AGENT_CONTEXT_CHARS": str(request.max_agent_context_chars),
-        "MAX_AGENT_OUTPUT_TOKENS": str(request.max_agent_output_tokens),
-        "SYNTHESIS_REPORT_MAX_CHARS": str(request.synthesis_report_max_chars),
-        "SYNTHESIS_INPUT_MAX_CHARS": str(request.synthesis_input_max_chars),
-        "MAX_SYNTHESIS_OUTPUT_TOKENS": str(request.max_synthesis_output_tokens),
     }
 
     if request.api_key:
@@ -126,6 +134,7 @@ def run_analysis_job(job: JobState, request, auto_paper_trade: Optional[bool] = 
             sec_client=sec_client,
             llm_provider_name=request.provider,
             model=(request.model.strip() if request.model else None),
+            budgets=_budgets_from_request(request),
         )
 
         async def _pipeline():
