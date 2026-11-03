@@ -242,8 +242,26 @@ def test_default_output_budgets_leave_room_for_signal_score():
     from config import Settings
 
     fields = Settings.model_fields
-    assert fields["max_agent_output_tokens"].default >= 3000
-    assert fields["max_synthesis_output_tokens"].default >= 3000
+    assert fields["max_agent_output_tokens"].default >= 8000
+    assert fields["max_synthesis_output_tokens"].default >= 8000
+    assert fields["max_sector_briefing_tokens"].default >= 2000
     assert RunAnalysisRequest.model_fields["max_agent_output_tokens"].default == (
         fields["max_agent_output_tokens"].default
     )
+
+
+@pytest.mark.asyncio
+async def test_failed_sector_specialist_does_not_sink_the_run(
+    sample_analysis_data, fake_provider, caplog
+):
+    """A specialist that runs out of tokens is optional context, not fatal."""
+    orch = Orchestrator(sec_client=MagicMock(), provider=fake_provider)
+    specialist = MagicMock()
+
+    async def boom(data):
+        raise RuntimeError("returned no text block (stop_reason=max_tokens)")
+
+    specialist.analyze = boom
+    with caplog.at_level("WARNING", logger="orchestrator"):
+        assert await orch._run_specialist(specialist, sample_analysis_data) == ""
+    assert "continuing without briefing" in caplog.text

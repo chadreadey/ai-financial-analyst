@@ -361,7 +361,7 @@ def main() -> None:
             max_agent_output_tokens = st.number_input(
                 "MAX_AGENT_OUTPUT_TOKENS",
                 min_value=100,
-                max_value=4000,
+                max_value=16000,
                 step=100,
                 value=settings.max_agent_output_tokens,
             )
@@ -382,7 +382,7 @@ def main() -> None:
             max_synthesis_output_tokens = st.number_input(
                 "MAX_SYNTHESIS_OUTPUT_TOKENS",
                 min_value=100,
-                max_value=5000,
+                max_value=16000,
                 step=100,
                 value=settings.max_synthesis_output_tokens,
             )

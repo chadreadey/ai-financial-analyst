@@ -52,7 +52,7 @@ class Settings(BaseSettings):
 
     # ── Agent context budgets ──────────────────────────────────────
     max_agent_context_chars: int = 12000
-    max_agent_output_tokens: int = 3000
+    max_agent_output_tokens: int = 8000
     max_context_dcf_chars: int = 0
     max_context_risk_chars: int = 0
     max_context_earnings_chars: int = 0
@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     # ── Synthesis budgets ──────────────────────────────────────────
     synthesis_report_max_chars: int = 4500
     synthesis_input_max_chars: int = 30000
-    max_synthesis_output_tokens: int = 3000
+    max_synthesis_output_tokens: int = 8000
 
     # ── Enrichment section caps ────────────────────────────────────
     max_market_section_chars: int = 1200
@@ -81,7 +81,7 @@ class Settings(BaseSettings):
     max_sector_tavily_chars: int = 2000
 
     # ── Sector specialist ──────────────────────────────────────────
-    max_sector_briefing_tokens: int = 600
+    max_sector_briefing_tokens: int = 2000
     max_sector_briefing_chars: int = 2500
 
     # ── Enrichment concurrency (I/O-bound workers) ───────────────────

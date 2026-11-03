@@ -684,6 +684,14 @@ class Orchestrator:
             model=self.synthesis_model,
         )
 
+    async def _run_specialist(self, specialist: SectorSpecialistAgent, data: AnalysisData) -> str:
+        """The sector briefing is optional context; a failed call must not sink the run."""
+        try:
+            return await specialist.analyze(data)
+        except Exception as exc:
+            logger.warning("Sector specialist failed, continuing without briefing: %s", exc)
+            return ""
+
     async def _run_agent(
         self,
         agent,
@@ -832,7 +840,7 @@ class Orchestrator:
                     f"Wave 1: running sector specialist + {len(non_competitive)} agents...",
                     32,
                 )
-            specialist_coro = specialist.analyze(data)
+            specialist_coro = self._run_specialist(specialist, data)
             wave1_coros = [
                 self._run_agent(a, data, progress_callback=progress_callback)
                 for a in non_competitive
@@ -843,10 +851,13 @@ class Orchestrator:
                     "Sector specialist completed. Updating competitive context...", 58
                 )
 
-            data.enrichment_sections = {
-                **data.enrichment_sections,
-                "sector_briefing": trim_text(specialist_result, settings.max_sector_briefing_chars),
-            }
+            if specialist_result:
+                data.enrichment_sections = {
+                    **data.enrichment_sections,
+                    "sector_briefing": trim_text(
+                        specialist_result, settings.max_sector_briefing_chars
+                    ),
+                }
 
             logger.info("Phase 1 wave 2: Competitive agent (with sector briefing)")
             if progress_callback:
