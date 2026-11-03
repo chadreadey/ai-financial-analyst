@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import { api } from "@/api/client";
+import { dropRetiredDefaults } from "@/lib/settingsMigration";
 
 export interface Settings {
   provider: string;
@@ -44,7 +45,7 @@ function loadFromStorage(): Settings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+      return { ...DEFAULT_SETTINGS, ...dropRetiredDefaults(JSON.parse(raw)) };
     }
   } catch {
     // ignore parse errors
