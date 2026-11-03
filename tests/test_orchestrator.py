@@ -242,9 +242,9 @@ def test_default_output_budgets_leave_room_for_signal_score():
     from config import Settings
 
     fields = Settings.model_fields
-    assert fields["max_agent_output_tokens"].default >= 8000
-    assert fields["max_synthesis_output_tokens"].default >= 8000
-    assert fields["max_sector_briefing_tokens"].default >= 2000
+    assert fields["max_agent_output_tokens"].default >= 16000
+    assert fields["max_synthesis_output_tokens"].default >= 16000
+    assert fields["max_sector_briefing_tokens"].default >= 8000
     assert RunAnalysisRequest.model_fields["max_agent_output_tokens"].default == (
         fields["max_agent_output_tokens"].default
     )
