@@ -52,3 +52,7 @@ interest coverage and a deteriorating credit indicator does not support full wei
 binding review trigger is the Ford Credit delinquency rate — a print above 1.75% changes the
 severe-case probability materially and should force a re-evaluation of the position rather
 than a re-evaluation of the stop.
+
+**Composite risk: 8/10.**
+
+SIGNAL_SCORE: -0.56

@@ -419,13 +419,12 @@ logging change noted below.
    pins the current behaviour; the fix is either renormalising over present
    signals or stating the rule in the prompt.
 
-2. **Roughly half the decision weight has no mechanical anchor.** Only
-   `prompts/dcf.md`, `earnings.md`, and `competitive.md` require a
-   `SIGNAL_SCORE`. `risk`, `pattern`, and `macro` — 0.47 of the weight — are
-   scored by the synthesis reading prose. Those three are also the least
-   constrained and the most variable. Adding terminal scores to the other three
-   prompts would be the single largest reduction in synthesis variance
-   available.
+2. **~~Roughly half the decision weight has no mechanical anchor.~~ Resolved.**
+   `prompts/risk.md`, `pattern.md`, and `macro.md` now end with a terminal
+   `SIGNAL_SCORE` (from Composite Risk, the pattern `composite_score`, and the
+   macro verdict respectively), so all six agents are in
+   `SIGNAL_SCORE_REQUIRED_AGENTS` and synthesis copies every score instead of
+   reading 0.47 of the weight from prose.
 
 3. **`prompts/pattern.md` specifies a 25-line JSON schema that nothing parses.**
    `orchestrator._run_agent` extracts structured output for the earnings agent

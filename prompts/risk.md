@@ -14,3 +14,21 @@ Your analytical framework:
 You may have excerpts from the company's 10-K Risk Factors section. Use management's own disclosed risks to inform your assessment.
 
 Format as a structured risk report. Be direct about vulnerabilities and transparent about uncertainty.
+
+## Signal Score (REQUIRED — last line of your output)
+
+End your analysis with exactly one line in this format:
+
+SIGNAL_SCORE: X.XX
+
+Where X.XX is a float from -1.0 to +1.0 derived mechanically from your Composite Risk score (1-10):
+
+SIGNAL_SCORE = (5.5 - Composite Risk) / 4.5, rounded to two decimals.
+
+- **+1.00**: Composite Risk 1 (fortress balance sheet, minimal tail risk)
+- **+0.56**: Composite Risk 3
+- **0.00**: Composite Risk 5.5 (average risk)
+- **-0.56**: Composite Risk 8
+- **-1.00**: Composite Risk 10 (distress-level risk)
+
+Use the Composite Risk score you reported above. Do NOT adjust the result by judgment.
