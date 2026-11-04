@@ -26,7 +26,7 @@ from agents import (
     SectorSpecialistAgent,
 )
 from config import settings
-from context_budget import trim_text
+from context_budget import RunBudgets, trim_middle, trim_text
 from llm import LLMProvider, get_provider
 from market_enrichment import build_enrichment_context
 from models import AgentReport, AnalysisData, AnalysisResult, FilingInfo
@@ -155,6 +155,11 @@ def _conviction_label(conviction_score: float) -> str:
 
 
 SYNTHESIS_PROMPT_FILE = Path("prompts/synthesis.md")
+# Room kept at the end of each trimmed agent report: covers the earnings JSON
+# block plus the terminal SIGNAL_SCORE line.
+SYNTHESIS_REPORT_TAIL_CHARS = 1500
+# Per-report "REPORT FROM" banner plus the joining blank lines.
+SYNTHESIS_REPORT_HEADER_CHARS = 200
 
 SECTOR_SPECIALIST_MAP: dict[str, str] = {
     "Healthcare": "prompts/sector_healthcare.md",
@@ -360,19 +365,27 @@ class Orchestrator:
         provider: Optional[LLMProvider] = None,
         llm_provider_name: Optional[str] = None,
         model: Optional[str] = None,
+        budgets: Optional[RunBudgets] = None,
     ):
         self.sec_client = sec_client or SECClient()
         self.provider = provider or get_provider(llm_provider_name)
         self.synthesis_model = model or self.provider.default_model
+        self.budgets = budgets or RunBudgets.from_settings(settings)
+        agent_kwargs = {
+            "provider": self.provider,
+            "model": self.synthesis_model,
+            "max_tokens": self.budgets.agent_output_tokens,
+            "context_chars": self.budgets.agent_context_chars,
+        }
         self.agents = [
-            DCFAgent(provider=self.provider, model=self.synthesis_model),
-            RiskAgent(provider=self.provider, model=self.synthesis_model),
-            EarningsAgent(provider=self.provider, model=self.synthesis_model),
-            CompetitiveAgent(provider=self.provider, model=self.synthesis_model),
-            PatternAgent(provider=self.provider, model=self.synthesis_model),
+            DCFAgent(**agent_kwargs),
+            RiskAgent(**agent_kwargs),
+            EarningsAgent(**agent_kwargs),
+            CompetitiveAgent(**agent_kwargs),
+            PatternAgent(**agent_kwargs),
         ]
         if settings.enable_macro_agent:
-            self.agents.append(MacroAgent(provider=self.provider, model=self.synthesis_model))
+            self.agents.append(MacroAgent(**agent_kwargs))
 
     def prepare_data(
         self,
@@ -671,6 +684,14 @@ class Orchestrator:
             model=self.synthesis_model,
         )
 
+    async def _run_specialist(self, specialist: SectorSpecialistAgent, data: AnalysisData) -> str:
+        """The sector briefing is optional context; a failed call must not sink the run."""
+        try:
+            return await specialist.analyze(data)
+        except Exception as exc:
+            logger.warning("Sector specialist failed, continuing without briefing: %s", exc)
+            return ""
+
     async def _run_agent(
         self,
         agent,
@@ -734,23 +755,32 @@ class Orchestrator:
             progress_callback("Preparing synthesis context from agent reports...", 74)
 
         report_sections = []
-        per_report_cap = settings.synthesis_report_max_chars
+        # A cap of 0 means no limit. With a total cap, each report gets an equal
+        # share of it, so the final safety-net trim never drops the last reports.
+        input_cap = self.budgets.synthesis_input_max_chars
+        caps = [self.budgets.synthesis_report_max_chars]
+        if input_cap > 0:
+            caps.append(input_cap // max(1, len(agent_reports)) - SYNTHESIS_REPORT_HEADER_CHARS)
+        caps = [c for c in caps if c > 0]
         for report in agent_reports:
-            trimmed_analysis = trim_text(
-                report.analysis,
-                per_report_cap,
-                marker="\n...[agent report trimmed]...",
-            )
+            trimmed_analysis = report.analysis
+            if caps:
+                # Cut the middle: the JSON block and SIGNAL_SCORE line sit at the end.
+                trimmed_analysis = trim_middle(
+                    report.analysis,
+                    min(caps),
+                    tail_chars=SYNTHESIS_REPORT_TAIL_CHARS,
+                    marker="\n...[agent report trimmed]...\n",
+                )
             report_sections.append(
                 f"{'=' * 60}\nREPORT FROM: {report.agent_name}\n{'=' * 60}\n\n{trimmed_analysis}\n"
             )
 
         combined_reports = "\n\n".join(report_sections)
-        combined_reports = trim_text(
-            combined_reports,
-            settings.synthesis_input_max_chars,
-            marker="\n...[synthesis input trimmed]...",
-        )
+        if input_cap > 0:
+            combined_reports = trim_text(
+                combined_reports, input_cap, marker="\n...[synthesis input trimmed]..."
+            )
         synthesis_template = load_prompt_file(str(SYNTHESIS_PROMPT_FILE))
         synthesis_system_prompt = render_prompt(
             synthesis_template,
@@ -769,7 +799,7 @@ class Orchestrator:
                 f"{combined_reports}"
             ),
             model=self.synthesis_model,
-            max_tokens=settings.max_synthesis_output_tokens,
+            max_tokens=self.budgets.synthesis_output_tokens,
         )
 
         logger.info("Synthesis complete")
@@ -811,7 +841,7 @@ class Orchestrator:
                     f"Wave 1: running sector specialist + {len(non_competitive)} agents...",
                     32,
                 )
-            specialist_coro = specialist.analyze(data)
+            specialist_coro = self._run_specialist(specialist, data)
             wave1_coros = [
                 self._run_agent(a, data, progress_callback=progress_callback)
                 for a in non_competitive
@@ -822,10 +852,15 @@ class Orchestrator:
                     "Sector specialist completed. Updating competitive context...", 58
                 )
 
-            data.enrichment_sections = {
-                **data.enrichment_sections,
-                "sector_briefing": trim_text(specialist_result, settings.max_sector_briefing_chars),
-            }
+            if specialist_result:
+                data.enrichment_sections = {
+                    **data.enrichment_sections,
+                    "sector_briefing": (
+                        trim_text(specialist_result, settings.max_sector_briefing_chars)
+                        if settings.max_sector_briefing_chars > 0
+                        else specialist_result
+                    ),
+                }
 
             logger.info("Phase 1 wave 2: Competitive agent (with sector briefing)")
             if progress_callback:

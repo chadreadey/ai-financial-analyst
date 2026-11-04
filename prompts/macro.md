@@ -31,3 +31,20 @@ Use actual rates and market data provided rather than assumptions. Be specific a
 Your analysis should be 4-5 paragraphs. The macro verdict (TAILWIND/NEUTRAL/HEADWIND) is the signal. The analysis must explain HOW the macro environment transmits to this specific company's revenues, costs, and valuation — not generically to "the sector."
 
 If research intelligence (RAG) provides recession probability models, credit spread signals, sector rotation frameworks, or tariff impact data, integrate those specific findings with attribution.
+
+## Signal Score (REQUIRED — last line of your output)
+
+End your analysis with exactly one line in this format:
+
+SIGNAL_SCORE: X.XX
+
+Where X.XX is a float from -1.0 to +1.0 that matches your MACRO VERDICT:
+- **+1.0**: Strong TAILWIND — supportive regime, easing policy and sector rotation all flow directly to this company's revenue or valuation
+- **+0.5**: TAILWIND — net supportive with a clear transmission mechanism
+- **+0.2**: Mild TAILWIND — supportive but small or indirect
+- **0.0**: NEUTRAL — offsetting or immaterial macro effects
+- **-0.2**: Mild HEADWIND — adverse but small or indirect
+- **-0.5**: HEADWIND — net adverse with a clear transmission mechanism
+- **-1.0**: Severe HEADWIND — recessionary or late-cycle regime with direct, quantified damage to earnings or valuation
+
+The sign must agree with your verdict: TAILWIND > 0, NEUTRAL = 0, HEADWIND < 0. Pick the magnitude from the size of the EPS or margin impact you quantified.

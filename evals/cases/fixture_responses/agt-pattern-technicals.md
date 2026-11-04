@@ -58,3 +58,5 @@ cost of a poorly timed entry is large. A pullback toward the $126.40 support zon
 %B toward 0.2 and lift the composite above the actionable threshold.
 
 No near-term catalyst identified.
+
+SIGNAL_SCORE: 0.31

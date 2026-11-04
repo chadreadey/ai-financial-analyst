@@ -43,10 +43,12 @@ class BaseAgent:
         provider: Optional[LLMProvider] = None,
         model: Optional[str] = None,
         max_tokens: Optional[int] = None,
+        context_chars: Optional[int] = None,
     ):
         self.provider = provider or get_provider()
         self.model = model or self.provider.default_model
         self.max_tokens = max_tokens or settings.max_agent_output_tokens
+        self.context_chars = context_chars
 
     def build_context(self, data: AnalysisData) -> str:
         parts = [
@@ -81,7 +83,7 @@ class BaseAgent:
             val = getattr(settings, self.context_limit_env.lower(), 0)
             if val:
                 return val
-        return settings.max_agent_context_chars or self.max_context_chars
+        return self.context_chars or settings.max_agent_context_chars or self.max_context_chars
 
     def trim_context(self, context: str) -> str:
         return trim_text(context, self.get_context_limit(), marker="\n...[context trimmed]...")
