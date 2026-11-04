@@ -35,10 +35,10 @@ const DEFAULT_SETTINGS: Settings = {
   enable_yahoo: true,
   enable_tavily: true,
   max_agent_context_chars: 12000,
-  max_agent_output_tokens: 16000,
-  synthesis_report_max_chars: 20000,
-  synthesis_input_max_chars: 120000,
-  max_synthesis_output_tokens: 16000,
+  max_agent_output_tokens: 128000,
+  synthesis_report_max_chars: 0,
+  synthesis_input_max_chars: 0,
+  max_synthesis_output_tokens: 128000,
 };
 
 function loadFromStorage(): Settings {
@@ -82,8 +82,8 @@ const DATA_SOURCES: DataSource[] = [
 const BUDGET_FIELDS: Array<{ key: keyof Settings; label: string }> = [
   { key: "max_agent_context_chars", label: "Agent context chars" },
   { key: "max_agent_output_tokens", label: "Agent output tokens" },
-  { key: "synthesis_report_max_chars", label: "Report max chars" },
-  { key: "synthesis_input_max_chars", label: "Synthesis input chars" },
+  { key: "synthesis_report_max_chars", label: "Report max chars (0 = no limit)" },
+  { key: "synthesis_input_max_chars", label: "Synthesis input chars (0 = no limit)" },
   { key: "max_synthesis_output_tokens", label: "Synthesis output tokens" },
 ];
 

@@ -58,13 +58,34 @@ class _Block:
         self.text = text
 
 
+class _Stream:
+    """Stands in for ``messages.stream(...)``: an async context manager."""
+
+    def __init__(self, fake_create, kw):
+        self._fake_create, self._kw = fake_create, kw
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def get_final_message(self):
+        return await self._fake_create(**self._kw)
+
+
 def _provider_with(fake_create):
     from types import SimpleNamespace
 
     from llm.providers import AnthropicProvider
 
+    async def no_create(**kw):
+        raise AssertionError("generate must stream, not call messages.create")
+
     p = AnthropicProvider(api_key="test")
-    p._client = SimpleNamespace(messages=SimpleNamespace(create=fake_create))
+    p._client = SimpleNamespace(
+        messages=SimpleNamespace(create=no_create, stream=lambda **kw: _Stream(fake_create, kw))
+    )
     return p
 
 
@@ -128,3 +149,27 @@ async def test_anthropic_end_turn_no_warning(caplog):
     with caplog.at_level("WARNING", logger="llm.providers"):
         await _provider_with(fake_create).generate("s", "u")
     assert "max_tokens" not in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_anthropic_joins_every_text_block():
+    """A reply split across text blocks must come back whole, not just block one."""
+
+    async def fake_create(**kw):
+        return _Msg(
+            [_Block("thinking"), _Block("text", "first half, "), _Block("text", "second half")]
+        )
+
+    assert await _provider_with(fake_create).generate("s", "u") == "first half, second half"
+
+
+@pytest.mark.asyncio
+async def test_anthropic_streams_with_full_output_budget():
+    seen = {}
+
+    async def fake_create(**kw):
+        seen.update(kw)
+        return _Msg([_Block("text", "done")])
+
+    await _provider_with(fake_create).generate("s", "u", max_tokens=128000)
+    assert seen["max_tokens"] == 128000

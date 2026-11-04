@@ -13,10 +13,10 @@ class RunAnalysisRequest(BaseModel):
     enable_yahoo: bool = True
     enable_tavily: bool = True
     max_agent_context_chars: int = 12000
-    max_agent_output_tokens: int = 16000
-    synthesis_report_max_chars: int = 20000
-    synthesis_input_max_chars: int = 120000
-    max_synthesis_output_tokens: int = 16000
+    max_agent_output_tokens: int = 128000
+    synthesis_report_max_chars: int = 0
+    synthesis_input_max_chars: int = 0
+    max_synthesis_output_tokens: int = 128000
 
 
 class JobCreated(BaseModel):
@@ -65,10 +65,10 @@ class ConfigDefaults(BaseModel):
     enable_yahoo: bool = True
     enable_tavily: bool = True
     max_agent_context_chars: int = 12000
-    max_agent_output_tokens: int = 16000
-    synthesis_report_max_chars: int = 20000
-    synthesis_input_max_chars: int = 120000
-    max_synthesis_output_tokens: int = 16000
+    max_agent_output_tokens: int = 128000
+    synthesis_report_max_chars: int = 0
+    synthesis_input_max_chars: int = 0
+    max_synthesis_output_tokens: int = 128000
 
 
 class PortfolioHolding(BaseModel):

@@ -242,9 +242,11 @@ def test_default_output_budgets_leave_room_for_signal_score():
     from config import Settings
 
     fields = Settings.model_fields
-    assert fields["max_agent_output_tokens"].default >= 16000
-    assert fields["max_synthesis_output_tokens"].default >= 16000
-    assert fields["max_sector_briefing_tokens"].default >= 8000
+    assert fields["max_agent_output_tokens"].default == 128000
+    assert fields["max_synthesis_output_tokens"].default == 128000
+    assert fields["max_sector_briefing_tokens"].default == 128000
+    assert fields["synthesis_report_max_chars"].default == 0
+    assert fields["synthesis_input_max_chars"].default == 0
     assert RunAnalysisRequest.model_fields["max_agent_output_tokens"].default == (
         fields["max_agent_output_tokens"].default
     )
@@ -265,3 +267,19 @@ async def test_failed_sector_specialist_does_not_sink_the_run(
     with caplog.at_level("WARNING", logger="orchestrator"):
         assert await orch._run_specialist(specialist, sample_analysis_data) == ""
     assert "continuing without briefing" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_run_phase2_zero_caps_pass_reports_whole(monkeypatch):
+    """0 means no limit: long reports reach synthesis untrimmed."""
+    monkeypatch.setattr(settings, "synthesis_report_max_chars", 0)
+    monkeypatch.setattr(settings, "synthesis_input_max_chars", 0)
+    provider = _CapturingProvider()
+    orch = Orchestrator(sec_client=MagicMock(), provider=provider)
+
+    reports = _long_reports(n_chars=60000)
+    await orch.run_phase2("TEST", "Test Corp", reports)
+
+    assert "trimmed]" not in provider.user
+    for r in reports:
+        assert r.analysis in provider.user

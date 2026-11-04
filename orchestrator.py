@@ -755,31 +755,32 @@ class Orchestrator:
             progress_callback("Preparing synthesis context from agent reports...", 74)
 
         report_sections = []
-        # Each report gets an equal share of the total budget, so the final
-        # safety-net trim below never drops the tail of the last reports.
-        fair_share = (
-            self.budgets.synthesis_input_max_chars // max(1, len(agent_reports))
-            - SYNTHESIS_REPORT_HEADER_CHARS
-        )
-        per_report_cap = min(self.budgets.synthesis_report_max_chars, fair_share)
+        # A cap of 0 means no limit. With a total cap, each report gets an equal
+        # share of it, so the final safety-net trim never drops the last reports.
+        input_cap = self.budgets.synthesis_input_max_chars
+        caps = [self.budgets.synthesis_report_max_chars]
+        if input_cap > 0:
+            caps.append(input_cap // max(1, len(agent_reports)) - SYNTHESIS_REPORT_HEADER_CHARS)
+        caps = [c for c in caps if c > 0]
         for report in agent_reports:
-            # Cut the middle: the JSON block and SIGNAL_SCORE line sit at the end.
-            trimmed_analysis = trim_middle(
-                report.analysis,
-                per_report_cap,
-                tail_chars=SYNTHESIS_REPORT_TAIL_CHARS,
-                marker="\n...[agent report trimmed]...\n",
-            )
+            trimmed_analysis = report.analysis
+            if caps:
+                # Cut the middle: the JSON block and SIGNAL_SCORE line sit at the end.
+                trimmed_analysis = trim_middle(
+                    report.analysis,
+                    min(caps),
+                    tail_chars=SYNTHESIS_REPORT_TAIL_CHARS,
+                    marker="\n...[agent report trimmed]...\n",
+                )
             report_sections.append(
                 f"{'=' * 60}\nREPORT FROM: {report.agent_name}\n{'=' * 60}\n\n{trimmed_analysis}\n"
             )
 
         combined_reports = "\n\n".join(report_sections)
-        combined_reports = trim_text(
-            combined_reports,
-            self.budgets.synthesis_input_max_chars,
-            marker="\n...[synthesis input trimmed]...",
-        )
+        if input_cap > 0:
+            combined_reports = trim_text(
+                combined_reports, input_cap, marker="\n...[synthesis input trimmed]..."
+            )
         synthesis_template = load_prompt_file(str(SYNTHESIS_PROMPT_FILE))
         synthesis_system_prompt = render_prompt(
             synthesis_template,
@@ -854,8 +855,10 @@ class Orchestrator:
             if specialist_result:
                 data.enrichment_sections = {
                     **data.enrichment_sections,
-                    "sector_briefing": trim_text(
-                        specialist_result, settings.max_sector_briefing_chars
+                    "sector_briefing": (
+                        trim_text(specialist_result, settings.max_sector_briefing_chars)
+                        if settings.max_sector_briefing_chars > 0
+                        else specialist_result
                     ),
                 }
 

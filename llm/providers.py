@@ -76,20 +76,21 @@ class AnthropicProvider(LLMProvider):
         if not resolved_model.startswith(_NO_SAMPLING_MODEL_PREFIXES):
             kwargs["temperature"] = 0.0
         if resolved_model.startswith("claude-sonnet-5-5"):
-            # Thinking-off mode for this model ("disabled" returns a 400); keeps
-            # small max_tokens budgets from being consumed by adaptive thinking.
+            # Thinking-off mode for this model ("disabled" returns a 400).
             kwargs["thinking"] = {"type": "between_tools"}
         elif resolved_model.startswith("claude-opus-5-5"):
-            # Thinking can't be disabled on this model; low effort keeps it
-            # small so it doesn't consume the small max_tokens budgets.
+            # Thinking can't be disabled on this model; low effort keeps it short.
             kwargs["output_config"] = {"effort": "low"}
-        message = await self._client.messages.create(
+        # Streamed so large max_tokens values aren't refused by the SDK's
+        # non-streaming timeout check.
+        async with self._client.messages.stream(
             model=resolved_model,
             max_tokens=max_tokens,
             system=system_param,
             messages=[{"role": "user", "content": user}],
             **kwargs,
-        )
+        ) as stream:
+            message = await stream.get_final_message()
         if message.stop_reason == "refusal":
             raise RuntimeError(f"Model {resolved_model} refused the request")
         if message.stop_reason == "max_tokens":
@@ -97,9 +98,10 @@ class AnthropicProvider(LLMProvider):
             logger.warning(
                 "Model %s hit max_tokens=%d; output is truncated", resolved_model, max_tokens
             )
-        for block in message.content:
-            if block.type == "text":
-                return block.text
+        # A reply can span several text blocks; returning only the first cuts it.
+        text = "".join(block.text for block in message.content if block.type == "text")
+        if text:
+            return text
         raise RuntimeError(
             f"Model {resolved_model} returned no text block (stop_reason={message.stop_reason})"
         )
