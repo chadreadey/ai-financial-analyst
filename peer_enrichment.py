@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from config import settings
 from context_budget import trim_text
 from utils import env_flag, format_money
-from yahoo_cache import YahooLookupCache
+from yahoo_cache import YahooLookupCache, fetch_info
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +153,6 @@ def _validate_ticker(
     sym: str, cache: Optional[YahooLookupCache] = None, fmp_cache=None
 ) -> Optional[Dict[str, Any]]:
     """Check that a string is a real tradeable ticker and return its info."""
-    import yfinance as yf
 
     if sym in TICKER_BLOCKLIST or len(sym) < 2:
         return None
@@ -182,7 +181,7 @@ def _validate_ticker(
         if cache is not None:
             info = cache.get_info(sym)
         else:
-            info = yf.Ticker(sym).info or {}
+            info = fetch_info(sym)
         if info.get("marketCap") and info.get("quoteType") in ("EQUITY", None):
             return info
     except Exception:
@@ -232,7 +231,6 @@ def discover_peers(
     """
     Dynamically discover peer tickers for each request.
     """
-    import yfinance as yf
 
     ticker = ticker.upper()
     sector = ""
@@ -252,7 +250,7 @@ def discover_peers(
         if cache is not None:
             info = cache.get_info(ticker)
         else:
-            info = yf.Ticker(ticker).info or {}
+            info = fetch_info(ticker)
         sector = info.get("sector", "")
         industry = info.get("industry", "")
         subject_cap = info.get("marketCap", 0) or 0
@@ -360,7 +358,6 @@ def _fetch_peer_metrics(
     peer_ticker: str, cache: Optional[YahooLookupCache] = None, fmp_cache=None
 ) -> Optional[Dict[str, Any]]:
     """Fetch key metrics for a single peer ticker."""
-    import yfinance as yf
 
     if fmp_cache and env_flag("ENABLE_FMP"):
         try:
@@ -390,7 +387,7 @@ def _fetch_peer_metrics(
         if cache is not None:
             info = cache.get_info(peer_ticker)
         else:
-            info = yf.Ticker(peer_ticker).info or {}
+            info = fetch_info(peer_ticker)
         if not info.get("marketCap"):
             return None
         result: Dict[str, Any] = {"ticker": peer_ticker}
@@ -416,7 +413,6 @@ def build_peer_comparison(
     Build a formatted peer comparison section.
     Returns (section_text, sources_list).
     """
-    import yfinance as yf
 
     ticker = ticker.upper()
     if peers is None:
@@ -458,7 +454,7 @@ def build_peer_comparison(
         if cache is not None:
             subject_info = cache.get_info(ticker)
         else:
-            subject_info = yf.Ticker(ticker).info or {}
+            subject_info = fetch_info(ticker)
         subject = {"ticker": ticker, "shortName": company_name}
         for key, _ in PEER_METRICS:
             subject[key] = subject_info.get(key)
