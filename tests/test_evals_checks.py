@@ -322,17 +322,11 @@ def test_duplicate_signal_score_is_caught(agent_cases):
     assert not _result(sample, "signal_score_present").passed
 
 
-def test_signal_score_not_required_for_risk_agent(agent_cases):
-    """
-    prompts/risk.md never asks for a SIGNAL_SCORE, so its absence is correct.
-
-    If that prompt gains one, test_signal_score_required_agents_match_prompts
-    fails first and points at the list to update.
-    """
+def test_signal_score_required_for_risk_agent(agent_cases):
+    """prompts/risk.md now ends with a SIGNAL_SCORE derived from Composite Risk."""
     case = agent_cases["agt-risk-leveraged"]
     sample = checks.grade_agent(case, load_fixture(case.id))
-    ran = {r.name for r in sample.results}
-    assert "signal_score_present" not in ran
+    assert _result(sample, "signal_score_present").passed
     assert not sample.failed_errors
 
 

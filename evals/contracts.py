@@ -122,11 +122,9 @@ SIGNAL_SCORE_PATTERN = re.compile(
 SIGNAL_SCORE_MIN = -1.0
 SIGNAL_SCORE_MAX = 1.0
 
-#: Only these prompts instruct the agent to emit a terminal SIGNAL_SCORE.
-#: ``risk``, ``pattern`` and ``macro`` do not, so the synthesis has to infer
-#: those three scores from prose — 0.47 of the decision weight with no
-#: mechanical anchor. See docs/EVALS.md.
-SIGNAL_SCORE_REQUIRED_AGENTS = ("dcf", "earnings", "competitive")
+#: Every analyst prompt instructs the agent to emit a terminal SIGNAL_SCORE,
+#: so synthesis copies all six scores instead of inferring any from prose.
+SIGNAL_SCORE_REQUIRED_AGENTS = ("dcf", "earnings", "competitive", "risk", "pattern", "macro")
 
 EARNINGS_BREAKDOWN_KEYS = ("trajectory", "margins", "quality", "outlook")
 EARNINGS_RED_FLAG_SEVERITIES = ("LOW", "MED", "HIGH")

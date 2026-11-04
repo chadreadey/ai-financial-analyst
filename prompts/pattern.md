@@ -121,3 +121,11 @@ In addition to the technical signal vector, also analyze:
 - Estimate revision momentum (if analyst data is available)
 
 Integrate these fundamental patterns into your commentary but keep the signal vector strictly price/volume-based.
+
+## Signal Score (REQUIRED — last line of your output)
+
+End your output, after the Technical Narrative, with exactly one line in this format:
+
+SIGNAL_SCORE: X.XX
+
+Where X.XX equals the `composite_score` in your JSON signal vector, rounded to two decimals. It is a float from -1.0 to +1.0. Do NOT adjust it for the fundamental pattern analysis; keep the score strictly price/volume-based.

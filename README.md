@@ -510,10 +510,10 @@ CORS_ORIGINS=https://your-app.vercel.app
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `MAX_AGENT_CONTEXT_CHARS` | `12000` | Per-agent context cap before LLM call |
-| `MAX_AGENT_OUTPUT_TOKENS` | `1200` | Per-agent max output tokens |
-| `MAX_SYNTHESIS_OUTPUT_TOKENS` | `1500` | Synthesis agent max output tokens |
-| `SYNTHESIS_INPUT_MAX_CHARS` | `22000` | Combined agent reports cap into synthesis |
-| `SYNTHESIS_REPORT_MAX_CHARS` | `4500` | Per-agent report cap inside synthesis input |
+| `MAX_AGENT_OUTPUT_TOKENS` | `128000` | Per-agent max output tokens |
+| `MAX_SYNTHESIS_OUTPUT_TOKENS` | `128000` | Synthesis agent max output tokens |
+| `SYNTHESIS_INPUT_MAX_CHARS` | `0` (no limit) | Combined agent reports cap into synthesis |
+| `SYNTHESIS_REPORT_MAX_CHARS` | `0` (no limit) | Per-agent report cap inside synthesis input |
 | `ENRICHMENT_MAX_CHARS` | `10000` | Hard cap on total enrichment text |
 
 Per-agent context overrides: `MAX_CONTEXT_DCF_CHARS`, `MAX_CONTEXT_RISK_CHARS`, `MAX_CONTEXT_EARNINGS_CHARS`, `MAX_CONTEXT_COMPETITIVE_CHARS`, `MAX_CONTEXT_PATTERN_CHARS`, `MAX_CONTEXT_MACRO_CHARS` (all default to `MAX_AGENT_CONTEXT_CHARS`).
