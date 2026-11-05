@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from config import settings
 from context_budget import trim_text
 from utils import env_flag, format_money
-from yahoo_cache import YahooLookupCache
+from yahoo_cache import YahooLookupCache, call_with_timeout
 
 logger = logging.getLogger(__name__)
 
@@ -205,7 +205,9 @@ def _analyst_estimates_section(ticker: str, cache: YahooLookupCache) -> tuple[st
     lines = ["=== Analyst Estimates & Consensus ==="]
 
     try:
-        targets = stock.analyst_price_targets
+        targets = call_with_timeout(
+            lambda: stock.analyst_price_targets, label=f"{ticker}.analyst_price_targets"
+        )
         if targets is not None and not (hasattr(targets, "empty") and targets.empty):
             if isinstance(targets, dict):
                 for k, v in targets.items():
@@ -221,7 +223,7 @@ def _analyst_estimates_section(ticker: str, cache: YahooLookupCache) -> tuple[st
         logger.debug("analyst_price_targets unavailable", exc_info=True)
 
     try:
-        ee = stock.earnings_estimate
+        ee = call_with_timeout(lambda: stock.earnings_estimate, label=f"{ticker}.earnings_estimate")
         if ee is not None and not (hasattr(ee, "empty") and ee.empty):
             lines.append("  -- EPS Estimates --")
             lines.append(f"  {ee.to_string()}")
@@ -229,7 +231,7 @@ def _analyst_estimates_section(ticker: str, cache: YahooLookupCache) -> tuple[st
         logger.debug("earnings_estimate unavailable", exc_info=True)
 
     try:
-        re = stock.revenue_estimate
+        re = call_with_timeout(lambda: stock.revenue_estimate, label=f"{ticker}.revenue_estimate")
         if re is not None and not (hasattr(re, "empty") and re.empty):
             lines.append("  -- Revenue Estimates --")
             lines.append(f"  {re.to_string()}")
@@ -237,7 +239,7 @@ def _analyst_estimates_section(ticker: str, cache: YahooLookupCache) -> tuple[st
         logger.debug("revenue_estimate unavailable", exc_info=True)
 
     try:
-        et = stock.earnings_trend
+        et = call_with_timeout(lambda: stock.earnings_trend, label=f"{ticker}.earnings_trend")
         if et is not None and not (hasattr(et, "empty") and et.empty):
             lines.append("  -- Earnings Trend (Revisions) --")
             lines.append(f"  {et.to_string()}")
@@ -245,7 +247,7 @@ def _analyst_estimates_section(ticker: str, cache: YahooLookupCache) -> tuple[st
         logger.debug("earnings_trend unavailable", exc_info=True)
 
     try:
-        ge = stock.growth_estimates
+        ge = call_with_timeout(lambda: stock.growth_estimates, label=f"{ticker}.growth_estimates")
         if ge is not None and not (hasattr(ge, "empty") and ge.empty):
             lines.append("  -- Growth Estimates --")
             lines.append(f"  {ge.to_string()}")
@@ -448,8 +450,12 @@ def _price_history_section(ticker: str, cache: YahooLookupCache) -> tuple[str, L
     stock = yf.Ticker(ticker)
 
     try:
-        daily = stock.history(period="2y", interval="1d")
-        weekly = stock.history(period="2y", interval="1wk")
+        daily = call_with_timeout(
+            lambda: stock.history(period="2y", interval="1d"), label=f"{ticker}.history(1d)"
+        )
+        weekly = call_with_timeout(
+            lambda: stock.history(period="2y", interval="1wk"), label=f"{ticker}.history(1wk)"
+        )
     except Exception:
         logger.debug("Price history unavailable for %s", ticker, exc_info=True)
         return "", []
@@ -688,7 +694,9 @@ def _macro_section(
                 if price is not None:
                     lines.append(f"  {label}: {float(price):,.2f}")
                 t = yf.Ticker(sym)
-                hist = t.history(period="ytd")
+                hist = call_with_timeout(
+                    lambda: t.history(period="ytd"), label=f"{sym}.history(ytd)"
+                )
                 if not hist.empty and len(hist) > 1:
                     ytd_ret = float(hist["Close"].iloc[-1]) / float(hist["Close"].iloc[0]) - 1
                     lines.append(f"  {label} YTD: {ytd_ret * 100:+.1f}%")
@@ -701,7 +709,9 @@ def _macro_section(
             etf_sym = SECTOR_ETF_MAP.get(sec)
             if etf_sym:
                 etf = yf.Ticker(etf_sym)
-                hist = etf.history(period="ytd")
+                hist = call_with_timeout(
+                    lambda: etf.history(period="ytd"), label=f"{etf_sym}.history(ytd)"
+                )
                 if not hist.empty and len(hist) > 1:
                     ytd = float(hist["Close"].iloc[-1]) / float(hist["Close"].iloc[0]) - 1
                     lines.append(f"  Sector ETF ({etf_sym} - {sec}) YTD: {ytd * 100:+.1f}%")

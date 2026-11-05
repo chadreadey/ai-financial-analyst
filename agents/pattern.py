@@ -91,7 +91,12 @@ def _compute_risk_metrics(ticker: str) -> Optional[str]:
         import yfinance as yf
         import numpy as np
 
-        hist = yf.Ticker(ticker).history(period="2y", interval="1d")
+        from yahoo_cache import call_with_timeout
+
+        hist = call_with_timeout(
+            lambda: yf.Ticker(ticker).history(period="2y", interval="1d"),
+            label=f"{ticker}.history(2y)",
+        )
         if hist.empty or len(hist) < 60:
             return None
 
