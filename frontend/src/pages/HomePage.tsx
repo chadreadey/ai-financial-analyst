@@ -1,19 +1,13 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import {
-  EXAMPLE_TICKERS,
-  fetchShowcaseIndex,
-  formatCompanyName,
-  resolveTickerRoute,
-  type ShowcaseIndexEntry,
-} from "@/lib/showcase";
+import { Link } from "react-router-dom";
+import { QuantEnginePanel } from "@/components/public/QuantEnginePanel";
+import { TickerForm } from "@/components/public/TickerForm";
+import { fetchShowcaseIndex, formatCompanyName, type ShowcaseIndexEntry } from "@/lib/showcase";
 
 const PITCH =
-  "Enter a ticker; six LLM analyst agents work in parallel and a synthesis agent reconciles them into one investment brief.";
+  "Enter a ticker; six LLM analyst agents work in parallel and a synthesis agent reconciles them into one investment brief. A separate quant engine ranks the universe and is what gets backtested.";
 
 export function HomePage() {
-  const navigate = useNavigate();
-  const [ticker, setTicker] = useState("");
   const [examples, setExamples] = useState<ShowcaseIndexEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,41 +19,23 @@ export function HomePage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (loading || !ticker.trim()) return;
-    const known = error ? EXAMPLE_TICKERS : examples.map((x) => x.ticker);
-    navigate(resolveTickerRoute(ticker, known));
-  };
-
   return (
     <div className="space-y-10">
       <section className="space-y-4">
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">AI Financial Analyst</h1>
         <p className="max-w-2xl text-muted-foreground">{PITCH}</p>
-        <form onSubmit={onSubmit} className="flex gap-2 max-w-md">
-          <input
-            value={ticker}
-            onChange={(e) => setTicker(e.target.value)}
-            placeholder="Ticker, e.g. NVDA"
-            aria-label="Ticker"
-            autoCapitalize="characters"
-            className="flex-1 min-w-0 rounded-md border border-border bg-secondary px-3 py-2 text-sm uppercase placeholder:normal-case focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-          <button
-            type="submit"
-            disabled={loading}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-          >
-            Analyze
-          </button>
-        </form>
+        <TickerForm examples={examples} loading={loading} error={error} />
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Example briefs
-        </h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Example briefs
+          </h2>
+          <span className="text-xs text-muted-foreground">
+            LLM layer · cached runs, no live API call
+          </span>
+        </div>
         {loading && <p className="text-sm text-muted-foreground">Loading examples...</p>}
         {error && <p className="text-sm text-muted-foreground">{error}</p>}
         <div className="grid gap-3 sm:grid-cols-2">
@@ -96,6 +72,8 @@ export function HomePage() {
           ))}
         </div>
       </section>
+
+      <QuantEnginePanel />
     </div>
   );
 }
