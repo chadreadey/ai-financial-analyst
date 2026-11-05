@@ -18,6 +18,9 @@ export function PublicLayout() {
             AI Financial Analyst
           </Link>
           <nav className="flex items-center gap-4 sm:gap-6">
+            <NavLink to="/run" className={navClass}>
+              Analyze
+            </NavLink>
             <NavLink to="/" end className={navClass}>
               Examples
             </NavLink>
