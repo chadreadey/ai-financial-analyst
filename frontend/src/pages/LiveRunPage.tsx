@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { BriefView } from "@/components/brief/BriefView";
 import { ProgressStream } from "@/components/analysis/ProgressStream";
+import { TickerForm } from "@/components/public/TickerForm";
 import { useAnalysis } from "@/hooks/useAnalysis";
 import { parseApiError } from "@/lib/brief";
 
@@ -17,7 +18,26 @@ export function LiveRunPage() {
     run({ ticker });
   }, [ticker, run]);
 
-  if (!ticker) return <p className="text-sm text-muted-foreground">Pick a ticker from the home page.</p>;
+  if (!ticker) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Analyze a ticker</h1>
+        <p className="max-w-2xl text-sm text-muted-foreground">
+          Six analyst agents run in parallel and a synthesis agent reconciles them into one brief.
+          Example tickers open a cached brief instantly; anything else runs live and takes a few
+          minutes.
+        </p>
+        <TickerForm autoFocus />
+        <p className="text-xs text-muted-foreground">
+          Not sure what to try?{" "}
+          <Link to="/" className="text-primary underline-offset-4 hover:underline">
+            Browse the example briefs
+          </Link>
+          .
+        </p>
+      </div>
+    );
+  }
 
   if (error) {
     const { status, detail } = parseApiError(error);
